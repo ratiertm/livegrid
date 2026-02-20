@@ -1,0 +1,51 @@
+{
+  "timestamp": "2026-02-20T14:05:24.778Z",
+  "reason": "compaction",
+  "status": {
+    "version": "2.0",
+    "lastUpdated": "2026-02-20T13:41:40.088Z",
+    "activeFeatures": [
+      "js"
+    ],
+    "primaryFeature": "js",
+    "features": {
+      "js": {
+        "phase": "do",
+        "phaseNumber": 3,
+        "matchRate": null,
+        "iterationCount": 0,
+        "requirements": [],
+        "documents": {},
+        "timestamps": {
+          "started": "2026-02-20T13:24:59.538Z",
+          "lastUpdated": "2026-02-20T13:41:40.088Z"
+        },
+        "lastFile": "/Users/leeeunmi/Projects/active/liveview_grid/assets/js/app.js"
+      }
+    },
+    "pipeline": {
+      "currentPhase": 1,
+      "level": "Dynamic",
+      "phaseHistory": []
+    },
+    "session": {
+      "startedAt": "2026-02-20T12:15:09.816Z",
+      "onboardingCompleted": false,
+      "lastActivity": "2026-02-20T13:41:40.088Z"
+    },
+    "history": [
+      {
+        "timestamp": "2026-02-20T13:24:59.538Z",
+        "feature": "js",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-02-20T13:41:40.088Z",
+        "feature": "js",
+        "phase": "do",
+        "action": "updated"
+      }
+    ]
+  }
+}
