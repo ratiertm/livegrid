@@ -124,6 +124,27 @@ defmodule LiveviewGridWeb.GridComponent do
   end
 
   @impl true
+  def handle_event("grid_toggle_filter", _params, socket) do
+    grid = socket.assigns.grid
+    show = !grid.state.show_filter_row
+
+    updated_grid = if show do
+      put_in(grid.state.show_filter_row, true)
+    else
+      # 숨길 때 필터 값도 초기화
+      grid
+      |> put_in([:state, :show_filter_row], false)
+      |> put_in([:state, :filters], %{})
+      |> put_in([:state, :pagination, :current_page], 1)
+      |> put_in([:state, :scroll_offset], 0)
+    end
+
+    socket = assign(socket, grid: updated_grid)
+    socket = if !show, do: push_event(socket, "reset_virtual_scroll", %{}), else: socket
+    {:noreply, socket}
+  end
+
+  @impl true
   def handle_event("grid_filter", %{"field" => field, "value" => value}, socket) do
     grid = socket.assigns.grid
     field_atom = String.to_atom(field)
@@ -188,15 +209,25 @@ defmodule LiveviewGridWeb.GridComponent do
       <!-- Header -->
       <%= if @grid.options.show_header do %>
         <div class="lv-grid__header">
-          <!-- 체크박스 컬럼 -->
-          <div class="lv-grid__header-cell" style="width: 50px; flex: 0 0 50px; justify-content: center;">
-            <input 
-              type="checkbox" 
+          <!-- 체크박스 + 필터 토글 컬럼 -->
+          <div class="lv-grid__header-cell" style="width: 50px; flex: 0 0 50px; justify-content: center; gap: 4px;">
+            <input
+              type="checkbox"
               phx-click="grid_select_all"
               phx-target={@myself}
               checked={@grid.state.selection.select_all}
               style="width: 18px; height: 18px; cursor: pointer;"
             />
+            <%= if has_filterable_columns?(@grid.columns) do %>
+              <button
+                class={"lv-grid__filter-toggle #{if @grid.state.show_filter_row, do: "lv-grid__filter-toggle--active"}"}
+                phx-click="grid_toggle_filter"
+                phx-target={@myself}
+                title={if @grid.state.show_filter_row, do: "필터 숨기기", else: "필터 표시"}
+              >
+                ▼
+              </button>
+            <% end %>
           </div>
           
           <%= for column <- @grid.columns do %>
@@ -220,7 +251,7 @@ defmodule LiveviewGridWeb.GridComponent do
       <% end %>
 
       <!-- Filter Row -->
-      <%= if has_filterable_columns?(@grid.columns) do %>
+      <%= if @grid.state.show_filter_row && has_filterable_columns?(@grid.columns) do %>
         <div class="lv-grid__filter-row">
           <!-- 체크박스 컬럼 빈칸 -->
           <div class="lv-grid__filter-cell" style="width: 50px; flex: 0 0 50px;">

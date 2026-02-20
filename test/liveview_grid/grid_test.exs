@@ -310,9 +310,10 @@ defmodule LiveViewGrid.GridTest do
       assert Enum.all?(visible, fn row -> row.city == "서울" end)
     end
 
-    test "initial_state에 filters 포함" do
+    test "initial_state에 filters와 show_filter_row 포함" do
       grid = Grid.new(data: [], columns: [%{field: :id, label: "ID"}])
       assert grid.state.filters == %{}
+      assert grid.state.show_filter_row == false
     end
   end
 end

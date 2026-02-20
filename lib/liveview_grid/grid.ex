@@ -123,6 +123,7 @@ defmodule LiveViewGrid.Grid do
     %{
       sort: nil,
       filters: %{},
+      show_filter_row: false,
       pagination: %{
         current_page: 1,
         total_rows: 0

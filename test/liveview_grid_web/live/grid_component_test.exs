@@ -52,25 +52,45 @@ defmodule LiveviewGridWeb.GridComponentTest do
       assert html =~ "grid_row_select"
     end
 
-    test "filter row renders for filterable columns", %{conn: conn} do
-      {:ok, _view, html} = live(conn, "/demo")
+    test "filter row hidden by default, shown after toggle", %{conn: conn} do
+      {:ok, view, html} = live(conn, "/demo")
 
-      # 필터 행이 렌더링되는지 확인
+      # 초기 상태: 필터 행 숨김
+      refute html =~ "lv-grid__filter-row"
+
+      # 필터 토글 버튼 클릭
+      view |> element("[phx-click=\"grid_toggle_filter\"]") |> render_click()
+      html = render(view)
+
+      # 필터 행이 표시됨
       assert html =~ "lv-grid__filter-row"
       assert html =~ "lv-grid__filter-input"
       assert html =~ "grid_filter"
     end
 
-    test "filter input has correct placeholder for text columns", %{conn: conn} do
-      {:ok, _view, html} = live(conn, "/demo")
+    test "filter row has correct placeholders after toggle", %{conn: conn} do
+      {:ok, view, _html} = live(conn, "/demo")
+
+      # 필터 토글
+      view |> element("[phx-click=\"grid_toggle_filter\"]") |> render_click()
+      html = render(view)
 
       assert html =~ "검색..."
+      assert html =~ "예: &gt;30, &lt;=25"
     end
 
-    test "filter input has correct placeholder for number columns", %{conn: conn} do
-      {:ok, _view, html} = live(conn, "/demo")
+    test "filter toggle hides row and clears filters", %{conn: conn} do
+      {:ok, view, _html} = live(conn, "/demo")
 
-      assert html =~ "예: &gt;30, &lt;=25"
+      # 필터 열기
+      view |> element("[phx-click=\"grid_toggle_filter\"]") |> render_click()
+      html = render(view)
+      assert html =~ "lv-grid__filter-row"
+
+      # 필터 닫기
+      view |> element("[phx-click=\"grid_toggle_filter\"]") |> render_click()
+      html = render(view)
+      refute html =~ "lv-grid__filter-row"
     end
   end
 end
