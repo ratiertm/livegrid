@@ -229,6 +229,12 @@ defmodule LiveviewGridWeb.GridComponent do
   end
 
   @impl true
+  def handle_event("cell_edit_save", _params, %{assigns: %{grid: %{state: %{editing: nil}}}} = socket) do
+    # 이미 취소된 상태 (Esc 후 blur 이벤트) → 무시
+    {:noreply, socket}
+  end
+
+  @impl true
   def handle_event("cell_edit_save", %{"row-id" => row_id, "field" => field, "value" => value}, socket) do
     grid = socket.assigns.grid
     row_id_int = String.to_integer(row_id)
@@ -576,9 +582,10 @@ defmodule LiveviewGridWeb.GridComponent do
       ~H"""
       <span
         class={"lv-grid__cell-value #{if @column.editable, do: "lv-grid__cell-value--editable"}"}
-        phx-dblclick={if @column.editable, do: "cell_edit_start"}
-        phx-value-row-id={@row.id}
-        phx-value-field={@column.field}
+        id={if @column.editable, do: "cell-#{@row.id}-#{@column.field}"}
+        phx-hook={if @column.editable, do: "CellEditable"}
+        data-row-id={@row.id}
+        data-field={@column.field}
         phx-target={@myself}
       >
         <%= Map.get(@row, @column.field) %>

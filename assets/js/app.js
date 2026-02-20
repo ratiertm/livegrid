@@ -186,6 +186,21 @@ Hooks.VirtualScroll = {
   }
 }
 
+// Cell Editable Hook (더블클릭으로 편집 모드 진입)
+Hooks.CellEditable = {
+  mounted() {
+    this.el.addEventListener("dblclick", () => {
+      const rowId = this.el.dataset.rowId
+      const field = this.el.dataset.field
+      const target = this.el.getAttribute("phx-target")
+      this.pushEventTo(target, "cell_edit_start", {
+        "row-id": rowId,
+        "field": field
+      })
+    })
+  }
+}
+
 // Cell Editor Hook (인라인 셀 편집 - 자동 포커스 & 텍스트 선택)
 Hooks.CellEditor = {
   mounted() {
