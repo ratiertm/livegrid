@@ -435,4 +435,68 @@ defmodule LiveViewGrid.GridTest do
       assert length(visible) == 5
     end
   end
+
+  describe "행 상태 추적 (row status)" do
+    setup do
+      data = [
+        %{id: 1, name: "Alice", age: 30},
+        %{id: 2, name: "Bob", age: 25},
+        %{id: 3, name: "Charlie", age: 35}
+      ]
+      columns = [
+        %{field: :name, label: "이름", editable: true},
+        %{field: :age, label: "나이", editable: true, editor_type: :number}
+      ]
+      grid = Grid.new(data: data, columns: columns)
+      %{grid: grid}
+    end
+
+    test "initial_state에 row_statuses와 show_status_column 포함" do
+      grid = Grid.new(data: [], columns: [%{field: :id, label: "ID"}])
+      assert grid.state.row_statuses == %{}
+      assert grid.state.show_status_column == true
+    end
+
+    test "update_cell이 자동으로 :updated 마킹", %{grid: grid} do
+      updated = Grid.update_cell(grid, 1, :name, "Alice Updated")
+      assert Grid.row_status(updated, 1) == :updated
+      assert Grid.row_status(updated, 2) == :normal
+    end
+
+    test "update_cell은 :new 상태를 덮어쓰지 않음", %{grid: grid} do
+      grid = Grid.mark_row_status(grid, 1, :new)
+      updated = Grid.update_cell(grid, 1, :name, "Alice New")
+      assert Grid.row_status(updated, 1) == :new
+    end
+
+    test "mark_row_status로 상태 설정/해제", %{grid: grid} do
+      grid = Grid.mark_row_status(grid, 2, :deleted)
+      assert Grid.row_status(grid, 2) == :deleted
+      grid = Grid.mark_row_status(grid, 2, :normal)
+      assert Grid.row_status(grid, 2) == :normal
+      refute Map.has_key?(grid.state.row_statuses, 2)
+    end
+
+    test "clear_row_statuses로 모든 상태 초기화", %{grid: grid} do
+      grid = Grid.mark_row_status(grid, 1, :new)
+      grid = Grid.mark_row_status(grid, 2, :updated)
+      grid = Grid.clear_row_statuses(grid)
+      assert grid.state.row_statuses == %{}
+    end
+
+    test "status_counts 정확한 카운트", %{grid: grid} do
+      grid = Grid.mark_row_status(grid, 1, :new)
+      grid = Grid.mark_row_status(grid, 2, :updated)
+      grid = Grid.mark_row_status(grid, 3, :updated)
+      counts = Grid.status_counts(grid)
+      assert counts[:new] == 1
+      assert counts[:updated] == 2
+    end
+
+    test "update_data가 row_statuses 보존", %{grid: grid} do
+      grid = Grid.mark_row_status(grid, 1, :updated)
+      updated = Grid.update_data(grid, grid.data, [%{field: :name, label: "이름"}], %{})
+      assert Grid.row_status(updated, 1) == :updated
+    end
+  end
 end

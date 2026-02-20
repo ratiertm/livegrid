@@ -145,6 +145,13 @@ defmodule LiveviewGridWeb.GridComponent do
   end
 
   @impl true
+  def handle_event("grid_toggle_status_column", _params, socket) do
+    grid = socket.assigns.grid
+    updated_grid = put_in(grid.state.show_status_column, !grid.state.show_status_column)
+    {:noreply, assign(socket, grid: updated_grid)}
+  end
+
+  @impl true
   def handle_event("grid_filter", %{"field" => field, "value" => value}, socket) do
     grid = socket.assigns.grid
     field_atom = String.to_atom(field)
@@ -334,8 +341,23 @@ defmodule LiveviewGridWeb.GridComponent do
                 ▼
               </button>
             <% end %>
+            <button
+              class={"lv-grid__status-toggle #{if @grid.state.show_status_column, do: "lv-grid__status-toggle--active"}"}
+              phx-click="grid_toggle_status_column"
+              phx-target={@myself}
+              title={if @grid.state.show_status_column, do: "상태 컬럼 숨기기", else: "상태 컬럼 표시"}
+            >
+              S
+            </button>
           </div>
-          
+
+          <!-- 상태 컬럼 헤더 -->
+          <%= if @grid.state.show_status_column do %>
+            <div class="lv-grid__header-cell lv-grid__header-cell--status" style="width: 60px; flex: 0 0 60px; justify-content: center;">
+              상태
+            </div>
+          <% end %>
+
           <%= for column <- @grid.columns do %>
             <div 
               class={"lv-grid__header-cell #{if column.sortable, do: "lv-grid__header-cell--sortable"}"}
@@ -362,6 +384,12 @@ defmodule LiveviewGridWeb.GridComponent do
           <!-- 체크박스 컬럼 빈칸 -->
           <div class="lv-grid__filter-cell" style="width: 50px; flex: 0 0 50px;">
           </div>
+
+          <!-- 상태 컬럼 빈칸 -->
+          <%= if @grid.state.show_status_column do %>
+            <div class="lv-grid__filter-cell" style="width: 60px; flex: 0 0 60px;">
+            </div>
+          <% end %>
 
           <%= for column <- @grid.columns do %>
             <div class="lv-grid__filter-cell" style={column_width_style(column)}>
@@ -420,6 +448,11 @@ defmodule LiveviewGridWeb.GridComponent do
                       style="width: 18px; height: 18px; cursor: pointer;"
                     />
                   </div>
+                  <%= if @grid.state.show_status_column do %>
+                    <div class="lv-grid__cell lv-grid__cell--status" style="width: 60px; flex: 0 0 60px; justify-content: center;">
+                      <%= render_status_badge(Map.get(@grid.state.row_statuses, row.id, :normal)) %>
+                    </div>
+                  <% end %>
                   <%= for column <- @grid.columns do %>
                     <div class="lv-grid__cell" style={column_width_style(column)}>
                       <%= render_cell(assigns, row, column) %>
@@ -445,6 +478,11 @@ defmodule LiveviewGridWeb.GridComponent do
                   style="width: 18px; height: 18px; cursor: pointer;"
                 />
               </div>
+              <%= if @grid.state.show_status_column do %>
+                <div class="lv-grid__cell lv-grid__cell--status" style="width: 60px; flex: 0 0 60px; justify-content: center;">
+                  <%= render_status_badge(Map.get(@grid.state.row_statuses, row.id, :normal)) %>
+                </div>
+              <% end %>
               <%= for column <- @grid.columns do %>
                 <div class="lv-grid__cell" style={column_width_style(column)}>
                   <%= render_cell(assigns, row, column) %>
@@ -522,6 +560,12 @@ defmodule LiveviewGridWeb.GridComponent do
               <span style="margin: 0 4px; color: #ccc;">/</span>
             <% end %>
             총 <%= @grid.state.pagination.total_rows %>개
+            <%= if map_size(@grid.state.row_statuses) > 0 do %>
+              <span style="margin: 0 8px; color: #ccc;">|</span>
+              <span style="color: #ff9800; font-weight: 600;">
+                <%= map_size(@grid.state.row_statuses) %>개 변경됨
+              </span>
+            <% end %>
           </div>
         </div>
       <% end %>
@@ -557,6 +601,17 @@ defmodule LiveviewGridWeb.GridComponent do
 
   defp editor_input_type(%{editor_type: :number}), do: "number"
   defp editor_input_type(_column), do: "text"
+
+  defp render_status_badge(:normal), do: ""
+  defp render_status_badge(:new) do
+    Phoenix.HTML.raw(~s(<span class="lv-grid__status-badge lv-grid__status-badge--new">N</span>))
+  end
+  defp render_status_badge(:updated) do
+    Phoenix.HTML.raw(~s(<span class="lv-grid__status-badge lv-grid__status-badge--updated">U</span>))
+  end
+  defp render_status_badge(:deleted) do
+    Phoenix.HTML.raw(~s(<span class="lv-grid__status-badge lv-grid__status-badge--deleted">D</span>))
+  end
 
   defp render_cell(assigns, row, column) do
     if column.editable && editing?(assigns.grid.state.editing, row.id, column.field) do

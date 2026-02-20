@@ -121,7 +121,47 @@ defmodule LiveViewGrid.Grid do
     updated_data = Enum.map(grid.data, fn row ->
       if row.id == row_id, do: Map.put(row, field, value), else: row
     end)
+
+    # 자동으로 :updated 마킹 (단, :new인 행은 :new 유지)
+    current_status = Map.get(grid.state.row_statuses, row_id)
+    updated_statuses = if current_status == :new do
+      grid.state.row_statuses
+    else
+      Map.put(grid.state.row_statuses, row_id, :updated)
+    end
+
     %{grid | data: updated_data}
+    |> put_in([:state, :row_statuses], updated_statuses)
+  end
+
+  @doc "특정 행의 상태를 조회합니다."
+  @spec row_status(grid :: t(), row_id :: any()) :: :normal | :new | :updated | :deleted
+  def row_status(grid, row_id) do
+    Map.get(grid.state.row_statuses, row_id, :normal)
+  end
+
+  @doc "특정 행의 상태를 설정합니다. :normal이면 맵에서 제거합니다."
+  @spec mark_row_status(grid :: t(), row_id :: any(), status :: atom()) :: t()
+  def mark_row_status(grid, row_id, :normal) do
+    put_in(grid.state.row_statuses, Map.delete(grid.state.row_statuses, row_id))
+  end
+  def mark_row_status(grid, row_id, status) when status in [:new, :updated, :deleted] do
+    put_in(grid.state.row_statuses, Map.put(grid.state.row_statuses, row_id, status))
+  end
+
+  @doc "모든 행 상태를 초기화합니다."
+  @spec clear_row_statuses(grid :: t()) :: t()
+  def clear_row_statuses(grid) do
+    put_in(grid.state.row_statuses, %{})
+  end
+
+  @doc "상태별 행 개수를 반환합니다."
+  @spec status_counts(grid :: t()) :: map()
+  def status_counts(grid) do
+    grid.state.row_statuses
+    |> Enum.group_by(fn {_id, status} -> status end)
+    |> Enum.map(fn {status, rows} -> {status, length(rows)} end)
+    |> Map.new()
   end
 
   # Private functions
@@ -159,7 +199,9 @@ defmodule LiveViewGrid.Grid do
         select_all: false
       },
       scroll_offset: 0,
-      editing: nil
+      editing: nil,
+      row_statuses: %{},
+      show_status_column: true
     }
   end
 

@@ -130,5 +130,31 @@ defmodule LiveviewGridWeb.GridComponentTest do
       # 초기 상태: 편집 에디터가 표시되지 않음
       refute html =~ "lv-grid__cell-editor"
     end
+
+    test "status column visible by default", %{conn: conn} do
+      {:ok, _view, html} = live(conn, "/demo")
+      assert html =~ "lv-grid__header-cell--status"
+      assert html =~ "상태"
+    end
+
+    test "status column toggle hides and shows column", %{conn: conn} do
+      {:ok, view, html} = live(conn, "/demo")
+      assert html =~ "lv-grid__header-cell--status"
+
+      # 토글 OFF
+      view |> element("button.lv-grid__status-toggle") |> render_click()
+      html = render(view)
+      refute html =~ "lv-grid__header-cell--status"
+
+      # 토글 ON
+      view |> element("button.lv-grid__status-toggle") |> render_click()
+      html = render(view)
+      assert html =~ "lv-grid__header-cell--status"
+    end
+
+    test "status badge not shown for normal rows", %{conn: conn} do
+      {:ok, _view, html} = live(conn, "/demo")
+      refute html =~ "lv-grid__status-badge"
+    end
   end
 end
