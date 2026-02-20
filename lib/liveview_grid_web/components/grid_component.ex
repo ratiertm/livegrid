@@ -1,0 +1,313 @@
+defmodule LiveviewGridWeb.GridComponent do
+  @moduledoc """
+  LiveView Grid 컴포넌트
+  
+  프로토타입 v0.1-alpha: 최소 기능만 구현
+  """
+  
+  use Phoenix.LiveComponent
+  
+  alias LiveViewGrid.{Grid, Pagination}
+
+  @impl true
+  def mount(socket) do
+    {:ok, socket}
+  end
+
+  @impl true
+  def update(assigns, socket) do
+    grid = if Map.has_key?(socket.assigns, :grid) do
+      # 이후 업데이트: 기존 state(scroll_offset, sort, selection) 보존
+      Grid.update_data(
+        socket.assigns.grid,
+        assigns.data,
+        assigns.columns,
+        Map.get(assigns, :options, %{})
+      )
+    else
+      # 첫 마운트: 새 Grid 생성
+      grid = Grid.new(
+        data: assigns.data,
+        columns: assigns.columns,
+        options: Map.get(assigns, :options, %{})
+      )
+      put_in(grid.state.pagination.total_rows, length(assigns.data))
+    end
+
+    {:ok, assign(socket, grid: grid)}
+  end
+
+  @impl true
+  def handle_event("grid_sort", %{"field" => field, "direction" => direction}, socket) do
+    grid = socket.assigns.grid
+    field_atom = String.to_atom(field)
+    direction_atom = String.to_atom(direction)
+
+    # 정렬 상태 업데이트 + 스크롤 위치 리셋
+    updated_grid = grid
+      |> put_in([:state, :sort], %{field: field_atom, direction: direction_atom})
+      |> put_in([:state, :scroll_offset], 0)
+
+    {:noreply,
+      socket
+      |> assign(grid: updated_grid)
+      |> push_event("reset_virtual_scroll", %{})
+    }
+  end
+
+  @impl true
+  def handle_event("grid_page_change", %{"page" => page}, socket) do
+    grid = socket.assigns.grid
+    page_num = String.to_integer(page)
+    
+    # 페이지 상태 업데이트
+    updated_grid = put_in(grid.state.pagination.current_page, page_num)
+    
+    {:noreply, assign(socket, grid: updated_grid)}
+  end
+
+  @impl true
+  def handle_event("grid_row_select", %{"row-id" => row_id}, socket) do
+    grid = socket.assigns.grid
+    id = String.to_integer(row_id)
+    
+    # 선택 토글
+    selected_ids = grid.state.selection.selected_ids
+    updated_ids = if id in selected_ids do
+      List.delete(selected_ids, id)
+    else
+      [id | selected_ids]
+    end
+    
+    updated_grid = put_in(grid.state.selection.selected_ids, updated_ids)
+    
+    {:noreply, assign(socket, grid: updated_grid)}
+  end
+
+  @impl true
+  def handle_event("grid_select_all", _params, socket) do
+    grid = socket.assigns.grid
+    
+    # 전체 선택/해제 토글
+    if grid.state.selection.select_all do
+      # 전체 해제
+      updated_grid = put_in(grid.state.selection, %{selected_ids: [], select_all: false})
+      {:noreply, assign(socket, grid: updated_grid)}
+    else
+      # 전체 선택
+      all_ids = Enum.map(grid.data, & &1.id)
+      updated_grid = put_in(grid.state.selection, %{selected_ids: all_ids, select_all: true})
+      {:noreply, assign(socket, grid: updated_grid)}
+    end
+  end
+
+  @impl true
+  def handle_event("grid_scroll", %{"scroll_top" => scroll_top}, socket) do
+    grid = socket.assigns.grid
+    row_height = grid.options.row_height
+
+    # scroll_top 안전 파싱 (JS에서 문자열로 전송)
+    scroll_top_num = case Integer.parse(to_string(scroll_top)) do
+      {num, _} -> num
+      :error -> 0
+    end
+
+    scroll_offset = max(0, div(scroll_top_num, row_height))
+    updated_grid = put_in(grid.state.scroll_offset, scroll_offset)
+
+    {:noreply, assign(socket, grid: updated_grid)}
+  end
+
+  @impl true
+  def render(assigns) do
+    ~H"""
+    <div class="lv-grid">
+      <!-- Header -->
+      <%= if @grid.options.show_header do %>
+        <div class="lv-grid__header">
+          <!-- 체크박스 컬럼 -->
+          <div class="lv-grid__header-cell" style="width: 50px; flex: 0 0 50px; justify-content: center;">
+            <input 
+              type="checkbox" 
+              phx-click="grid_select_all"
+              phx-target={@myself}
+              checked={@grid.state.selection.select_all}
+              style="width: 18px; height: 18px; cursor: pointer;"
+            />
+          </div>
+          
+          <%= for column <- @grid.columns do %>
+            <div 
+              class={"lv-grid__header-cell #{if column.sortable, do: "lv-grid__header-cell--sortable"}"}
+              style={column_width_style(column)}
+              phx-click={if column.sortable, do: "grid_sort"}
+              phx-value-field={column.field}
+              phx-value-direction={next_direction(@grid.state.sort, column.field)}
+              phx-target={@myself}
+            >
+              <%= column.label %>
+              <%= if column.sortable && sort_active?(@grid.state.sort, column.field) do %>
+                <span class="lv-grid__sort-icon">
+                  <%= sort_icon(@grid.state.sort.direction) %>
+                </span>
+              <% end %>
+            </div>
+          <% end %>
+        </div>
+      <% end %>
+
+      <!-- Body -->
+      <%= if @grid.options.virtual_scroll do %>
+        <!-- Virtual Scroll Body -->
+        <div
+          class="lv-grid__body lv-grid__body--virtual"
+          id={"#{@grid.id}-virtual-body"}
+          phx-hook="VirtualScroll"
+          data-row-height={@grid.options.row_height}
+          style="max-height: 600px; overflow-y: auto;"
+        >
+          <!-- 전체 높이 스페이서 (스크롤바 크기 결정) -->
+          <div style={"height: #{length(@grid.data) * @grid.options.row_height}px; position: relative;"}>
+            <!-- 보이는 행만 올바른 위치에 렌더링 -->
+            <div style={"position: absolute; top: #{Grid.virtual_offset_top(@grid)}px; width: 100%;"}>
+              <%= for row <- Grid.visible_data(@grid) do %>
+                <div class={"lv-grid__row #{if row.id in @grid.state.selection.selected_ids, do: "lv-grid__row--selected"}"}>
+                  <div class="lv-grid__cell" style="width: 50px; flex: 0 0 50px; justify-content: center;">
+                    <input
+                      type="checkbox"
+                      phx-click="grid_row_select"
+                      phx-value-row-id={row.id}
+                      phx-target={@myself}
+                      checked={row.id in @grid.state.selection.selected_ids}
+                      style="width: 18px; height: 18px; cursor: pointer;"
+                    />
+                  </div>
+                  <%= for column <- @grid.columns do %>
+                    <div class="lv-grid__cell" style={column_width_style(column)}>
+                      <%= Map.get(row, column.field) %>
+                    </div>
+                  <% end %>
+                </div>
+              <% end %>
+            </div>
+          </div>
+        </div>
+      <% else %>
+        <!-- 기본 Body (페이징 방식) -->
+        <div class="lv-grid__body" style="max-height: 600px; overflow-y: auto;">
+          <%= for row <- Grid.visible_data(@grid) do %>
+            <div class={"lv-grid__row #{if row.id in @grid.state.selection.selected_ids, do: "lv-grid__row--selected"}"}>
+              <div class="lv-grid__cell" style="width: 50px; flex: 0 0 50px; justify-content: center;">
+                <input
+                  type="checkbox"
+                  phx-click="grid_row_select"
+                  phx-value-row-id={row.id}
+                  phx-target={@myself}
+                  checked={row.id in @grid.state.selection.selected_ids}
+                  style="width: 18px; height: 18px; cursor: pointer;"
+                />
+              </div>
+              <%= for column <- @grid.columns do %>
+                <div class="lv-grid__cell" style={column_width_style(column)}>
+                  <%= Map.get(row, column.field) %>
+                </div>
+              <% end %>
+            </div>
+          <% end %>
+        </div>
+      <% end %>
+
+      <!-- 디버깅: 보이는 데이터 개수 (debug 옵션으로 토글) -->
+      <%= if @grid.options.debug do %>
+        <div style="padding: 10px; background: #fff9c4; border: 1px solid #fbc02d; margin: 10px 0; font-size: 12px;">
+          전체 데이터 <%= length(@grid.data) %>개 |
+          화면 표시 <%= length(Grid.visible_data(@grid)) %>개 |
+          현재 페이지 <%= @grid.state.pagination.current_page %> |
+          페이지 크기 <%= @grid.options.page_size %> |
+          Virtual Scroll <%= if @grid.options.virtual_scroll, do: "ON (offset: #{@grid.state.scroll_offset})", else: "OFF" %>
+        </div>
+      <% end %>
+      
+      <!-- Footer -->
+      <%= if @grid.options.show_footer do %>
+        <div class="lv-grid__footer">
+          <%= if !@grid.options.virtual_scroll do %>
+            <div class="lv-grid__pagination">
+              <!-- 이전 버튼 -->
+              <button
+                class="lv-grid__page-btn"
+                phx-click="grid_page_change"
+                phx-value-page={@grid.state.pagination.current_page - 1}
+                phx-target={@myself}
+                disabled={@grid.state.pagination.current_page == 1}
+              >
+                &lt;
+              </button>
+
+              <!-- 페이지 번호 -->
+              <%= for page <- page_range(@grid.state.pagination, @grid.options.page_size) do %>
+                <button
+                  class={"lv-grid__page-btn #{if page == @grid.state.pagination.current_page, do: "lv-grid__page-btn--current"}"}
+                  phx-click="grid_page_change"
+                  phx-value-page={page}
+                  phx-target={@myself}
+                >
+                  <%= page %>
+                </button>
+              <% end %>
+
+              <!-- 다음 버튼 -->
+              <button
+                class="lv-grid__page-btn"
+                phx-click="grid_page_change"
+                phx-value-page={@grid.state.pagination.current_page + 1}
+                phx-target={@myself}
+                disabled={@grid.state.pagination.current_page >= Pagination.total_pages(@grid.state.pagination.total_rows, @grid.options.page_size)}
+              >
+                &gt;
+              </button>
+            </div>
+          <% end %>
+
+          <div class="lv-grid__info">
+            <%= if length(@grid.state.selection.selected_ids) > 0 do %>
+              <span style="color: #2196f3; font-weight: 600;">
+                <%= length(@grid.state.selection.selected_ids) %>개 선택됨
+              </span>
+              <span style="margin: 0 8px; color: #ccc;">|</span>
+            <% end %>
+            총 <%= @grid.state.pagination.total_rows %>개
+          </div>
+        </div>
+      <% end %>
+    </div>
+    """
+  end
+
+  # Helper functions
+
+  defp column_width_style(%{width: :auto}), do: "flex: 1"
+  defp column_width_style(%{width: width}), do: "width: #{width}px; flex: 0 0 #{width}px"
+
+  defp sort_active?(nil, _field), do: false
+  defp sort_active?(%{field: sort_field}, field), do: sort_field == field
+
+  defp sort_icon(:asc), do: "▲"
+  defp sort_icon(:desc), do: "▼"
+
+  defp next_direction(nil, _field), do: "asc"
+  defp next_direction(%{field: sort_field, direction: :asc}, field) when sort_field == field, do: "desc"
+  defp next_direction(%{field: sort_field, direction: :desc}, field) when sort_field == field, do: "asc"
+  defp next_direction(_sort, _field), do: "asc"
+
+  defp page_range(pagination, page_size) do
+    total = Pagination.total_pages(pagination.total_rows, page_size)
+    current = pagination.current_page
+    
+    # 간단한 페이지 범위 (최대 5개)
+    start = max(1, current - 2)
+    finish = min(total, current + 2)
+    
+    start..finish
+  end
+end

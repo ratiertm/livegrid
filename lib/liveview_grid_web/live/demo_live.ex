@@ -1,0 +1,375 @@
+defmodule LiveviewGridWeb.DemoLive do
+  @moduledoc """
+  LiveView Grid 데모 페이지
+  
+  프로토타입 v0.1-alpha
+  """
+  
+  use Phoenix.LiveView
+
+  @impl true
+  def mount(_params, _session, socket) do
+    all_users = generate_sample_data(50)
+    {:ok, assign(socket,
+      all_users: all_users,
+      filtered_users: all_users,
+      visible_users: Enum.take(all_users, 100),
+      data_count: 50,
+      search_query: "",
+      page_size: 10,
+      loaded_count: min(100, length(all_users)),
+      virtual_scroll: false
+    )}
+  end
+
+  @impl true
+  def handle_event("change_data_count", %{"count" => count}, socket) do
+    count_num = String.to_integer(count)
+    all_users = generate_sample_data(count_num)
+    filtered = filter_users(all_users, socket.assigns.search_query)
+    visible = Enum.take(filtered, 100)
+    
+    socket = assign(socket, 
+      all_users: all_users,
+      filtered_users: filtered,
+      visible_users: visible,
+      data_count: count_num,
+      loaded_count: min(100, length(filtered))
+    )
+    
+    # 스크롤 상태 리셋 (새로운 데이터니까 다시 로드 가능)
+    {:noreply, push_event(socket, "reset_scroll", %{})}
+  end
+
+  @impl true
+  def handle_event("search", %{"value" => query}, socket) do
+    filtered = filter_users(socket.assigns.all_users, query)
+    visible = Enum.take(filtered, 100)
+    
+    socket = assign(socket, 
+      filtered_users: filtered,
+      visible_users: visible,
+      search_query: query,
+      loaded_count: min(100, length(filtered))
+    )
+    
+    # 스크롤 상태 리셋
+    {:noreply, push_event(socket, "reset_scroll", %{})}
+  end
+
+  @impl true
+  def handle_event("clear_search", _params, socket) do
+    {:noreply, assign(socket, 
+      filtered_users: socket.assigns.all_users,
+      search_query: ""
+    )}
+  end
+
+  @impl true
+  def handle_event("change_page_size", %{"size" => size}, socket) do
+    {:noreply, assign(socket, page_size: String.to_integer(size))}
+  end
+
+  @impl true
+  def handle_event("load_more", _params, socket) do
+    current_loaded = socket.assigns.loaded_count
+    total = length(socket.assigns.filtered_users)
+    
+    require Logger
+    Logger.info("📥 load_more 이벤트 수신: #{current_loaded}/#{total}")
+    
+    # 이미 모두 로드했으면 무시
+    if current_loaded >= total do
+      Logger.info("⛔ 이미 모든 데이터 로드됨 - no_more_data 전송")
+      # JavaScript에 더 이상 데이터 없음을 알림
+      {:noreply, push_event(socket, "no_more_data", %{})}
+    else
+      # 다음 100개 추가 로드
+      new_loaded = min(current_loaded + 100, total)
+      visible = Enum.take(socket.assigns.filtered_users, new_loaded)
+      
+      Logger.info("✅ 데이터 추가 로드: #{current_loaded} → #{new_loaded} (visible_users: #{length(visible)}개)")
+      
+      socket = assign(socket, 
+        visible_users: visible,
+        loaded_count: new_loaded
+      )
+      
+      # 모두 로드되었으면 알림
+      if new_loaded >= total do
+        Logger.info("🎉 모든 데이터 로드 완료 - no_more_data 전송")
+        {:noreply, push_event(socket, "no_more_data", %{})}
+      else
+        Logger.info("🔄 아직 더 로드 가능 (남은: #{total - new_loaded}개)")
+        {:noreply, socket}
+      end
+    end
+  end
+
+  @impl true
+  def handle_event("toggle_virtual_scroll", _params, socket) do
+    {:noreply, assign(socket, virtual_scroll: !socket.assigns.virtual_scroll)}
+  end
+
+  @impl true
+  def handle_event("export_csv", %{"type" => type}, socket) do
+    data = case type do
+      "all" -> socket.assigns.all_users
+      "filtered" -> socket.assigns.filtered_users
+      "selected" -> get_selected_users(socket)
+    end
+    
+    csv_content = generate_csv(data)
+    filename = "liveview_grid_#{type}_#{DateTime.utc_now() |> DateTime.to_unix()}.csv"
+    
+    {:noreply, push_event(socket, "download_csv", %{content: csv_content, filename: filename})}
+  end
+
+  defp get_selected_users(_socket) do
+    # GridComponent의 선택 상태를 가져올 수 없으므로 임시로 빈 리스트
+    # 실제로는 선택 상태를 DemoLive로 전달해야 함
+    []
+  end
+
+  defp generate_csv([]), do: "데이터가 없습니다"
+  defp generate_csv(data) when is_list(data) and length(data) > 0 do
+    # UTF-8 BOM 추가 (Excel에서 한글 깨짐 방지)
+    bom = <<0xEF, 0xBB, 0xBF>>
+    
+    # 헤더
+    headers = ["ID", "이름", "이메일", "나이", "도시"]
+    header_line = Enum.join(headers, ",")
+    
+    # 데이터 행
+    rows = Enum.map(data, fn user ->
+      [user.id, user.name, user.email, user.age, user.city]
+      |> Enum.map(&to_string/1)
+      |> Enum.map(&escape_csv/1)
+      |> Enum.join(",")
+    end)
+    
+    csv_content = [header_line | rows]
+    |> Enum.join("\n")
+    
+    # BOM + CSV
+    bom <> csv_content
+  end
+
+  defp escape_csv(value) do
+    value = to_string(value)
+    if String.contains?(value, [",", "\"", "\n"]) do
+      "\"#{String.replace(value, "\"", "\"\"")}\""
+    else
+      value
+    end
+  end
+
+  @impl true
+  def render(assigns) do
+    ~H"""
+    <div style="padding: 20px;">
+      <h1>LiveView Grid 프로토타입 v0.1-alpha</h1>
+      <p>기본 기능: 정렬 + 페이징 + Virtual Scrolling</p>
+      
+      <!-- 데이터 상태 표시 -->
+      <div style="margin: 10px 0; padding: 10px; background: #e1f5fe; border-left: 4px solid #03a9f4; border-radius: 4px;">
+        <strong>📊 현재 데이터:</strong> 
+        전체 <span style="color: #03a9f4; font-weight: 600; font-size: 18px;"><%= length(@all_users) %>개</span>
+        <%= if @search_query != "" do %>
+          / 검색 결과 <span style="color: #ff9800; font-weight: 600; font-size: 18px;"><%= length(@filtered_users) %>개</span>
+        <% end %>
+        <span style="margin-left: 20px; padding: 5px 10px; background: #4caf50; color: white; border-radius: 3px; font-size: 12px;">
+          로드됨: <%= @loaded_count %>개 / <%= length(@filtered_users) %>개
+        </span>
+      </div>
+      
+      <!-- 검색 기능 -->
+      <div style="margin: 20px 0; padding: 15px; background: #e3f2fd; border-radius: 4px; border-left: 4px solid #2196f3;">
+        <form phx-submit="search" style="display: flex; align-items: center; gap: 10px;">
+          <label style="font-weight: 600;">🔍 전체 검색:</label>
+          <input 
+            type="text" 
+            name="value"
+            value={@search_query}
+            placeholder="이름, 이메일, 도시로 검색..."
+            style="flex: 1; padding: 10px 15px; border: 2px solid #2196f3; border-radius: 4px; font-size: 14px;"
+          />
+          <button 
+            type="submit"
+            style="padding: 10px 24px; background: #2196f3; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: 600; font-size: 14px;"
+          >
+            검색
+          </button>
+          <%= if @search_query != "" do %>
+            <button 
+              type="button"
+              phx-click="clear_search"
+              style="padding: 10px 20px; background: #f44336; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: 600;"
+            >
+              ✕ 초기화
+            </button>
+          <% end %>
+        </form>
+        <div style="margin-top: 10px; font-size: 13px; color: #666;">
+          <%= if @search_query != "" do %>
+            <strong style="color: #2196f3;"><%= length(@filtered_users) %>개</strong> 검색됨 
+            (전체 <%= length(@all_users) %>개 중)
+          <% else %>
+            전체 <strong><%= length(@all_users) %>개</strong> 표시 중
+          <% end %>
+        </div>
+      </div>
+      
+      <!-- Export 기능 -->
+      <div style="margin: 20px 0; padding: 15px; background: #f1f8e9; border-radius: 4px; border-left: 4px solid #8bc34a;">
+        <div style="display: flex; align-items: center; justify-content: space-between;">
+          <div>
+            <label style="font-weight: 600; margin-right: 15px;">📥 데이터 내보내기 (CSV):</label>
+          </div>
+          <div style="display: flex; gap: 10px;">
+            <button 
+              phx-click="export_csv" 
+              phx-value-type="all"
+              style="padding: 10px 20px; background: #8bc34a; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: 600;"
+            >
+              전체 (<%= length(@all_users) %>개)
+            </button>
+            <%= if @search_query != "" do %>
+              <button 
+                phx-click="export_csv" 
+                phx-value-type="filtered"
+                style="padding: 10px 20px; background: #2196f3; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: 600;"
+              >
+                검색 결과 (<%= length(@filtered_users) %>개)
+              </button>
+            <% end %>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Virtual Scroll 토글 -->
+      <div style="margin: 20px 0; padding: 15px; background: #fff3e0; border-radius: 4px; border-left: 4px solid #ff9800;">
+        <div style="display: flex; align-items: center; justify-content: space-between;">
+          <div>
+            <label style="font-weight: 600;">Virtual Scrolling:</label>
+            <span style="margin-left: 10px; color: #666; font-size: 13px;">
+              <%= if @virtual_scroll do %>
+                ON - 보이는 행만 렌더링 (대용량 최적화)
+              <% else %>
+                OFF - 무한 스크롤 모드 (100개씩 추가 로드)
+              <% end %>
+            </span>
+          </div>
+          <button
+            phx-click="toggle_virtual_scroll"
+            style={"padding: 10px 24px; border: none; border-radius: 4px; cursor: pointer; font-weight: 600; #{if @virtual_scroll, do: "background: #ff9800; color: white;", else: "background: #e0e0e0; color: #666;"}"}
+          >
+            <%= if @virtual_scroll, do: "ON", else: "OFF" %>
+          </button>
+        </div>
+      </div>
+      
+      <div style="margin: 20px 0; padding: 15px; background: #f5f5f5; border-radius: 4px;">
+        <label style="margin-right: 10px; font-weight: 600;">데이터 개수:</label>
+        <button phx-click="change_data_count" phx-value-count="50" style={"padding: 8px 16px; margin: 0 5px; border: 1px solid #ddd; border-radius: 4px; cursor: pointer; #{if @data_count == 50, do: "background: #2196f3; color: white;", else: "background: white;"}"}>
+          50개
+        </button>
+        <button phx-click="change_data_count" phx-value-count="100" style={"padding: 8px 16px; margin: 0 5px; border: 1px solid #ddd; border-radius: 4px; cursor: pointer; #{if @data_count == 100, do: "background: #2196f3; color: white;", else: "background: white;"}"}>
+          100개
+        </button>
+        <button phx-click="change_data_count" phx-value-count="200" style={"padding: 8px 16px; margin: 0 5px; border: 1px solid #ddd; border-radius: 4px; cursor: pointer; #{if @data_count == 200, do: "background: #2196f3; color: white;", else: "background: white;"}"}>
+          200개
+        </button>
+        <button phx-click="change_data_count" phx-value-count="500" style={"padding: 8px 16px; margin: 0 5px; border: 1px solid #ddd; border-radius: 4px; cursor: pointer; #{if @data_count == 500, do: "background: #2196f3; color: white;", else: "background: white;"}"}>
+          500개
+        </button>
+        <button phx-click="change_data_count" phx-value-count="1000" style={"padding: 8px 16px; margin: 0 5px; border: 1px solid #ddd; border-radius: 4px; cursor: pointer; #{if @data_count == 1000, do: "background: #2196f3; color: white;", else: "background: white;"}"}>
+          1000개
+        </button>
+        <span style="margin-left: 15px; color: #666;">현재: <%= @data_count %>개</span>
+      </div>
+      
+      <div style="position: relative;">
+        <.live_component
+          module={LiveviewGridWeb.GridComponent}
+          id="users-grid"
+          data={if @virtual_scroll, do: @filtered_users, else: @visible_users}
+          columns={[
+            %{field: :id, label: "ID", width: 80, sortable: true},
+            %{field: :name, label: "이름", width: 150, sortable: true},
+            %{field: :email, label: "이메일", width: 250, sortable: true},
+            %{field: :age, label: "나이", width: 80, sortable: true},
+            %{field: :city, label: "도시", width: 120, sortable: true}
+          ]}
+          options={%{
+            page_size: if(@virtual_scroll, do: 20, else: 99999),
+            virtual_scroll: @virtual_scroll,
+            row_height: 40,
+            show_footer: !@virtual_scroll,
+            debug: true
+          }}
+        />
+        
+        <!-- 상세 디버깅 정보 (Grid 하단) - 개발 모드에서만 표시 -->
+        <%= if Mix.env() == :dev do %>
+          <div style="position: absolute; bottom: 20px; right: 20px; padding: 12px; background: rgba(0, 0, 0, 0.8); color: white; border-radius: 8px; font-size: 11px; box-shadow: 0 2px 8px rgba(0,0,0,0.3); max-width: 300px;">
+            <div style="font-weight: 600; margin-bottom: 5px; color: #4caf50;">🔍 실시간 디버깅</div>
+            <div>전체: <%= length(@filtered_users) %>개</div>
+            <div>로드됨: <strong style="color: #2196f3;"><%= @loaded_count %>개</strong></div>
+            <div>visible_users: <strong style="color: #ff9800;"><%= length(@visible_users) %>개</strong></div>
+            <%= if @loaded_count < length(@filtered_users) do %>
+              <div style="margin-top: 5px; padding: 5px; background: rgba(33, 150, 243, 0.3); border-radius: 3px;">
+                ⏳ 더 로드 가능 (남은: <%= length(@filtered_users) - @loaded_count %>개)
+              </div>
+            <% else %>
+              <div style="margin-top: 5px; padding: 5px; background: rgba(76, 175, 80, 0.3); border-radius: 3px;">
+                ✅ 모두 로드됨
+              </div>
+            <% end %>
+          </div>
+        <% end %>
+      </div>
+      
+      <!-- 완료 메시지 -->
+      <%= if @loaded_count >= length(@filtered_users) && length(@filtered_users) > 100 do %>
+        <div style="text-align: center; padding: 15px; color: #666; font-size: 13px; background: #e8f5e9; border-radius: 4px; margin: 10px 0;">
+          ✅ 모든 데이터를 표시했습니다 (<%= @loaded_count %>개)
+        </div>
+      <% end %>
+    </div>
+    """
+  end
+
+  # 검색 필터링
+  defp filter_users(users, ""), do: users
+  defp filter_users(users, query) do
+    query_lower = String.downcase(query)
+    
+    Enum.filter(users, fn user ->
+      String.contains?(String.downcase(user.name), query_lower) or
+      String.contains?(String.downcase(user.email), query_lower) or
+      String.contains?(String.downcase(user.city), query_lower) or
+      String.contains?(to_string(user.age), query_lower)
+    end)
+  end
+
+  # 샘플 데이터 생성 (동적 개수)
+  defp generate_sample_data(count) do
+    first_names = ["Alice", "Bob", "Charlie", "David", "Eve", "Frank", "Grace", "Henry", "Iris", "Jack"]
+    last_names = ["Kim", "Lee", "Park", "Choi", "Jung", "Kang", "Cho", "Yoon", "Jang", "Lim"]
+    cities = ["서울", "부산", "대구", "인천", "광주", "대전", "울산", "수원", "창원", "고양"]
+    
+    for i <- 1..count do
+      first = Enum.random(first_names)
+      last = Enum.random(last_names)
+      
+      %{
+        id: i,
+        name: "#{first} #{last}",
+        email: "#{String.downcase(first)}.#{String.downcase(last)}@example.com",
+        age: Enum.random(20..60),
+        city: Enum.random(cities)
+      }
+    end
+  end
+end

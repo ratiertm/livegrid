@@ -2,4 +2,7 @@
 @import "tailwindcss/components";
 @import "tailwindcss/utilities";
 
+/* LiveView Grid styles */
+@import "./liveview_grid.css";
+
 /* This file is for your main application CSS */
