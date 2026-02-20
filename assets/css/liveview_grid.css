@@ -89,6 +89,13 @@
 
 /* 5. Body */
 .lv-grid__body {
+  max-height: 600px;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+/* Virtual Scroll Body - 고정 높이로 스크롤바 보장 */
+.lv-grid__body--virtual {
   height: 600px;
   overflow-y: scroll;
   overflow-x: hidden;

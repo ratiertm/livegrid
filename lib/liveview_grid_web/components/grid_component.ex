@@ -16,25 +16,47 @@ defmodule LiveviewGridWeb.GridComponent do
 
   @impl true
   def update(assigns, socket) do
-    grid = if Map.has_key?(socket.assigns, :grid) do
+    new_options = Map.get(assigns, :options, %{})
+
+    {grid, virtual_changed?} = if Map.has_key?(socket.assigns, :grid) do
+      old_grid = socket.assigns.grid
+      old_virtual = old_grid.options.virtual_scroll
+      new_virtual = Map.get(new_options, :virtual_scroll, old_virtual)
+
       # 이후 업데이트: 기존 state(scroll_offset, sort, selection) 보존
-      Grid.update_data(
-        socket.assigns.grid,
+      updated = Grid.update_data(
+        old_grid,
         assigns.data,
         assigns.columns,
-        Map.get(assigns, :options, %{})
+        new_options
       )
+
+      # virtual_scroll 옵션이 변경되었으면 scroll_offset 리셋
+      if old_virtual != new_virtual do
+        {put_in(updated.state.scroll_offset, 0), true}
+      else
+        {updated, false}
+      end
     else
       # 첫 마운트: 새 Grid 생성
       grid = Grid.new(
         data: assigns.data,
         columns: assigns.columns,
-        options: Map.get(assigns, :options, %{})
+        options: new_options
       )
-      put_in(grid.state.pagination.total_rows, length(assigns.data))
+      {put_in(grid.state.pagination.total_rows, length(assigns.data)), false}
     end
 
-    {:ok, assign(socket, grid: grid)}
+    socket = assign(socket, grid: grid)
+
+    # virtual scroll 전환 시 JS 스크롤 리셋
+    socket = if virtual_changed? do
+      push_event(socket, "reset_virtual_scroll", %{})
+    else
+      socket
+    end
+
+    {:ok, socket}
   end
 
   @impl true
@@ -164,7 +186,7 @@ defmodule LiveviewGridWeb.GridComponent do
           id={"#{@grid.id}-virtual-body"}
           phx-hook="VirtualScroll"
           data-row-height={@grid.options.row_height}
-          style="max-height: 600px; overflow-y: auto;"
+          style="height: 600px;"
         >
           <!-- 전체 높이 스페이서 (스크롤바 크기 결정) -->
           <div style={"height: #{length(@grid.data) * @grid.options.row_height}px; position: relative;"}>
@@ -194,7 +216,7 @@ defmodule LiveviewGridWeb.GridComponent do
         </div>
       <% else %>
         <!-- 기본 Body (페이징 방식) -->
-        <div class="lv-grid__body" style="max-height: 600px; overflow-y: auto;">
+        <div class="lv-grid__body">
           <%= for row <- Grid.visible_data(@grid) do %>
             <div class={"lv-grid__row #{if row.id in @grid.state.selection.selected_ids, do: "lv-grid__row--selected"}"}>
               <div class="lv-grid__cell" style="width: 50px; flex: 0 0 50px; justify-content: center;">

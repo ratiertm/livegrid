@@ -150,16 +150,11 @@ Hooks.VirtualScroll = {
 
     this.el.addEventListener("scroll", this.scrollHandler, {passive: true})
 
-    // 마우스가 그리드 컨테이너 위에 있을 때 페이지 스크롤 차단
-    // (페이지 외부 스크롤과 그리드 내부 스크롤 혼재 방지)
+    // 마우스가 그리드 컨테이너 위에 있을 때 페이지 스크롤 항상 차단
+    // preventDefault()로 네이티브 스크롤을 막고 직접 scrollTop 제어
     this.wheelHandler = (e) => {
-      const el = this.el
-      const atTop = el.scrollTop <= 0 && e.deltaY < 0
-      const atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 1 && e.deltaY > 0
-      // 그리드 내부에서 아직 스크롤할 여지가 있으면 페이지 스크롤 차단
-      if (!atTop && !atBottom) {
-        e.preventDefault()
-      }
+      e.preventDefault()
+      this.el.scrollTop += e.deltaY
     }
     this.el.addEventListener("wheel", this.wheelHandler, {passive: false})
 
