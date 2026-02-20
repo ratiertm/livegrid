@@ -1,0 +1,91 @@
+<div class="p-8">
+  <div class="mb-6">
+    <h1 class="text-3xl font-bold text-gray-900">LiveView Grid Demo</h1>
+    <p class="text-gray-600 mt-2">Phoenix LiveView 기반 엔터프라이즈 그리드</p>
+  </div>
+
+  <div class="bg-white shadow-lg rounded-lg overflow-hidden">
+    <!-- 그리드 테이블 -->
+    <div class="overflow-x-auto">
+      <table class="min-w-full divide-y divide-gray-200">
+        <!-- 헤더 -->
+        <thead class="bg-gray-50">
+          <tr>
+            <th class="w-12 px-4 py-3">
+              <input type="checkbox" class="rounded border-gray-300" />
+            </th>
+            <%= for column <- @columns do %>
+              <th
+                class={"px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 #{if column[:align] == "right", do: "text-right", else: "text-left"}"}
+                style={"width: #{column.width}"}
+                phx-click={if column[:sortable], do: "sort"}
+                phx-value-column={column.key}
+              >
+                <div class="flex items-center justify-between">
+                  <span><%= column.label %></span>
+                  <%= if @sort_by == column.key do %>
+                    <svg
+                      class={"w-4 h-4 #{if @sort_direction == :asc, do: "", else: "rotate-180"}"}
+                      fill="currentColor"
+                      viewBox="0 0 20 20"
+                    >
+                      <path
+                        fill-rule="evenodd"
+                        d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
+                        clip-rule="evenodd"
+                      />
+                    </svg>
+                  <% end %>
+                </div>
+              </th>
+            <% end %>
+          </tr>
+        </thead>
+        <!-- 바디 -->
+        <tbody class="bg-white divide-y divide-gray-200">
+          <%= for row <- @data do %>
+            <tr
+              class={"hover:bg-gray-50 #{if MapSet.member?(@selected_rows, row.id), do: "bg-blue-50", else: ""}"}
+              phx-click="toggle_row"
+              phx-value-id={row.id}
+            >
+              <td class="px-4 py-4">
+                <input
+                  type="checkbox"
+                  class="rounded border-gray-300"
+                  checked={MapSet.member?(@selected_rows, row.id)}
+                />
+              </td>
+              <%= for column <- @columns do %>
+                <% value = Map.get(row, column.key) %>
+                <td class={"px-6 py-4 whitespace-nowrap text-sm #{if column[:align] == "right", do: "text-right", else: "text-left"} #{if column.key == :change, do: change_color(value), else: "text-gray-900"}"}>
+                  <%= if column.key == :change do %>
+                    <%= if value > 0, do: "+", else: "" %><%= format_value(value) %>%
+                  <% else %>
+                    <%= format_value(value) %>
+                  <% end %>
+                </td>
+              <% end %>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- 선택된 행 정보 -->
+  <div class="mt-4 text-sm text-gray-600">
+    선택된 행: <%= MapSet.size(@selected_rows) %>개
+  </div>
+
+  <!-- 기능 안내 -->
+  <div class="mt-8 p-4 bg-blue-50 rounded-lg">
+    <h3 class="font-semibold text-blue-900 mb-2">✨ 구현된 기능</h3>
+    <ul class="list-disc list-inside text-blue-800 space-y-1">
+      <li>컬럼 헤더 클릭 → 정렬 (오름차순 ⇄ 내림차순)</li>
+      <li>행 클릭 → 선택/해제</li>
+      <li>실시간 상태 업데이트 (LiveView)</li>
+      <li>변동률 색상 표시 (빨강/초록)</li>
+    </ul>
+  </div>
+</div>
