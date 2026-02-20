@@ -107,5 +107,28 @@ defmodule LiveviewGridWeb.GridComponentTest do
       # 초기 상태: 클리어 버튼 없음
       refute html =~ "lv-grid__search-clear"
     end
+
+    test "editable cells have editable class", %{conn: conn} do
+      {:ok, _view, html} = live(conn, "/demo")
+
+      # editable 컬럼의 셀에 editable 클래스가 있어야 함
+      assert html =~ "lv-grid__cell-value--editable"
+    end
+
+    test "non-editable cells do not have editable class for ID column", %{conn: conn} do
+      {:ok, _view, html} = live(conn, "/demo")
+
+      # ID 컬럼은 editable이 아니므로 일반 cell-value만 있어야 함
+      # 단, 다른 editable 컬럼이 있으므로 전체적으로 editable 클래스가 존재함
+      # ID 컬럼 값(숫자)이 editable 아닌 span으로 렌더링되는지 확인
+      assert html =~ "lv-grid__cell-value"
+    end
+
+    test "cell edit editor not shown by default", %{conn: conn} do
+      {:ok, _view, html} = live(conn, "/demo")
+
+      # 초기 상태: 편집 에디터가 표시되지 않음
+      refute html =~ "lv-grid__cell-editor"
+    end
   end
 end

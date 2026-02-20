@@ -165,6 +165,28 @@ defmodule LiveviewGridWeb.DemoLive do
   end
 
   @impl true
+  def handle_info({:grid_cell_updated, row_id, field, value}, socket) do
+    # GridComponent에서 셀 편집 완료 시 원본 데이터 업데이트
+    updated_users = Enum.map(socket.assigns.all_users, fn user ->
+      if user.id == row_id, do: Map.put(user, field, value), else: user
+    end)
+
+    updated_filtered = Enum.map(socket.assigns.filtered_users, fn user ->
+      if user.id == row_id, do: Map.put(user, field, value), else: user
+    end)
+
+    updated_visible = Enum.map(socket.assigns.visible_users, fn user ->
+      if user.id == row_id, do: Map.put(user, field, value), else: user
+    end)
+
+    {:noreply, assign(socket,
+      all_users: updated_users,
+      filtered_users: updated_filtered,
+      visible_users: updated_visible
+    )}
+  end
+
+  @impl true
   def render(assigns) do
     ~H"""
     <div style="padding: 20px;">
@@ -296,10 +318,10 @@ defmodule LiveviewGridWeb.DemoLive do
           data={if @virtual_scroll, do: @filtered_users, else: @visible_users}
           columns={[
             %{field: :id, label: "ID", width: 80, sortable: true},
-            %{field: :name, label: "이름", width: 150, sortable: true, filterable: true, filter_type: :text},
-            %{field: :email, label: "이메일", width: 250, sortable: true, filterable: true, filter_type: :text},
-            %{field: :age, label: "나이", width: 80, sortable: true, filterable: true, filter_type: :number},
-            %{field: :city, label: "도시", width: 120, sortable: true, filterable: true, filter_type: :text}
+            %{field: :name, label: "이름", width: 150, sortable: true, filterable: true, filter_type: :text, editable: true},
+            %{field: :email, label: "이메일", width: 250, sortable: true, filterable: true, filter_type: :text, editable: true},
+            %{field: :age, label: "나이", width: 80, sortable: true, filterable: true, filter_type: :number, editable: true, editor_type: :number},
+            %{field: :city, label: "도시", width: 120, sortable: true, filterable: true, filter_type: :text, editable: true}
           ]}
           options={%{
             page_size: if(@virtual_scroll, do: 20, else: 99999),

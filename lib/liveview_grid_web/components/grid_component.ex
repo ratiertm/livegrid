@@ -219,6 +219,66 @@ defmodule LiveviewGridWeb.GridComponent do
   end
 
   @impl true
+  def handle_event("cell_edit_start", %{"row-id" => row_id, "field" => field}, socket) do
+    grid = socket.assigns.grid
+    row_id_int = String.to_integer(row_id)
+    field_atom = String.to_atom(field)
+
+    updated_grid = put_in(grid.state.editing, %{row_id: row_id_int, field: field_atom})
+    {:noreply, assign(socket, grid: updated_grid)}
+  end
+
+  @impl true
+  def handle_event("cell_edit_save", %{"row-id" => row_id, "field" => field, "value" => value}, socket) do
+    grid = socket.assigns.grid
+    row_id_int = String.to_integer(row_id)
+    field_atom = String.to_atom(field)
+
+    # 숫자 타입이면 변환 시도
+    column = Enum.find(grid.columns, fn c -> c.field == field_atom end)
+    parsed_value = if column && column.editor_type == :number do
+      case Float.parse(value) do
+        {num, ""} -> if num == trunc(num), do: trunc(num), else: num
+        {num, _} -> if num == trunc(num), do: trunc(num), else: num
+        :error -> value
+      end
+    else
+      value
+    end
+
+    updated_grid = grid
+      |> Grid.update_cell(row_id_int, field_atom, parsed_value)
+      |> put_in([:state, :editing], nil)
+
+    # 부모 LiveView에 변경 알림
+    send(self(), {:grid_cell_updated, row_id_int, field_atom, parsed_value})
+
+    {:noreply, assign(socket, grid: updated_grid)}
+  end
+
+  @impl true
+  def handle_event("cell_edit_cancel", _params, socket) do
+    grid = socket.assigns.grid
+    updated_grid = put_in(grid.state.editing, nil)
+    {:noreply, assign(socket, grid: updated_grid)}
+  end
+
+  @impl true
+  def handle_event("cell_keydown", %{"key" => "Enter", "value" => value} = params, socket) do
+    handle_event("cell_edit_save", Map.put(params, "value", value), socket)
+  end
+
+  @impl true
+  def handle_event("cell_keydown", %{"key" => "Escape"}, socket) do
+    handle_event("cell_edit_cancel", %{}, socket)
+  end
+
+  @impl true
+  def handle_event("cell_keydown", _params, socket) do
+    {:noreply, socket}
+  end
+
+  @impl true
   def render(assigns) do
     ~H"""
     <div class="lv-grid">
@@ -356,7 +416,7 @@ defmodule LiveviewGridWeb.GridComponent do
                   </div>
                   <%= for column <- @grid.columns do %>
                     <div class="lv-grid__cell" style={column_width_style(column)}>
-                      <%= Map.get(row, column.field) %>
+                      <%= render_cell(assigns, row, column) %>
                     </div>
                   <% end %>
                 </div>
@@ -381,7 +441,7 @@ defmodule LiveviewGridWeb.GridComponent do
               </div>
               <%= for column <- @grid.columns do %>
                 <div class="lv-grid__cell" style={column_width_style(column)}>
-                  <%= Map.get(row, column.field) %>
+                  <%= render_cell(assigns, row, column) %>
                 </div>
               <% end %>
             </div>
@@ -485,6 +545,47 @@ defmodule LiveviewGridWeb.GridComponent do
 
   defp filter_placeholder(%{filter_type: :number}), do: "예: >30, <=25"
   defp filter_placeholder(_column), do: "검색..."
+
+  defp editing?(nil, _row_id, _field), do: false
+  defp editing?(%{row_id: rid, field: f}, row_id, field), do: rid == row_id and f == field
+
+  defp editor_input_type(%{editor_type: :number}), do: "number"
+  defp editor_input_type(_column), do: "text"
+
+  defp render_cell(assigns, row, column) do
+    if column.editable && editing?(assigns.grid.state.editing, row.id, column.field) do
+      # 편집 모드
+      assigns = assign(assigns, row: row, column: column)
+      ~H"""
+      <input
+        type={editor_input_type(@column)}
+        value={Map.get(@row, @column.field)}
+        phx-blur="cell_edit_save"
+        phx-keyup="cell_keydown"
+        phx-value-row-id={@row.id}
+        phx-value-field={@column.field}
+        phx-target={@myself}
+        class="lv-grid__cell-editor"
+        id={"editor-#{@row.id}-#{@column.field}"}
+        phx-hook="CellEditor"
+      />
+      """
+    else
+      # 보기 모드
+      assigns = assign(assigns, row: row, column: column)
+      ~H"""
+      <span
+        class={"lv-grid__cell-value #{if @column.editable, do: "lv-grid__cell-value--editable"}"}
+        phx-dblclick={if @column.editable, do: "cell_edit_start"}
+        phx-value-row-id={@row.id}
+        phx-value-field={@column.field}
+        phx-target={@myself}
+      >
+        <%= Map.get(@row, @column.field) %>
+      </span>
+      """
+    end
+  end
 
   defp page_range_for(total_rows, current_page, page_size) do
     total = Pagination.total_pages(total_rows, page_size)

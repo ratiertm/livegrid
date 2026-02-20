@@ -186,6 +186,17 @@ Hooks.VirtualScroll = {
   }
 }
 
+// Cell Editor Hook (인라인 셀 편집 - 자동 포커스 & 텍스트 선택)
+Hooks.CellEditor = {
+  mounted() {
+    this.el.focus()
+    this.el.select()
+  },
+  updated() {
+    this.el.focus()
+  }
+}
+
 let csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")
 let liveSocket = new LiveSocket("/live", Socket, {
   longPollFallbackMs: 2500,

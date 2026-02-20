@@ -282,6 +282,44 @@
   white-space: nowrap;
 }
 
+/* 5.5 Cell Editing */
+.lv-grid__cell-value {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  width: 100%;
+}
+
+.lv-grid__cell-value--editable {
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 2px;
+  transition: background 0.15s ease;
+}
+
+.lv-grid__cell-value--editable:hover {
+  background: #fff3e0;
+}
+
+.lv-grid__cell-editor {
+  width: 100%;
+  height: 32px;
+  padding: 4px 8px;
+  border: 2px solid var(--lv-grid-primary);
+  border-radius: 2px;
+  font-size: var(--lv-grid-font-size-md);
+  font-family: var(--lv-grid-font-family);
+  color: var(--lv-grid-text);
+  background: white;
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.2);
+}
+
+.lv-grid__cell-editor:focus {
+  border-color: #1976d2;
+  box-shadow: 0 0 0 3px rgba(33, 150, 243, 0.3);
+}
+
 /* 6. Footer */
 .lv-grid__footer {
   display: flex;

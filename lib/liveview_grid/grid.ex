@@ -112,6 +112,18 @@ defmodule LiveViewGrid.Grid do
     start_index * options.row_height
   end
 
+  @doc """
+  특정 행의 특정 필드 값을 업데이트합니다.
+  row_id가 없는 경우 원본 데이터를 그대로 반환합니다.
+  """
+  @spec update_cell(grid :: t(), row_id :: any(), field :: atom(), value :: any()) :: t()
+  def update_cell(grid, row_id, field, value) do
+    updated_data = Enum.map(grid.data, fn row ->
+      if row.id == row_id, do: Map.put(row, field, value), else: row
+    end)
+    %{grid | data: updated_data}
+  end
+
   # Private functions
 
   defp generate_id do
@@ -125,6 +137,8 @@ defmodule LiveViewGrid.Grid do
         sortable: false,
         filterable: false,
         filter_type: :text,
+        editable: false,
+        editor_type: :text,
         align: :left
       }, col)
     end)
@@ -144,7 +158,8 @@ defmodule LiveViewGrid.Grid do
         selected_ids: [],
         select_all: false
       },
-      scroll_offset: 0
+      scroll_offset: 0,
+      editing: nil
     }
   end
 

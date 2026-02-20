@@ -318,6 +318,69 @@ defmodule LiveViewGrid.GridTest do
     end
   end
 
+  describe "셀 편집" do
+    setup do
+      data = [
+        %{id: 1, name: "Alice", age: 30},
+        %{id: 2, name: "Bob", age: 25},
+        %{id: 3, name: "Charlie", age: 35}
+      ]
+
+      columns = [
+        %{field: :name, label: "이름", editable: true},
+        %{field: :age, label: "나이", editable: true, editor_type: :number}
+      ]
+
+      grid = Grid.new(data: data, columns: columns)
+      %{grid: grid}
+    end
+
+    test "initial_state에 editing: nil 포함" do
+      grid = Grid.new(data: [], columns: [%{field: :id, label: "ID"}])
+      assert grid.state.editing == nil
+    end
+
+    test "normalize_columns에 editable/editor_type 기본값" do
+      grid = Grid.new(data: [], columns: [%{field: :name, label: "이름"}])
+      [col | _] = grid.columns
+      assert col.editable == false
+      assert col.editor_type == :text
+    end
+
+    test "update_cell로 값 변경", %{grid: grid} do
+      updated = Grid.update_cell(grid, 1, :name, "Alice Updated")
+      row = Enum.find(updated.data, &(&1.id == 1))
+      assert row.name == "Alice Updated"
+    end
+
+    test "update_cell로 숫자 값 변경", %{grid: grid} do
+      updated = Grid.update_cell(grid, 2, :age, 99)
+      row = Enum.find(updated.data, &(&1.id == 2))
+      assert row.age == 99
+    end
+
+    test "update_cell 없는 row_id는 무시", %{grid: grid} do
+      updated = Grid.update_cell(grid, 999, :name, "Ghost")
+      assert updated.data == grid.data
+    end
+
+    test "update_cell은 다른 행에 영향 없음", %{grid: grid} do
+      updated = Grid.update_cell(grid, 1, :name, "Changed")
+      bob = Enum.find(updated.data, &(&1.id == 2))
+      assert bob.name == "Bob"
+    end
+
+    test "editable 컬럼 설정 유지", %{grid: grid} do
+      name_col = Enum.find(grid.columns, &(&1.field == :name))
+      age_col = Enum.find(grid.columns, &(&1.field == :age))
+
+      assert name_col.editable == true
+      assert name_col.editor_type == :text
+      assert age_col.editable == true
+      assert age_col.editor_type == :number
+    end
+  end
+
   describe "전체 검색 통합" do
     setup do
       data = [
