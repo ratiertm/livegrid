@@ -51,5 +51,26 @@ defmodule LiveviewGridWeb.GridComponentTest do
       assert html =~ "grid_select_all"
       assert html =~ "grid_row_select"
     end
+
+    test "filter row renders for filterable columns", %{conn: conn} do
+      {:ok, _view, html} = live(conn, "/demo")
+
+      # 필터 행이 렌더링되는지 확인
+      assert html =~ "lv-grid__filter-row"
+      assert html =~ "lv-grid__filter-input"
+      assert html =~ "grid_filter"
+    end
+
+    test "filter input has correct placeholder for text columns", %{conn: conn} do
+      {:ok, _view, html} = live(conn, "/demo")
+
+      assert html =~ "검색..."
+    end
+
+    test "filter input has correct placeholder for number columns", %{conn: conn} do
+      {:ok, _view, html} = live(conn, "/demo")
+
+      assert html =~ "예: &gt;30, &lt;=25"
+    end
   end
 end

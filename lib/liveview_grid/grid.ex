@@ -58,9 +58,10 @@ defmodule LiveViewGrid.Grid do
   화면에 표시할 데이터 (정렬 + 페이징 적용)
   """
   @spec visible_data(grid :: t()) :: list(map())
-  def visible_data(%{data: data, state: state, options: options}) do
-    sorted = apply_sort(data, state.sort)
-    
+  def visible_data(%{data: data, columns: columns, state: state, options: options}) do
+    filtered = apply_filters(data, state.filters, columns)
+    sorted = apply_sort(filtered, state.sort)
+
     # Virtual Scrolling 사용 시
     if options.virtual_scroll do
       apply_virtual_scroll(sorted, state.scroll_offset, options)
@@ -73,9 +74,20 @@ defmodule LiveViewGrid.Grid do
   Virtual Scroll용 전체 데이터 (정렬만 적용)
   """
   @spec sorted_data(grid :: t()) :: list(map())
-  def sorted_data(%{data: data, state: state}) do
-    apply_sort(data, state.sort)
+  def sorted_data(%{data: data, columns: columns, state: state}) do
+    data
+    |> apply_filters(state.filters, columns)
+    |> apply_sort(state.sort)
   end
+
+  @doc """
+  필터 적용 후 데이터 개수 (footer에 표시할 건수)
+  """
+  @spec filtered_count(grid :: t()) :: non_neg_integer()
+  def filtered_count(%{data: data, columns: columns, state: %{filters: filters}}) when map_size(filters) > 0 do
+    length(apply_filters(data, filters, columns))
+  end
+  def filtered_count(%{data: data}), do: length(data)
 
   @doc """
   Virtual Scroll 시 렌더링 시작 위치 (px)
@@ -100,6 +112,8 @@ defmodule LiveViewGrid.Grid do
       Map.merge(%{
         width: :auto,
         sortable: false,
+        filterable: false,
+        filter_type: :text,
         align: :left
       }, col)
     end)
@@ -108,6 +122,7 @@ defmodule LiveViewGrid.Grid do
   defp initial_state do
     %{
       sort: nil,
+      filters: %{},
       pagination: %{
         current_page: 1,
         total_rows: 0
@@ -130,6 +145,11 @@ defmodule LiveViewGrid.Grid do
       row_height: 40,
       debug: false
     }, options)
+  end
+
+  defp apply_filters(data, filters, _columns) when map_size(filters) == 0, do: data
+  defp apply_filters(data, filters, columns) do
+    LiveViewGrid.Filter.apply(data, filters, columns)
   end
 
   defp apply_sort(data, nil), do: data

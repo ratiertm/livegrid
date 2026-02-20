@@ -236,4 +236,83 @@ defmodule LiveViewGrid.GridTest do
       assert grid.options.debug == false
     end
   end
+
+  describe "필터 통합" do
+    setup do
+      data = [
+        %{id: 1, name: "Alice", age: 30, city: "서울"},
+        %{id: 2, name: "Bob", age: 25, city: "부산"},
+        %{id: 3, name: "Charlie", age: 35, city: "대전"},
+        %{id: 4, name: "David", age: 28, city: "서울"},
+        %{id: 5, name: "Eve", age: 40, city: "인천"}
+      ]
+
+      columns = [
+        %{field: :name, label: "이름", sortable: true, filterable: true, filter_type: :text},
+        %{field: :age, label: "나이", sortable: true, filterable: true, filter_type: :number},
+        %{field: :city, label: "도시", filterable: true, filter_type: :text}
+      ]
+
+      grid = Grid.new(data: data, columns: columns, options: %{page_size: 10})
+      %{grid: grid}
+    end
+
+    test "visible_data에 텍스트 필터 적용", %{grid: grid} do
+      grid = put_in(grid.state.filters, %{name: "ali"})
+      visible = Grid.visible_data(grid)
+      assert length(visible) == 1
+      assert hd(visible).name == "Alice"
+    end
+
+    test "visible_data에 숫자 필터 적용", %{grid: grid} do
+      grid = put_in(grid.state.filters, %{age: ">30"})
+      visible = Grid.visible_data(grid)
+      assert length(visible) == 2
+      names = Enum.map(visible, & &1.name) |> Enum.sort()
+      assert names == ["Charlie", "Eve"]
+    end
+
+    test "필터 + 정렬 동시 적용", %{grid: grid} do
+      grid = put_in(grid.state.filters, %{city: "서울"})
+      grid = put_in(grid.state.sort, %{field: :name, direction: :asc})
+      visible = Grid.visible_data(grid)
+      assert length(visible) == 2
+      assert hd(visible).name == "Alice"
+    end
+
+    test "필터 + 페이징 동시 적용", %{grid: grid} do
+      grid = put_in(grid.state.filters, %{age: ">=25"})
+      grid = %{grid | options: %{grid.options | page_size: 2}}
+      visible = Grid.visible_data(grid)
+      assert length(visible) == 2
+    end
+
+    test "빈 필터는 전체 데이터 반환", %{grid: grid} do
+      grid = put_in(grid.state.filters, %{})
+      visible = Grid.visible_data(grid)
+      assert length(visible) == 5
+    end
+
+    test "filtered_count 필터 적용 건수", %{grid: grid} do
+      grid = put_in(grid.state.filters, %{city: "서울"})
+      assert Grid.filtered_count(grid) == 2
+    end
+
+    test "filtered_count 빈 필터는 전체 건수", %{grid: grid} do
+      assert Grid.filtered_count(grid) == 5
+    end
+
+    test "필터 + virtual scroll", %{grid: grid} do
+      grid = %{grid | options: %{grid.options | virtual_scroll: true, row_height: 40, virtual_buffer: 5}}
+      grid = put_in(grid.state.filters, %{city: "서울"})
+      visible = Grid.visible_data(grid)
+      assert length(visible) == 2
+      assert Enum.all?(visible, fn row -> row.city == "서울" end)
+    end
+
+    test "initial_state에 filters 포함" do
+      grid = Grid.new(data: [], columns: [%{field: :id, label: "ID"}])
+      assert grid.state.filters == %{}
+    end
+  end
 end

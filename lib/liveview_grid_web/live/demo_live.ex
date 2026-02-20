@@ -296,10 +296,10 @@ defmodule LiveviewGridWeb.DemoLive do
           data={if @virtual_scroll, do: @filtered_users, else: @visible_users}
           columns={[
             %{field: :id, label: "ID", width: 80, sortable: true},
-            %{field: :name, label: "이름", width: 150, sortable: true},
-            %{field: :email, label: "이메일", width: 250, sortable: true},
-            %{field: :age, label: "나이", width: 80, sortable: true},
-            %{field: :city, label: "도시", width: 120, sortable: true}
+            %{field: :name, label: "이름", width: 150, sortable: true, filterable: true, filter_type: :text},
+            %{field: :email, label: "이메일", width: 250, sortable: true, filterable: true, filter_type: :text},
+            %{field: :age, label: "나이", width: 80, sortable: true, filterable: true, filter_type: :number},
+            %{field: :city, label: "도시", width: 120, sortable: true, filterable: true, filter_type: :text}
           ]}
           options={%{
             page_size: if(@virtual_scroll, do: 20, else: 99999),

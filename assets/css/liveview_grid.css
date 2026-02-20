@@ -87,6 +87,67 @@
   color: var(--lv-grid-primary);
 }
 
+/* 4.5 Filter Row */
+.lv-grid__filter-row {
+  display: flex;
+  background: #f8f9fa;
+  border-bottom: 1px solid var(--lv-grid-border);
+  position: relative;
+}
+
+.lv-grid__filter-cell {
+  padding: 4px 8px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+}
+
+.lv-grid__filter-input {
+  width: 100%;
+  padding: 5px 8px;
+  border: 1px solid var(--lv-grid-border);
+  border-radius: 3px;
+  font-size: 12px;
+  font-family: var(--lv-grid-font-family);
+  color: var(--lv-grid-text);
+  background: white;
+  transition: border-color 0.2s ease;
+}
+
+.lv-grid__filter-input:focus {
+  outline: none;
+  border-color: var(--lv-grid-primary);
+  box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.15);
+}
+
+.lv-grid__filter-input::placeholder {
+  color: #aaa;
+  font-size: 11px;
+}
+
+.lv-grid__filter-clear {
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 24px;
+  height: 24px;
+  border: none;
+  background: #ef5350;
+  color: white;
+  border-radius: 50%;
+  font-size: 12px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s ease;
+}
+
+.lv-grid__filter-clear:hover {
+  background: #d32f2f;
+}
+
 /* 5. Body */
 .lv-grid__body {
   max-height: 600px;

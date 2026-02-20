@@ -124,6 +124,47 @@ defmodule LiveviewGridWeb.GridComponent do
   end
 
   @impl true
+  def handle_event("grid_filter", %{"field" => field, "value" => value}, socket) do
+    grid = socket.assigns.grid
+    field_atom = String.to_atom(field)
+
+    # 필터 값 업데이트 (빈 문자열이면 해당 필터 제거)
+    updated_filters = if value == "" do
+      Map.delete(grid.state.filters, field_atom)
+    else
+      Map.put(grid.state.filters, field_atom, value)
+    end
+
+    # 필터 변경 시 페이지 1로 리셋 + 스크롤 리셋
+    updated_grid = grid
+      |> put_in([:state, :filters], updated_filters)
+      |> put_in([:state, :pagination, :current_page], 1)
+      |> put_in([:state, :scroll_offset], 0)
+
+    {:noreply,
+      socket
+      |> assign(grid: updated_grid)
+      |> push_event("reset_virtual_scroll", %{})
+    }
+  end
+
+  @impl true
+  def handle_event("grid_clear_filters", _params, socket) do
+    grid = socket.assigns.grid
+
+    updated_grid = grid
+      |> put_in([:state, :filters], %{})
+      |> put_in([:state, :pagination, :current_page], 1)
+      |> put_in([:state, :scroll_offset], 0)
+
+    {:noreply,
+      socket
+      |> assign(grid: updated_grid)
+      |> push_event("reset_virtual_scroll", %{})
+    }
+  end
+
+  @impl true
   def handle_event("grid_scroll", %{"scroll_top" => scroll_top}, socket) do
     grid = socket.assigns.grid
     row_height = grid.options.row_height
@@ -174,6 +215,44 @@ defmodule LiveviewGridWeb.GridComponent do
                 </span>
               <% end %>
             </div>
+          <% end %>
+        </div>
+      <% end %>
+
+      <!-- Filter Row -->
+      <%= if has_filterable_columns?(@grid.columns) do %>
+        <div class="lv-grid__filter-row">
+          <!-- 체크박스 컬럼 빈칸 -->
+          <div class="lv-grid__filter-cell" style="width: 50px; flex: 0 0 50px;">
+          </div>
+
+          <%= for column <- @grid.columns do %>
+            <div class="lv-grid__filter-cell" style={column_width_style(column)}>
+              <%= if column.filterable do %>
+                <input
+                  type="text"
+                  class="lv-grid__filter-input"
+                  placeholder={filter_placeholder(column)}
+                  value={Map.get(@grid.state.filters, column.field, "")}
+                  phx-keyup="grid_filter"
+                  phx-value-field={column.field}
+                  phx-debounce="300"
+                  phx-target={@myself}
+                />
+              <% end %>
+            </div>
+          <% end %>
+
+          <!-- 필터 초기화 버튼 -->
+          <%= if map_size(@grid.state.filters) > 0 do %>
+            <button
+              class="lv-grid__filter-clear"
+              phx-click="grid_clear_filters"
+              phx-target={@myself}
+              title="필터 초기화"
+            >
+              ✕
+            </button>
           <% end %>
         </div>
       <% end %>
@@ -267,7 +346,8 @@ defmodule LiveviewGridWeb.GridComponent do
               </button>
 
               <!-- 페이지 번호 -->
-              <%= for page <- page_range(@grid.state.pagination, @grid.options.page_size) do %>
+              <% filtered_total = Grid.filtered_count(@grid) %>
+              <%= for page <- page_range_for(filtered_total, @grid.state.pagination.current_page, @grid.options.page_size) do %>
                 <button
                   class={"lv-grid__page-btn #{if page == @grid.state.pagination.current_page, do: "lv-grid__page-btn--current"}"}
                   phx-click="grid_page_change"
@@ -284,7 +364,7 @@ defmodule LiveviewGridWeb.GridComponent do
                 phx-click="grid_page_change"
                 phx-value-page={@grid.state.pagination.current_page + 1}
                 phx-target={@myself}
-                disabled={@grid.state.pagination.current_page >= Pagination.total_pages(@grid.state.pagination.total_rows, @grid.options.page_size)}
+                disabled={@grid.state.pagination.current_page >= Pagination.total_pages(filtered_total, @grid.options.page_size)}
               >
                 &gt;
               </button>
@@ -297,6 +377,12 @@ defmodule LiveviewGridWeb.GridComponent do
                 <%= length(@grid.state.selection.selected_ids) %>개 선택됨
               </span>
               <span style="margin: 0 8px; color: #ccc;">|</span>
+            <% end %>
+            <%= if map_size(@grid.state.filters) > 0 do %>
+              <span style="color: #ff9800; font-weight: 600;">
+                <%= Grid.filtered_count(@grid) %>개 필터됨
+              </span>
+              <span style="margin: 0 4px; color: #ccc;">/</span>
             <% end %>
             총 <%= @grid.state.pagination.total_rows %>개
           </div>
@@ -322,14 +408,22 @@ defmodule LiveviewGridWeb.GridComponent do
   defp next_direction(%{field: sort_field, direction: :desc}, field) when sort_field == field, do: "asc"
   defp next_direction(_sort, _field), do: "asc"
 
-  defp page_range(pagination, page_size) do
-    total = Pagination.total_pages(pagination.total_rows, page_size)
-    current = pagination.current_page
-    
-    # 간단한 페이지 범위 (최대 5개)
-    start = max(1, current - 2)
-    finish = min(total, current + 2)
-    
-    start..finish
+  defp has_filterable_columns?(columns) do
+    Enum.any?(columns, & &1.filterable)
+  end
+
+  defp filter_placeholder(%{filter_type: :number}), do: "예: >30, <=25"
+  defp filter_placeholder(_column), do: "검색..."
+
+  defp page_range_for(total_rows, current_page, page_size) do
+    total = Pagination.total_pages(total_rows, page_size)
+
+    if total == 0 do
+      1..1
+    else
+      start = max(1, current_page - 2)
+      finish = min(total, current_page + 2)
+      start..finish
+    end
   end
 end
