@@ -186,6 +186,22 @@ defmodule LiveviewGridWeb.GridComponent do
   end
 
   @impl true
+  def handle_event("grid_global_search", %{"value" => value}, socket) do
+    grid = socket.assigns.grid
+
+    updated_grid = grid
+      |> put_in([:state, :global_search], value)
+      |> put_in([:state, :pagination, :current_page], 1)
+      |> put_in([:state, :scroll_offset], 0)
+
+    {:noreply,
+      socket
+      |> assign(grid: updated_grid)
+      |> push_event("reset_virtual_scroll", %{})
+    }
+  end
+
+  @impl true
   def handle_event("grid_scroll", %{"scroll_top" => scroll_top}, socket) do
     grid = socket.assigns.grid
     row_height = grid.options.row_height
@@ -206,6 +222,30 @@ defmodule LiveviewGridWeb.GridComponent do
   def render(assigns) do
     ~H"""
     <div class="lv-grid">
+      <!-- Search Bar -->
+      <div class="lv-grid__search-bar">
+        <span class="lv-grid__search-icon">&#x1F50D;</span>
+        <input
+          type="text"
+          class="lv-grid__search-input"
+          placeholder="전체 검색..."
+          value={@grid.state.global_search}
+          phx-keyup="grid_global_search"
+          phx-debounce="300"
+          phx-target={@myself}
+        />
+        <%= if @grid.state.global_search != "" do %>
+          <button
+            class="lv-grid__search-clear"
+            phx-click="grid_global_search"
+            phx-value-value=""
+            phx-target={@myself}
+          >
+            ✕
+          </button>
+        <% end %>
+      </div>
+
       <!-- Header -->
       <%= if @grid.options.show_header do %>
         <div class="lv-grid__header">
@@ -409,9 +449,9 @@ defmodule LiveviewGridWeb.GridComponent do
               </span>
               <span style="margin: 0 8px; color: #ccc;">|</span>
             <% end %>
-            <%= if map_size(@grid.state.filters) > 0 do %>
+            <%= if @grid.state.global_search != "" or map_size(@grid.state.filters) > 0 do %>
               <span style="color: #ff9800; font-weight: 600;">
-                <%= Grid.filtered_count(@grid) %>개 필터됨
+                <%= Grid.filtered_count(@grid) %>개 검색됨
               </span>
               <span style="margin: 0 4px; color: #ccc;">/</span>
             <% end %>

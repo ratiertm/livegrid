@@ -92,5 +92,20 @@ defmodule LiveviewGridWeb.GridComponentTest do
       html = render(view)
       refute html =~ "lv-grid__filter-row"
     end
+
+    test "search bar renders", %{conn: conn} do
+      {:ok, _view, html} = live(conn, "/demo")
+
+      assert html =~ "lv-grid__search-bar"
+      assert html =~ "lv-grid__search-input"
+      assert html =~ "전체 검색..."
+    end
+
+    test "search bar clear button shows when search active", %{conn: conn} do
+      {:ok, _view, html} = live(conn, "/demo")
+
+      # 초기 상태: 클리어 버튼 없음
+      refute html =~ "lv-grid__search-clear"
+    end
   end
 end

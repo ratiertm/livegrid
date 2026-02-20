@@ -59,7 +59,8 @@ defmodule LiveViewGrid.Grid do
   """
   @spec visible_data(grid :: t()) :: list(map())
   def visible_data(%{data: data, columns: columns, state: state, options: options}) do
-    filtered = apply_filters(data, state.filters, columns)
+    searched = apply_global_search(data, state.global_search, columns)
+    filtered = apply_filters(searched, state.filters, columns)
     sorted = apply_sort(filtered, state.sort)
 
     # Virtual Scrolling 사용 시
@@ -76,6 +77,7 @@ defmodule LiveViewGrid.Grid do
   @spec sorted_data(grid :: t()) :: list(map())
   def sorted_data(%{data: data, columns: columns, state: state}) do
     data
+    |> apply_global_search(state.global_search, columns)
     |> apply_filters(state.filters, columns)
     |> apply_sort(state.sort)
   end
@@ -84,10 +86,19 @@ defmodule LiveViewGrid.Grid do
   필터 적용 후 데이터 개수 (footer에 표시할 건수)
   """
   @spec filtered_count(grid :: t()) :: non_neg_integer()
-  def filtered_count(%{data: data, columns: columns, state: %{filters: filters}}) when map_size(filters) > 0 do
-    length(apply_filters(data, filters, columns))
+  def filtered_count(%{data: data, columns: columns, state: state}) do
+    has_search = state.global_search != ""
+    has_filters = map_size(state.filters) > 0
+
+    if has_search or has_filters do
+      data
+      |> apply_global_search(state.global_search, columns)
+      |> apply_filters(state.filters, columns)
+      |> length()
+    else
+      length(data)
+    end
   end
-  def filtered_count(%{data: data}), do: length(data)
 
   @doc """
   Virtual Scroll 시 렌더링 시작 위치 (px)
@@ -123,6 +134,7 @@ defmodule LiveViewGrid.Grid do
     %{
       sort: nil,
       filters: %{},
+      global_search: "",
       show_filter_row: false,
       pagination: %{
         current_page: 1,
@@ -146,6 +158,12 @@ defmodule LiveViewGrid.Grid do
       row_height: 40,
       debug: false
     }, options)
+  end
+
+  defp apply_global_search(data, "", _columns), do: data
+  defp apply_global_search(data, nil, _columns), do: data
+  defp apply_global_search(data, query, columns) do
+    LiveViewGrid.Filter.global_search(data, query, columns)
   end
 
   defp apply_filters(data, filters, _columns) when map_size(filters) == 0, do: data

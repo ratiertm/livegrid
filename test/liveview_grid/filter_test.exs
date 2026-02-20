@@ -138,6 +138,62 @@ defmodule LiveViewGrid.FilterTest do
     end
   end
 
+  describe "전체 검색 (global_search)" do
+    test "이름으로 검색" do
+      result = Filter.global_search(@data, "alice", @columns)
+      assert length(result) == 1
+      assert hd(result).name == "Alice Kim"
+    end
+
+    test "이메일로 검색" do
+      result = Filter.global_search(@data, "bob@", @columns)
+      assert length(result) == 1
+      assert hd(result).name == "Bob Lee"
+    end
+
+    test "도시로 검색 (한글)" do
+      result = Filter.global_search(@data, "서울", @columns)
+      assert length(result) == 2
+    end
+
+    test "대소문자 무관" do
+      result = Filter.global_search(@data, "CHARLIE", @columns)
+      assert length(result) == 1
+      assert hd(result).name == "Charlie Park"
+    end
+
+    test "빈 문자열 → 전체 데이터" do
+      result = Filter.global_search(@data, "", @columns)
+      assert length(result) == 5
+    end
+
+    test "공백만 → 전체 데이터" do
+      result = Filter.global_search(@data, "   ", @columns)
+      assert length(result) == 5
+    end
+
+    test "일치 없음 → 빈 결과" do
+      result = Filter.global_search(@data, "zzzzz", @columns)
+      assert result == []
+    end
+
+    test "숫자 컬럼에서도 검색" do
+      result = Filter.global_search(@data, "30", @columns)
+      assert length(result) == 1
+      assert hd(result).age == 30
+    end
+
+    test "nil 값 포함 데이터에서 검색" do
+      data_with_nil = [
+        %{id: 1, name: nil, email: "a@b.com", age: 30, city: "서울"},
+        %{id: 2, name: "Bob", email: "b@b.com", age: 25, city: "부산"}
+      ]
+      result = Filter.global_search(data_with_nil, "bob", @columns)
+      assert length(result) == 1
+      assert hd(result).name == "Bob"
+    end
+  end
+
   describe "nil 값 포함 데이터" do
     test "nil 필드값은 텍스트 필터에서 제외" do
       data_with_nil = [

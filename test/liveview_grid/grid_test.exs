@@ -314,6 +314,62 @@ defmodule LiveViewGrid.GridTest do
       grid = Grid.new(data: [], columns: [%{field: :id, label: "ID"}])
       assert grid.state.filters == %{}
       assert grid.state.show_filter_row == false
+      assert grid.state.global_search == ""
+    end
+  end
+
+  describe "전체 검색 통합" do
+    setup do
+      data = [
+        %{id: 1, name: "Alice", age: 30, city: "서울"},
+        %{id: 2, name: "Bob", age: 25, city: "부산"},
+        %{id: 3, name: "Charlie", age: 35, city: "대전"},
+        %{id: 4, name: "David", age: 28, city: "서울"},
+        %{id: 5, name: "Eve", age: 40, city: "인천"}
+      ]
+
+      columns = [
+        %{field: :name, label: "이름", sortable: true, filterable: true, filter_type: :text},
+        %{field: :age, label: "나이", sortable: true, filterable: true, filter_type: :number},
+        %{field: :city, label: "도시", filterable: true, filter_type: :text}
+      ]
+
+      grid = Grid.new(data: data, columns: columns, options: %{page_size: 10})
+      %{grid: grid}
+    end
+
+    test "visible_data에 전체 검색 적용", %{grid: grid} do
+      grid = put_in(grid.state.global_search, "alice")
+      visible = Grid.visible_data(grid)
+      assert length(visible) == 1
+      assert hd(visible).name == "Alice"
+    end
+
+    test "전체 검색 + 컬럼 필터 동시 적용", %{grid: grid} do
+      grid = put_in(grid.state.global_search, "서울")
+      grid = put_in(grid.state.filters, %{name: "ali"})
+      visible = Grid.visible_data(grid)
+      assert length(visible) == 1
+      assert hd(visible).name == "Alice"
+    end
+
+    test "전체 검색 + 정렬 동시 적용", %{grid: grid} do
+      grid = put_in(grid.state.global_search, "서울")
+      grid = put_in(grid.state.sort, %{field: :name, direction: :desc})
+      visible = Grid.visible_data(grid)
+      assert length(visible) == 2
+      assert hd(visible).name == "David"
+    end
+
+    test "filtered_count가 전체 검색 반영", %{grid: grid} do
+      grid = put_in(grid.state.global_search, "서울")
+      assert Grid.filtered_count(grid) == 2
+    end
+
+    test "빈 검색어는 전체 데이터 반환", %{grid: grid} do
+      grid = put_in(grid.state.global_search, "")
+      visible = Grid.visible_data(grid)
+      assert length(visible) == 5
     end
   end
 end

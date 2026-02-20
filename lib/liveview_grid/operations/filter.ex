@@ -8,6 +8,42 @@ defmodule LiveViewGrid.Filter do
   """
 
   @doc """
+  전체 검색 (모든 컬럼에서 검색어 매칭)
+
+  columns의 field 값들을 문자열로 변환하여 검색어 포함 여부 확인.
+  대소문자 구분 없음.
+
+  ## Examples
+
+      iex> data = [%{name: "Alice", city: "Seoul"}, %{name: "Bob", city: "Busan"}]
+      iex> columns = [%{field: :name}, %{field: :city}]
+      iex> Filter.global_search(data, "ali", columns)
+      [%{name: "Alice", city: "Seoul"}]
+  """
+  @spec global_search(data :: list(map()), query :: String.t(), columns :: list(map())) :: list(map())
+  def global_search(data, query, columns) when is_list(data) and is_binary(query) do
+    query = query |> String.trim() |> String.downcase()
+
+    if query == "" do
+      data
+    else
+      fields = Enum.map(columns, & &1.field)
+
+      Enum.filter(data, fn row ->
+        Enum.any?(fields, fn field ->
+          value = Map.get(row, field)
+
+          if is_nil(value) do
+            false
+          else
+            value |> to_string() |> String.downcase() |> String.contains?(query)
+          end
+        end)
+      end)
+    end
+  end
+
+  @doc """
   필터 적용
 
   filters는 %{field_atom => filter_value} 형태
