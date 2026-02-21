@@ -227,12 +227,19 @@ Hooks.CellEditable = {
   }
 }
 
+// 글로벌 리사이즈 플래그 (ColumnReorder와 충돌 방지)
+window.__gridResizing = false
+
 // Column Resize Hook (컬럼 너비 드래그 조절)
 Hooks.ColumnResize = {
   mounted() {
     this.handleMouseDown = (e) => {
       e.preventDefault()
       e.stopPropagation()
+
+      // 글로벌 플래그: 리사이즈 중임을 알림
+      window.__gridResizing = true
+
       const headerCell = this.el.parentElement
       const columnIndex = this.el.dataset.colIndex
       const columnField = this.el.dataset.field
@@ -275,6 +282,9 @@ Hooks.ColumnResize = {
             })
           }
         }
+
+        // 글로벌 플래그 해제 (약간 지연시켜 mouseup 핸들러 순서 보장)
+        setTimeout(() => { window.__gridResizing = false }, 0)
       }
 
       document.addEventListener("mousemove", handleMouseMove)
@@ -289,7 +299,7 @@ Hooks.ColumnResize = {
   }
 }
 
-// Column Reorder Hook (드래그&드롭으로 컬럼 순서 변경)
+// Column Reorder Hook (드래그&드롭으로 컬럼 순서 변경 + 클릭 시 정렬)
 Hooks.ColumnReorder = {
   mounted() {
     this.isDragging = false
@@ -301,18 +311,29 @@ Hooks.ColumnReorder = {
     this.sourceField = this.el.dataset.field
     this.isFrozen = this.el.dataset.frozen === "true"
 
-    // frozen 컬럼은 드래그 불가
-    if (this.isFrozen) return
-
     this.handleMouseDown = (e) => {
-      // 리사이즈 핸들 위에서는 드래그 시작하지 않음
+      // 리사이즈 중이면 무시
+      if (window.__gridResizing) return
+      // 리사이즈 핸들 위에서는 무시 (closest로 자식도 감지)
+      if (e.target.closest && e.target.closest(".lv-grid__resize-handle")) return
       if (e.target.classList.contains("lv-grid__resize-handle")) return
-      // 정렬 클릭과 구분하기 위해 즉시 드래그 시작하지 않음
+
       this.startX = e.clientX
       this.startY = e.clientY
       this.isDragging = false
 
       const onMouseMove = (e) => {
+        // 리사이즈가 시작되면 드래그 중단
+        if (window.__gridResizing) {
+          document.removeEventListener("mousemove", onMouseMove)
+          document.removeEventListener("mouseup", onMouseUp)
+          this.isDragging = false
+          return
+        }
+
+        // frozen 컬럼은 드래그 불가 (클릭 정렬만 가능)
+        if (this.isFrozen) return
+
         const dx = e.clientX - this.startX
         const dy = e.clientY - this.startY
         const distance = Math.sqrt(dx * dx + dy * dy)
@@ -332,9 +353,13 @@ Hooks.ColumnReorder = {
         document.removeEventListener("mouseup", onMouseUp)
 
         if (this.isDragging) {
+          // 드래그 완료 → reorder
           e.preventDefault()
           e.stopPropagation()
           this.endDrag(e)
+        } else {
+          // 드래그 없이 클릭 → 정렬 (sortable인 경우만)
+          this.handleSort()
         }
         this.isDragging = false
       }
@@ -344,6 +369,20 @@ Hooks.ColumnReorder = {
     }
 
     this.el.addEventListener("mousedown", this.handleMouseDown)
+  },
+
+  // 클릭 시 정렬 이벤트 push
+  handleSort() {
+    const sortable = this.el.dataset.sortable === "true"
+    if (!sortable) return
+
+    const field = this.el.dataset.field
+    const direction = this.el.dataset.sortDirection
+    const target = this.el.getAttribute("phx-target")
+
+    if (target && field) {
+      this.pushEventTo(target, "grid_sort", {field: field, direction: direction})
+    }
   },
 
   startDrag(e) {

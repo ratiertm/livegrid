@@ -752,13 +752,11 @@ defmodule LiveviewGridWeb.GridComponent do
             <div
               class={"lv-grid__header-cell #{if column.sortable, do: "lv-grid__header-cell--sortable"} #{frozen_class(col_idx, @grid)}"}
               style={"#{column_width_style(column, @grid)}; #{frozen_style(col_idx, @grid)}"}
-              phx-click={if column.sortable, do: "grid_sort"}
-              phx-value-field={column.field}
-              phx-value-direction={next_direction(@grid.state.sort, column.field)}
               phx-target={@myself}
-              data-confirm={if column.sortable && Grid.has_changes?(@grid), do: "저장하지 않은 변경사항이 있습니다. 계속하시겠습니까?"}
               data-col-index={col_idx}
               data-field={column.field}
+              data-sortable={if column.sortable, do: "true", else: "false"}
+              data-sort-direction={next_direction(@grid.state.sort, column.field)}
               data-frozen={if(col_idx < (@grid.options[:frozen_columns] || 0), do: "true", else: "false")}
               id={"header-#{column.field}"}
               phx-hook="ColumnReorder"
