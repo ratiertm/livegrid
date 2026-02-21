@@ -24,8 +24,10 @@ mix phx.server
 ```
 
 Open in browser:
-- **Grid Demo**: http://localhost:5001/demo
-- **Homepage**: http://localhost:5001
+- **Dashboard**: http://localhost:5001 (redirects to /demo)
+- **DBMS Demo**: http://localhost:5001/dbms-demo
+- **API Demo**: http://localhost:5001/api-demo
+- **API Docs**: http://localhost:5001/api-docs
 
 ### Development Setup
 
@@ -40,77 +42,76 @@ mix assets.setup
 mix test
 ```
 
-## ✨ Implemented Features (v0.1-alpha)
+## ✨ Implemented Features
 
-### Core
+### v0.1 - Core Grid
 - [x] Table rendering (LiveComponent-based)
 - [x] Column sorting (asc/desc toggle with sort icons)
 - [x] Row selection (checkbox, select all/none)
 - [x] Frozen columns
 - [x] Column resize (drag handle)
-
-### Search & Filter
 - [x] Global text search (300ms debounce)
 - [x] Per-column filters (text/number types)
-- [x] Filter toggle button (in header)
-- [x] Filter clear button
-
-### Large Dataset
 - [x] Virtual scrolling - renders only visible rows
 - [x] Infinite scroll - loads more on scroll
-- [x] Dynamic data count (50~10,000 rows)
 - [x] Pagination (when virtual scroll is OFF)
-
-### Editing
 - [x] Inline cell editing (double-click to enter)
-- [x] Text/number editor (input)
-- [x] Dropdown editor (select) - for fixed-choice columns
-- [x] Add row (top/bottom)
-- [x] Delete rows (select & delete, :deleted marking)
-- [x] Change tracking (N=New, U=Updated, D=Deleted badges)
-- [x] Batch save / discard (Save & Discard)
+- [x] Text/number/dropdown editors
+- [x] Add row / Delete rows / Change tracking (N/U/D badges)
+- [x] Batch save & discard
+- [x] CSV download
 
-### Export
-- [x] CSV download (full data)
+### v0.2 - Validation & Themes
+- [x] Cell validation - required fields, number ranges, format checks
+- [x] Validation error UI (cell highlight, tooltip messages)
+- [x] Theme system (dark mode, custom themes, CSS variable customizer)
+
+### v0.3 - DBMS Integration
+- [x] Ecto/Repo integration - DataSource behaviour adapter pattern
+- [x] SQLite support (`ecto_sqlite3`)
+- [x] Server-side sort/filter/paging (SQL ORDER BY, WHERE, LIMIT/OFFSET)
+- [x] Persist changes to DB (INSERT/UPDATE/DELETE via Ecto Changeset)
+
+### v0.4 - Column Resize & Reorder
+- [x] Column resize (drag handle with min/max width)
+- [x] Column drag reorder
+- [x] Pagination bug fixes
+
+### v0.5 - REST API Integration
+- [x] REST DataSource adapter (configurable base_url, endpoint, headers)
+- [x] Async data fetching with loading states & response time tracking
+- [x] API-based CRUD (POST create, PUT update, DELETE remove)
+- [x] Offset-based pagination via API (page/page_size)
+- [x] Authentication header support (Bearer token, custom headers)
+- [x] Error handling & retry logic (exponential backoff)
+- [x] Mock REST API server (MockApiController)
+- [x] API Key management (generate/revoke/delete, SQLite storage)
+- [x] API Documentation page
+- [x] Dashboard layout with sidebar navigation
 
 ## 🗺️ Roadmap
 
-### v0.2 - Validation & Themes
-- [ ] Cell validation - required fields, number ranges, format checks
-- [ ] Validation error UI (cell highlight, tooltip messages)
-- [ ] Theme system (dark mode, custom themes)
+### v0.6 - Upgrade: DBMS & API Enhancements
+- [ ] Multi-DB drivers - PostgreSQL (`postgrex`), MySQL/MariaDB (`myxql`)
+- [ ] Multi-DB drivers - MSSQL (`tds_ecto`), Oracle (`ecto_oracle`)
+- [ ] Large dataset streaming (`Repo.stream` for memory-efficient processing)
+- [ ] GraphQL data source support
+- [ ] PATCH method support (partial update)
+- [ ] Cursor-based pagination (in addition to offset)
+- [ ] API Key authentication enforcement (validate keys on API requests)
 
-### v0.3 - DBMS Integration
-- [ ] Ecto/Repo integration - adapter-based multi-DB support
-  - PostgreSQL, MySQL/MariaDB (Ecto built-in)
-  - MSSQL (`ecto_sql` + `tds`)
-  - Oracle (`ecto_oracle`)
-  - SQLite (`ecto_sqlite3`)
-- [ ] Server-side sort/filter/paging (DB queries)
-- [ ] Persist changes to DB (INSERT/UPDATE/DELETE)
-- [ ] Large dataset streaming (Repo.stream)
-
-### v0.4 - REST API Integration
-- [ ] External API data source (REST/GraphQL)
-- [ ] Async data fetching with loading states
-- [ ] API-based CRUD operations (POST/PUT/PATCH/DELETE)
-- [ ] Pagination via API (cursor/offset)
-- [ ] Authentication header support (Bearer token, API key)
-- [ ] Error handling & retry logic
-
-### v0.5 - Advanced Data Processing
+### v0.7 - Advanced Data Processing
 - [ ] Grouping
 - [ ] Pivot table
 - [ ] Tree grid
 
-### v0.6 - Collaboration & Real-time
+### v0.8 - Collaboration & Real-time
 - [ ] Real-time sync (multi-user concurrent editing)
 - [ ] Change history (Undo/Redo)
 - [ ] Cell locking
 
 ### v1.0 - Enterprise
 - [ ] Excel Export/Import
-- [ ] Column drag reorder
 - [ ] Context menu
 - [ ] Keyboard navigation
 - [ ] API documentation (HexDocs)
@@ -121,12 +122,28 @@ mix test
 lib/
 ├── liveview_grid/              # Business logic
 │   ├── grid.ex                 # Grid core module (data/state management)
+│   ├── data_source.ex          # DataSource behaviour (adapter pattern)
+│   ├── data_source/
+│   │   ├── in_memory.ex        # InMemory adapter (v0.1)
+│   │   ├── ecto.ex             # Ecto/DB adapter (v0.3)
+│   │   └── rest.ex             # REST API adapter (v0.5)
+│   ├── api_key.ex              # API Key schema
+│   ├── api_keys.ex             # API Key context (CRUD)
 │   └── application.ex
 └── liveview_grid_web/          # Web layer
     ├── live/
-    │   └── demo_live.ex        # Demo page (LiveView)
+    │   ├── demo_live.ex        # InMemory demo
+    │   ├── dbms_demo_live.ex   # DBMS demo (SQLite)
+    │   ├── api_demo_live.ex    # REST API demo
+    │   ├── renderer_demo_live.ex # Renderer demo
+    │   ├── api_key_live.ex     # API Key management
+    │   └── api_doc_live.ex     # API documentation
     ├── components/
-    │   └── grid_component.ex   # Grid LiveComponent (rendering/events)
+    │   ├── grid_component.ex   # Grid LiveComponent
+    │   └── layouts/
+    │       └── dashboard.html.heex  # Sidebar dashboard layout
+    ├── controllers/
+    │   └── mock_api_controller.ex   # Mock REST API
     └── router.ex
 
 assets/
