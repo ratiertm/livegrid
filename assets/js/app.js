@@ -27,24 +27,50 @@ topbar.config({barColors: {0: "#29d"}, shadowColor: "rgba(0, 0, 0, .3)"})
 window.addEventListener("phx:page-loading-start", _info => topbar.show(300))
 window.addEventListener("phx:page-loading-stop", _info => topbar.hide())
 
-// CSV 다운로드 핸들러
+// CSV 다운로드 핸들러 (레거시 - 기존 호환)
 window.addEventListener("phx:download_csv", (e) => {
   const {content, filename} = e.detail
-  
+
   // Blob 생성
   const blob = new Blob([content], {type: 'text/csv;charset=utf-8;'})
-  
+
   // 다운로드 링크 생성
   const link = document.createElement('a')
   const url = URL.createObjectURL(blob)
-  
+
   link.setAttribute('href', url)
   link.setAttribute('download', filename)
   link.style.visibility = 'hidden'
-  
+
   document.body.appendChild(link)
   link.click()
   document.body.removeChild(link)
+})
+
+// 범용 파일 다운로드 핸들러 (Base64 → Blob → Download)
+// Excel, CSV 등 모든 형식 지원
+window.addEventListener("phx:download_file", (e) => {
+  const {content, filename, mime_type} = e.detail
+
+  // Base64 → 바이너리 변환
+  const byteCharacters = atob(content)
+  const byteNumbers = new Array(byteCharacters.length)
+  for (let i = 0; i < byteCharacters.length; i++) {
+    byteNumbers[i] = byteCharacters.charCodeAt(i)
+  }
+  const byteArray = new Uint8Array(byteNumbers)
+
+  // Blob 생성 + 다운로드
+  const blob = new Blob([byteArray], {type: mime_type || 'application/octet-stream'})
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = filename
+  link.style.visibility = 'hidden'
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  URL.revokeObjectURL(url)
 })
 
 // Grid Scroll Hook (스크롤 위치 감지 - 미리 로딩)

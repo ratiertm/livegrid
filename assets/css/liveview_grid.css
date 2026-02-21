@@ -702,3 +702,63 @@ select.lv-grid__cell-editor {
   min-width: 30px;
   text-align: right;
 }
+
+/* 8. Export Buttons */
+.lv-grid__export {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+.lv-grid__export-btn {
+  padding: 4px 12px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  background: white;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+.lv-grid__export-btn:hover {
+  background: #f5f5f5;
+  border-color: #999;
+}
+.lv-grid__export-btn--excel {
+  color: #217346;
+  border-color: #217346;
+}
+.lv-grid__export-btn--excel:hover {
+  background: #e8f5e9;
+}
+.lv-grid__export-btn--csv {
+  color: #1565c0;
+  border-color: #1565c0;
+}
+.lv-grid__export-btn--csv:hover {
+  background: #e3f2fd;
+}
+.lv-grid__export-dropdown {
+  position: absolute;
+  bottom: 100%;
+  right: 0;
+  margin-bottom: 4px;
+  background: white;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  box-shadow: 0 -2px 8px rgba(0,0,0,0.12);
+  min-width: 180px;
+  z-index: 100;
+  overflow: hidden;
+}
+.lv-grid__export-dropdown-item {
+  padding: 8px 16px;
+  cursor: pointer;
+  font-size: 13px;
+  white-space: nowrap;
+  transition: background 0.15s;
+}
+.lv-grid__export-dropdown-item:hover {
+  background: #f5f5f5;
+}

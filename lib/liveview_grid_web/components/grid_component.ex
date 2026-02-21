@@ -7,7 +7,7 @@ defmodule LiveviewGridWeb.GridComponent do
   
   use Phoenix.LiveComponent
   
-  alias LiveViewGrid.{Grid, Pagination}
+  alias LiveViewGrid.{Grid, Export, Pagination}
 
   @impl true
   def mount(socket) do
@@ -48,6 +48,14 @@ defmodule LiveviewGridWeb.GridComponent do
     end
 
     socket = assign(socket, grid: grid)
+
+    # export_menu_open 초기화 (첫 마운트 시)
+    socket =
+      if Map.has_key?(socket.assigns, :export_menu_open) do
+        socket
+      else
+        assign(socket, export_menu_open: nil)
+      end
 
     # virtual scroll 전환 시 JS 스크롤 리셋
     socket = if virtual_changed? do
@@ -404,6 +412,77 @@ defmodule LiveviewGridWeb.GridComponent do
     {:noreply, assign(socket, grid: updated_grid)}
   end
 
+  # ── Export 이벤트 ──
+
+  @impl true
+  def handle_event("export_excel", %{"type" => type}, socket) do
+    grid = socket.assigns.grid
+    {data, columns} = export_data(grid, type)
+
+    case Export.to_xlsx(data, columns) do
+      {:ok, {_filename, binary}} ->
+        content = Base.encode64(binary)
+        timestamp = DateTime.utc_now() |> DateTime.to_unix()
+        filename = "liveview_grid_#{type}_#{timestamp}.xlsx"
+
+        # 부모 LiveView에 다운로드 요청 (LiveComponent의 push_event는 window에 도달하지 않음)
+        send(self(), {:grid_download_file, %{
+          content: content,
+          filename: filename,
+          mime_type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        }})
+
+        {:noreply, assign(socket, export_menu_open: nil)}
+
+      {:error, reason} ->
+        require Logger
+        Logger.error("Excel export failed: #{inspect(reason)}")
+        {:noreply, assign(socket, export_menu_open: nil)}
+    end
+  end
+
+  @impl true
+  def handle_event("export_csv", %{"type" => type}, socket) do
+    grid = socket.assigns.grid
+    {data, columns} = export_data(grid, type)
+
+    csv_content = Export.to_csv(data, columns)
+    content = Base.encode64(csv_content)
+    timestamp = DateTime.utc_now() |> DateTime.to_unix()
+    filename = "liveview_grid_#{type}_#{timestamp}.csv"
+
+    # 부모 LiveView에 다운로드 요청
+    send(self(), {:grid_download_file, %{
+      content: content,
+      filename: filename,
+      mime_type: "text/csv;charset=utf-8"
+    }})
+
+    {:noreply, assign(socket, export_menu_open: nil)}
+  end
+
+  @impl true
+  def handle_event("toggle_export_menu", %{"format" => format}, socket) do
+    current = socket.assigns[:export_menu_open]
+    new_value = if current == format, do: nil, else: format
+    {:noreply, assign(socket, export_menu_open: new_value)}
+  end
+
+  defp export_data(grid, type) do
+    data =
+      case type do
+        "all" -> grid.data
+        "filtered" -> Grid.sorted_data(grid)
+        "selected" ->
+          selected_ids = grid.state.selection.selected_ids
+          Enum.filter(grid.data, fn row -> row.id in selected_ids end)
+        _ -> grid.data
+      end
+
+    columns = grid.columns
+    {data, columns}
+  end
+
   @impl true
   def render(assigns) do
     ~H"""
@@ -736,6 +815,65 @@ defmodule LiveviewGridWeb.GridComponent do
                 <%= map_size(@grid.state.row_statuses) %>개 변경됨
               </span>
             <% end %>
+          </div>
+
+          <!-- Export 버튼 -->
+          <div class="lv-grid__export">
+            <div style="position: relative;">
+              <button
+                class="lv-grid__export-btn lv-grid__export-btn--excel"
+                phx-click="toggle_export_menu"
+                phx-value-format="excel"
+                phx-target={@myself}
+              >
+                📊 Excel
+              </button>
+              <%= if @export_menu_open == "excel" do %>
+                <div class="lv-grid__export-dropdown">
+                  <div class="lv-grid__export-dropdown-item" phx-click="export_excel" phx-value-type="all" phx-target={@myself}>
+                    전체 데이터 (<%= @grid.state.pagination.total_rows %>개)
+                  </div>
+                  <%= if @grid.state.global_search != "" or map_size(@grid.state.filters) > 0 do %>
+                    <div class="lv-grid__export-dropdown-item" phx-click="export_excel" phx-value-type="filtered" phx-target={@myself}>
+                      필터 결과 (<%= Grid.filtered_count(@grid) %>개)
+                    </div>
+                  <% end %>
+                  <%= if length(@grid.state.selection.selected_ids) > 0 do %>
+                    <div class="lv-grid__export-dropdown-item" phx-click="export_excel" phx-value-type="selected" phx-target={@myself}>
+                      선택된 행 (<%= length(@grid.state.selection.selected_ids) %>개)
+                    </div>
+                  <% end %>
+                </div>
+              <% end %>
+            </div>
+
+            <div style="position: relative;">
+              <button
+                class="lv-grid__export-btn lv-grid__export-btn--csv"
+                phx-click="toggle_export_menu"
+                phx-value-format="csv"
+                phx-target={@myself}
+              >
+                📄 CSV
+              </button>
+              <%= if @export_menu_open == "csv" do %>
+                <div class="lv-grid__export-dropdown">
+                  <div class="lv-grid__export-dropdown-item" phx-click="export_csv" phx-value-type="all" phx-target={@myself}>
+                    전체 데이터 (<%= @grid.state.pagination.total_rows %>개)
+                  </div>
+                  <%= if @grid.state.global_search != "" or map_size(@grid.state.filters) > 0 do %>
+                    <div class="lv-grid__export-dropdown-item" phx-click="export_csv" phx-value-type="filtered" phx-target={@myself}>
+                      필터 결과 (<%= Grid.filtered_count(@grid) %>개)
+                    </div>
+                  <% end %>
+                  <%= if length(@grid.state.selection.selected_ids) > 0 do %>
+                    <div class="lv-grid__export-dropdown-item" phx-click="export_csv" phx-value-type="selected" phx-target={@myself}>
+                      선택된 행 (<%= length(@grid.state.selection.selected_ids) %>개)
+                    </div>
+                  <% end %>
+                </div>
+              <% end %>
+            </div>
           </div>
         </div>
       <% end %>

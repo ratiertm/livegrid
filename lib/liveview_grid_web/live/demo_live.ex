@@ -130,57 +130,10 @@ defmodule LiveviewGridWeb.DemoLive do
     {:noreply, assign(socket, virtual_scroll: !socket.assigns.virtual_scroll)}
   end
 
+  # CSV/Excel Export: GridComponent → 부모 LiveView → push_event → JS 다운로드 (F-510)
   @impl true
-  def handle_event("export_csv", %{"type" => type}, socket) do
-    data = case type do
-      "all" -> socket.assigns.all_users
-      "filtered" -> socket.assigns.filtered_users
-      "selected" -> get_selected_users(socket)
-    end
-    
-    csv_content = generate_csv(data)
-    filename = "liveview_grid_#{type}_#{DateTime.utc_now() |> DateTime.to_unix()}.csv"
-    
-    {:noreply, push_event(socket, "download_csv", %{content: csv_content, filename: filename})}
-  end
-
-  defp get_selected_users(_socket) do
-    # GridComponent의 선택 상태를 가져올 수 없으므로 임시로 빈 리스트
-    # 실제로는 선택 상태를 DemoLive로 전달해야 함
-    []
-  end
-
-  defp generate_csv([]), do: "데이터가 없습니다"
-  defp generate_csv(data) when is_list(data) and length(data) > 0 do
-    # UTF-8 BOM 추가 (Excel에서 한글 깨짐 방지)
-    bom = <<0xEF, 0xBB, 0xBF>>
-    
-    # 헤더
-    headers = ["ID", "이름", "이메일", "나이", "도시"]
-    header_line = Enum.join(headers, ",")
-    
-    # 데이터 행
-    rows = Enum.map(data, fn user ->
-      [user.id, user.name, user.email, user.age, user.city]
-      |> Enum.map(&to_string/1)
-      |> Enum.map(&escape_csv/1)
-      |> Enum.join(",")
-    end)
-    
-    csv_content = [header_line | rows]
-    |> Enum.join("\n")
-    
-    # BOM + CSV
-    bom <> csv_content
-  end
-
-  defp escape_csv(value) do
-    value = to_string(value)
-    if String.contains?(value, [",", "\"", "\n"]) do
-      "\"#{String.replace(value, "\"", "\"\"")}\""
-    else
-      value
-    end
+  def handle_info({:grid_download_file, payload}, socket) do
+    {:noreply, push_event(socket, "download_file", payload)}
   end
 
   @impl true
@@ -335,32 +288,7 @@ defmodule LiveviewGridWeb.DemoLive do
         </div>
       </div>
       
-      <!-- Export 기능 -->
-      <div style="margin: 20px 0; padding: 15px; background: #f1f8e9; border-radius: 4px; border-left: 4px solid #8bc34a;">
-        <div style="display: flex; align-items: center; justify-content: space-between;">
-          <div>
-            <label style="font-weight: 600; margin-right: 15px;">📥 데이터 내보내기 (CSV):</label>
-          </div>
-          <div style="display: flex; gap: 10px;">
-            <button 
-              phx-click="export_csv" 
-              phx-value-type="all"
-              style="padding: 10px 20px; background: #8bc34a; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: 600;"
-            >
-              전체 (<%= length(@all_users) %>개)
-            </button>
-            <%= if @search_query != "" do %>
-              <button 
-                phx-click="export_csv" 
-                phx-value-type="filtered"
-                style="padding: 10px 20px; background: #2196f3; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: 600;"
-              >
-                검색 결과 (<%= length(@filtered_users) %>개)
-              </button>
-            <% end %>
-          </div>
-        </div>
-      </div>
+      <!-- Export: Grid 하단 footer에서 Excel/CSV 버튼으로 내보내기 -->
       
       <!-- Virtual Scroll 토글 -->
       <div style="margin: 20px 0; padding: 15px; background: #fff3e0; border-radius: 4px; border-left: 4px solid #ff9800;">
