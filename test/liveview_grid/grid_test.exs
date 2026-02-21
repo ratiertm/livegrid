@@ -638,6 +638,198 @@ defmodule LiveViewGrid.GridTest do
     end
   end
 
+  describe "셀 검증 (validation)" do
+    setup do
+      data = [
+        %{id: 1, name: "Alice", age: 30, email: "alice@example.com"},
+        %{id: 2, name: "Bob", age: 25, email: "bob@example.com"},
+        %{id: 3, name: "", age: 0, email: "invalid"}
+      ]
+
+      columns = [
+        %{field: :name, label: "이름", editable: true,
+          validators: [{:required, "이름은 필수입니다"}]},
+        %{field: :age, label: "나이", editable: true, editor_type: :number,
+          validators: [{:required, "나이는 필수입니다"}, {:min, 1, "1 이상이어야 합니다"}, {:max, 150, "150 이하이어야 합니다"}]},
+        %{field: :email, label: "이메일", editable: true,
+          validators: [{:required, "이메일은 필수입니다"}, {:pattern, ~r/@/, "이메일 형식이 올바르지 않습니다"}]}
+      ]
+
+      grid = Grid.new(data: data, columns: columns)
+      %{grid: grid}
+    end
+
+    test "initial_state에 cell_errors 포함" do
+      grid = Grid.new(data: [], columns: [%{field: :id, label: "ID"}])
+      assert grid.state.cell_errors == %{}
+    end
+
+    test "normalize_columns에서 validators 기본값은 빈 리스트" do
+      grid = Grid.new(data: [], columns: [%{field: :name, label: "이름"}])
+      [col | _] = grid.columns
+      assert col.validators == []
+    end
+
+    test "required 검증 - 빈 값이면 에러", %{grid: grid} do
+      # 이름을 빈 값으로 변경
+      grid = Grid.update_cell(grid, 1, :name, "")
+      grid = Grid.validate_cell(grid, 1, :name)
+      assert Grid.cell_error(grid, 1, :name) == "이름은 필수입니다"
+    end
+
+    test "required 검증 - nil 값이면 에러", %{grid: grid} do
+      grid = Grid.update_cell(grid, 1, :name, nil)
+      grid = Grid.validate_cell(grid, 1, :name)
+      assert Grid.cell_error(grid, 1, :name) == "이름은 필수입니다"
+    end
+
+    test "required 검증 - 값 있으면 에러 없음", %{grid: grid} do
+      grid = Grid.validate_cell(grid, 1, :name)
+      assert Grid.cell_error(grid, 1, :name) == nil
+    end
+
+    test "min 검증 - 최소값 미만이면 에러", %{grid: grid} do
+      grid = Grid.update_cell(grid, 1, :age, 0)
+      grid = Grid.validate_cell(grid, 1, :age)
+      assert Grid.cell_error(grid, 1, :age) == "1 이상이어야 합니다"
+    end
+
+    test "min 검증 - 최소값 이상이면 에러 없음", %{grid: grid} do
+      grid = Grid.validate_cell(grid, 1, :age)
+      assert Grid.cell_error(grid, 1, :age) == nil
+    end
+
+    test "max 검증 - 최대값 초과이면 에러", %{grid: grid} do
+      grid = Grid.update_cell(grid, 1, :age, 200)
+      grid = Grid.validate_cell(grid, 1, :age)
+      assert Grid.cell_error(grid, 1, :age) == "150 이하이어야 합니다"
+    end
+
+    test "max 검증 - 최대값 이하이면 에러 없음", %{grid: grid} do
+      grid = Grid.update_cell(grid, 1, :age, 150)
+      grid = Grid.validate_cell(grid, 1, :age)
+      assert Grid.cell_error(grid, 1, :age) == nil
+    end
+
+    test "pattern 검증 - 패턴 불일치 에러", %{grid: grid} do
+      grid = Grid.update_cell(grid, 1, :email, "invalid-email")
+      grid = Grid.validate_cell(grid, 1, :email)
+      assert Grid.cell_error(grid, 1, :email) == "이메일 형식이 올바르지 않습니다"
+    end
+
+    test "pattern 검증 - 패턴 일치 에러 없음", %{grid: grid} do
+      grid = Grid.validate_cell(grid, 1, :email)
+      assert Grid.cell_error(grid, 1, :email) == nil
+    end
+
+    test "has_errors? - 에러 있을 때 true", %{grid: grid} do
+      grid = Grid.update_cell(grid, 1, :name, "")
+      grid = Grid.validate_cell(grid, 1, :name)
+      assert Grid.has_errors?(grid)
+    end
+
+    test "has_errors? - 에러 없을 때 false", %{grid: grid} do
+      refute Grid.has_errors?(grid)
+    end
+
+    test "error_count - 에러 개수 반환", %{grid: grid} do
+      grid = Grid.update_cell(grid, 1, :name, "")
+      grid = Grid.validate_cell(grid, 1, :name)
+      grid = Grid.update_cell(grid, 2, :age, 0)
+      grid = Grid.validate_cell(grid, 2, :age)
+      assert Grid.error_count(grid) == 2
+    end
+
+    test "검증 에러 수정 시 에러 제거", %{grid: grid} do
+      # 에러 발생
+      grid = Grid.update_cell(grid, 1, :name, "")
+      grid = Grid.validate_cell(grid, 1, :name)
+      assert Grid.has_errors?(grid)
+
+      # 에러 수정
+      grid = Grid.update_cell(grid, 1, :name, "Alice Fixed")
+      grid = Grid.validate_cell(grid, 1, :name)
+      refute Grid.has_errors?(grid)
+    end
+
+    test "clear_cell_errors로 모든 에러 초기화", %{grid: grid} do
+      grid = Grid.update_cell(grid, 1, :name, "")
+      grid = Grid.validate_cell(grid, 1, :name)
+      assert Grid.has_errors?(grid)
+
+      grid = Grid.clear_cell_errors(grid)
+      refute Grid.has_errors?(grid)
+    end
+
+    test "validators 미설정 시 검증 통과", %{grid: _grid} do
+      # validators 없는 컬럼
+      grid = Grid.new(
+        data: [%{id: 1, name: "Test"}],
+        columns: [%{field: :name, label: "이름", editable: true}]
+      )
+      grid = Grid.validate_cell(grid, 1, :name)
+      refute Grid.has_errors?(grid)
+    end
+
+    test "update_data가 cell_errors 보존", %{grid: grid} do
+      grid = Grid.update_cell(grid, 1, :name, "")
+      grid = Grid.validate_cell(grid, 1, :name)
+      assert Grid.has_errors?(grid)
+
+      updated = Grid.update_data(grid, grid.data, grid.columns, %{})
+      assert Grid.has_errors?(updated)
+      assert Grid.cell_error(updated, 1, :name) == "이름은 필수입니다"
+    end
+  end
+
+  describe "min_length / max_length 검증" do
+    test "min_length - 짧으면 에러" do
+      columns = [%{field: :name, label: "이름", validators: [{:min_length, 3, "3자 이상이어야 합니다"}]}]
+      grid = Grid.new(data: [%{id: 1, name: "AB"}], columns: columns)
+      grid = Grid.validate_cell(grid, 1, :name)
+      assert Grid.cell_error(grid, 1, :name) == "3자 이상이어야 합니다"
+    end
+
+    test "min_length - 충분하면 에러 없음" do
+      columns = [%{field: :name, label: "이름", validators: [{:min_length, 3, "3자 이상이어야 합니다"}]}]
+      grid = Grid.new(data: [%{id: 1, name: "ABC"}], columns: columns)
+      grid = Grid.validate_cell(grid, 1, :name)
+      assert Grid.cell_error(grid, 1, :name) == nil
+    end
+
+    test "max_length - 길면 에러" do
+      columns = [%{field: :name, label: "이름", validators: [{:max_length, 5, "5자 이하이어야 합니다"}]}]
+      grid = Grid.new(data: [%{id: 1, name: "ABCDEF"}], columns: columns)
+      grid = Grid.validate_cell(grid, 1, :name)
+      assert Grid.cell_error(grid, 1, :name) == "5자 이하이어야 합니다"
+    end
+
+    test "max_length - 짧으면 에러 없음" do
+      columns = [%{field: :name, label: "이름", validators: [{:max_length, 5, "5자 이하이어야 합니다"}]}]
+      grid = Grid.new(data: [%{id: 1, name: "ABC"}], columns: columns)
+      grid = Grid.validate_cell(grid, 1, :name)
+      assert Grid.cell_error(grid, 1, :name) == nil
+    end
+  end
+
+  describe "custom 검증" do
+    test "custom 함수 - 검증 실패" do
+      is_even = fn val -> is_number(val) and rem(val, 2) == 0 end
+      columns = [%{field: :age, label: "나이", validators: [{:custom, is_even, "짝수여야 합니다"}]}]
+      grid = Grid.new(data: [%{id: 1, age: 3}], columns: columns)
+      grid = Grid.validate_cell(grid, 1, :age)
+      assert Grid.cell_error(grid, 1, :age) == "짝수여야 합니다"
+    end
+
+    test "custom 함수 - 검증 통과" do
+      is_even = fn val -> is_number(val) and rem(val, 2) == 0 end
+      columns = [%{field: :age, label: "나이", validators: [{:custom, is_even, "짝수여야 합니다"}]}]
+      grid = Grid.new(data: [%{id: 1, age: 4}], columns: columns)
+      grid = Grid.validate_cell(grid, 1, :age)
+      assert Grid.cell_error(grid, 1, :age) == nil
+    end
+  end
+
   describe "select editor (드롭다운 편집기)" do
     test "normalize_columns에서 editor_options 기본값은 빈 리스트" do
       columns = [%{field: :city, label: "도시"}]

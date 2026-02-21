@@ -206,6 +206,11 @@ defmodule LiveviewGridWeb.DemoLive do
   end
 
   @impl true
+  def handle_info({:grid_save_blocked, error_count}, socket) do
+    {:noreply, put_flash(socket, :error, "검증 오류 #{error_count}건이 있어 저장할 수 없습니다. 오류를 수정해주세요.")}
+  end
+
+  @impl true
   def handle_info({:grid_save_requested, changed_rows}, socket) do
     # 실제 프로젝트에서는 여기서 DB에 저장
     # 예: Repo.update_all(changed_rows)
@@ -406,9 +411,12 @@ defmodule LiveviewGridWeb.DemoLive do
           data={if @virtual_scroll, do: @filtered_users, else: @visible_users}
           columns={[
             %{field: :id, label: "ID", width: 80, sortable: true},
-            %{field: :name, label: "이름", width: 150, sortable: true, filterable: true, filter_type: :text, editable: true},
-            %{field: :email, label: "이메일", width: 250, sortable: true, filterable: true, filter_type: :text, editable: true},
-            %{field: :age, label: "나이", width: 80, sortable: true, filterable: true, filter_type: :number, editable: true, editor_type: :number},
+            %{field: :name, label: "이름", width: 150, sortable: true, filterable: true, filter_type: :text, editable: true,
+              validators: [{:required, "이름은 필수입니다"}]},
+            %{field: :email, label: "이메일", width: 250, sortable: true, filterable: true, filter_type: :text, editable: true,
+              validators: [{:required, "이메일은 필수입니다"}, {:pattern, ~r/@/, "이메일 형식이 올바르지 않습니다"}]},
+            %{field: :age, label: "나이", width: 80, sortable: true, filterable: true, filter_type: :number, editable: true, editor_type: :number,
+              validators: [{:required, "나이는 필수입니다"}, {:min, 1, "1 이상이어야 합니다"}, {:max, 150, "150 이하이어야 합니다"}]},
             %{field: :city, label: "도시", width: 120, sortable: true, filterable: true, filter_type: :text, editable: true, editor_type: :select,
               editor_options: [
                 {"서울", "서울"}, {"부산", "부산"}, {"대구", "대구"},

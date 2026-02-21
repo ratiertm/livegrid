@@ -192,6 +192,107 @@ defmodule LiveViewGrid.Grid do
     map_size(grid.state.row_statuses) > 0
   end
 
+  # ── 셀 검증 (Validation) ──
+
+  @doc """
+  특정 셀의 값을 검증하고 결과를 cell_errors에 저장합니다.
+  검증 실패 시 에러 메시지를 저장하고, 성공 시 에러를 제거합니다.
+  """
+  @spec validate_cell(grid :: t(), row_id :: any(), field :: atom()) :: t()
+  def validate_cell(grid, row_id, field) do
+    column = Enum.find(grid.columns, fn c -> c.field == field end)
+    row = Enum.find(grid.data, fn r -> r.id == row_id end)
+    value = if row, do: Map.get(row, field), else: nil
+    validators = if column, do: Map.get(column, :validators, []), else: []
+
+    error = run_validators(value, validators)
+
+    cell_errors = if error do
+      Map.put(grid.state.cell_errors, {row_id, field}, error)
+    else
+      Map.delete(grid.state.cell_errors, {row_id, field})
+    end
+
+    put_in(grid.state.cell_errors, cell_errors)
+  end
+
+  @doc "특정 셀의 에러 메시지를 조회합니다. 에러 없으면 nil."
+  @spec cell_error(grid :: t(), row_id :: any(), field :: atom()) :: String.t() | nil
+  def cell_error(grid, row_id, field) do
+    Map.get(grid.state.cell_errors, {row_id, field})
+  end
+
+  @doc "검증 에러가 있는지 확인합니다."
+  @spec has_errors?(grid :: t()) :: boolean()
+  def has_errors?(grid) do
+    map_size(grid.state.cell_errors) > 0
+  end
+
+  @doc "검증 에러 개수를 반환합니다."
+  @spec error_count(grid :: t()) :: non_neg_integer()
+  def error_count(grid) do
+    map_size(grid.state.cell_errors)
+  end
+
+  @doc "모든 셀 에러를 초기화합니다."
+  @spec clear_cell_errors(grid :: t()) :: t()
+  def clear_cell_errors(grid) do
+    put_in(grid.state.cell_errors, %{})
+  end
+
+  # 검증 규칙을 순서대로 실행하여 첫 번째 에러 메시지 반환 (에러 없으면 nil)
+  defp run_validators(_value, []), do: nil
+  defp run_validators(value, [{:required, msg} | rest]) do
+    if value == nil or value == "" do
+      msg
+    else
+      run_validators(value, rest)
+    end
+  end
+  defp run_validators(value, [{:min, min_val, msg} | rest]) do
+    if is_number(value) and value < min_val do
+      msg
+    else
+      run_validators(value, rest)
+    end
+  end
+  defp run_validators(value, [{:max, max_val, msg} | rest]) do
+    if is_number(value) and value > max_val do
+      msg
+    else
+      run_validators(value, rest)
+    end
+  end
+  defp run_validators(value, [{:min_length, len, msg} | rest]) do
+    if is_binary(value) and String.length(value) < len do
+      msg
+    else
+      run_validators(value, rest)
+    end
+  end
+  defp run_validators(value, [{:max_length, len, msg} | rest]) do
+    if is_binary(value) and String.length(value) > len do
+      msg
+    else
+      run_validators(value, rest)
+    end
+  end
+  defp run_validators(value, [{:pattern, regex, msg} | rest]) do
+    if is_binary(value) and not Regex.match?(regex, value) do
+      msg
+    else
+      run_validators(value, rest)
+    end
+  end
+  defp run_validators(value, [{:custom, fun, msg} | rest]) do
+    if not fun.(value) do
+      msg
+    else
+      run_validators(value, rest)
+    end
+  end
+  defp run_validators(value, [_ | rest]), do: run_validators(value, rest)
+
   @doc """
   새 행을 추가합니다. 임시 ID(음수)를 자동 부여하고 :new 상태로 마킹합니다.
   position이 :top이면 맨 앞, :bottom이면 맨 뒤에 추가합니다.
@@ -261,6 +362,7 @@ defmodule LiveViewGrid.Grid do
         editable: false,
         editor_type: :text,
         editor_options: [],
+        validators: [],
         align: :left
       }, col)
     end)
@@ -283,6 +385,7 @@ defmodule LiveViewGrid.Grid do
       scroll_offset: 0,
       editing: nil,
       row_statuses: %{},
+      cell_errors: %{},
       show_status_column: true
     }
   end

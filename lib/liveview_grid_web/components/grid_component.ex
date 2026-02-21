@@ -268,9 +268,10 @@ defmodule LiveviewGridWeb.GridComponent do
       updated_grid = put_in(grid.state.editing, nil)
       {:noreply, assign(socket, grid: updated_grid)}
     else
-      # 값 변경됨 → update_cell + 부모 알림
+      # 값 변경됨 → update_cell + validate_cell + 부모 알림
       updated_grid = grid
         |> Grid.update_cell(row_id_int, field_atom, parsed_value)
+        |> Grid.validate_cell(row_id_int, field_atom)
         |> put_in([:state, :editing], nil)
 
       send(self(), {:grid_cell_updated, row_id_int, field_atom, parsed_value})
@@ -293,9 +294,10 @@ defmodule LiveviewGridWeb.GridComponent do
       updated_grid = put_in(grid.state.editing, nil)
       {:noreply, assign(socket, grid: updated_grid)}
     else
-      # 값 변경됨 → update_cell + 부모 알림
+      # 값 변경됨 → update_cell + validate_cell + 부모 알림
       updated_grid = grid
         |> Grid.update_cell(row_id_int, field_atom, value)
+        |> Grid.validate_cell(row_id_int, field_atom)
         |> put_in([:state, :editing], nil)
 
       send(self(), {:grid_cell_updated, row_id_int, field_atom, value})
@@ -371,14 +373,21 @@ defmodule LiveviewGridWeb.GridComponent do
   @impl true
   def handle_event("grid_save", _params, socket) do
     grid = socket.assigns.grid
-    changed = Grid.changed_rows(grid)
 
-    # 부모 LiveView에 저장 요청
-    send(self(), {:grid_save_requested, changed})
+    # 검증 에러가 있으면 저장 차단
+    if Grid.has_errors?(grid) do
+      send(self(), {:grid_save_blocked, Grid.error_count(grid)})
+      {:noreply, socket}
+    else
+      changed = Grid.changed_rows(grid)
 
-    # 저장 후 상태 초기화
-    updated_grid = Grid.clear_row_statuses(grid)
-    {:noreply, assign(socket, grid: updated_grid)}
+      # 부모 LiveView에 저장 요청
+      send(self(), {:grid_save_requested, changed})
+
+      # 저장 후 상태 초기화
+      updated_grid = Grid.clear_row_statuses(grid)
+      {:noreply, assign(socket, grid: updated_grid)}
+    end
   end
 
   @impl true
@@ -389,7 +398,9 @@ defmodule LiveviewGridWeb.GridComponent do
     send(self(), :grid_discard_requested)
 
     # 상태만 초기화 (데이터는 부모가 원본으로 다시 전달해줌)
-    updated_grid = Grid.clear_row_statuses(grid)
+    updated_grid = grid
+      |> Grid.clear_row_statuses()
+      |> Grid.clear_cell_errors()
     {:noreply, assign(socket, grid: updated_grid)}
   end
 
@@ -448,10 +459,14 @@ defmodule LiveviewGridWeb.GridComponent do
             <span class="lv-grid__save-count">
               <%= map_size(@grid.state.row_statuses) %>건 변경
             </span>
+            <%= if Grid.has_errors?(@grid) do %>
+              <span class="lv-grid__error-count">⚠ <%= Grid.error_count(@grid) %>건 오류</span>
+            <% end %>
             <button
-              class="lv-grid__save-btn"
+              class={"lv-grid__save-btn #{if Grid.has_errors?(@grid), do: "lv-grid__save-btn--disabled"}"}
               phx-click="grid_save"
               phx-target={@myself}
+              title={if Grid.has_errors?(@grid), do: "검증 오류를 수정한 후 저장하세요", else: "변경사항 저장"}
             >
               💾 저장
             </button>
@@ -838,18 +853,28 @@ defmodule LiveviewGridWeb.GridComponent do
       end
     else
       # 보기 모드
-      assigns = assign(assigns, row: row, column: column)
+      cell_error = Grid.cell_error(assigns.grid, row.id, column.field)
+      assigns = assign(assigns, row: row, column: column, cell_error: cell_error)
       ~H"""
-      <span
-        class={"lv-grid__cell-value #{if @column.editable, do: "lv-grid__cell-value--editable"}"}
-        id={if @column.editable, do: "cell-#{@row.id}-#{@column.field}"}
-        phx-hook={if @column.editable, do: "CellEditable"}
-        data-row-id={@row.id}
-        data-field={@column.field}
-        phx-target={@myself}
-      >
-        <%= Map.get(@row, @column.field) %>
-      </span>
+      <div class={"lv-grid__cell-wrapper #{if @cell_error, do: "lv-grid__cell-wrapper--error"}"}>
+        <span
+          class={"lv-grid__cell-value #{if @column.editable, do: "lv-grid__cell-value--editable"} #{if @cell_error, do: "lv-grid__cell-value--error"}"}
+          id={if @column.editable, do: "cell-#{@row.id}-#{@column.field}"}
+          phx-hook={if @column.editable, do: "CellEditable"}
+          data-row-id={@row.id}
+          data-field={@column.field}
+          phx-target={@myself}
+          title={@cell_error}
+        >
+          <%= Map.get(@row, @column.field) %>
+          <%= if @cell_error do %>
+            <span class="lv-grid__cell-error-icon">!</span>
+          <% end %>
+        </span>
+        <%= if @cell_error do %>
+          <span class="lv-grid__cell-error-msg"><%= @cell_error %></span>
+        <% end %>
+      </div>
       """
     end
   end
