@@ -89,16 +89,18 @@ mix test
 - [x] API Documentation page
 - [x] Dashboard layout with sidebar navigation
 
+### v0.6 - DBMS & API Enhancements (Phase A)
+- [x] PATCH method support (partial update via `PATCH /api/users/:id`)
+- [x] API Key authentication enforcement (RequireApiKey plug, permission/expiration check)
+
 ## 🗺️ Roadmap
 
-### v0.6 - Upgrade: DBMS & API Enhancements
+### v0.6 - DBMS & API Enhancements (Phase B~D)
 - [ ] Multi-DB drivers - PostgreSQL (`postgrex`), MySQL/MariaDB (`myxql`)
 - [ ] Multi-DB drivers - MSSQL (`tds_ecto`), Oracle (`ecto_oracle`)
 - [ ] Large dataset streaming (`Repo.stream` for memory-efficient processing)
 - [ ] GraphQL data source support
-- [ ] PATCH method support (partial update)
 - [ ] Cursor-based pagination (in addition to offset)
-- [ ] API Key authentication enforcement (validate keys on API requests)
 
 ### v0.7 - Advanced Data Processing
 - [ ] Grouping
@@ -142,6 +144,8 @@ lib/
     │   ├── grid_component.ex   # Grid LiveComponent
     │   └── layouts/
     │       └── dashboard.html.heex  # Sidebar dashboard layout
+    ├── plugs/
+    │   └── require_api_key.ex       # API Key authentication plug (v0.6)
     ├── controllers/
     │   └── mock_api_controller.ex   # Mock REST API
     └── router.ex

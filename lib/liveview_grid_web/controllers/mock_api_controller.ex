@@ -10,7 +10,8 @@ defmodule LiveviewGridWeb.MockApiController do
       GET    /api/users          - List users (paginated, sortable, filterable)
       GET    /api/users/:id      - Get single user
       POST   /api/users          - Create user
-      PUT    /api/users/:id      - Update user
+      PUT    /api/users/:id      - Update user (full replacement)
+      PATCH  /api/users/:id      - Partial update user (specific fields only)
       DELETE /api/users/:id      - Delete user
 
   ## Query Parameters
@@ -126,6 +127,38 @@ defmodule LiveviewGridWeb.MockApiController do
           {:error, changeset} ->
             errors = Ecto.Changeset.traverse_errors(changeset, fn {msg, _} -> msg end)
             conn |> put_status(:unprocessable_entity) |> json(%{error: errors})
+        end
+    end
+  end
+
+  def patch(conn, %{"id" => id} = params) do
+    case Repo.get(DemoUser, id) do
+      nil ->
+        conn |> put_status(:not_found) |> json(%{error: "Not found"})
+
+      user ->
+        # PATCH: only update fields that are explicitly provided
+        allowed = ~w(name email department age salary status join_date)
+        provided = Map.take(params, allowed)
+
+        if map_size(provided) == 0 do
+          conn |> put_status(:bad_request) |> json(%{error: "No fields to update"})
+        else
+          changes =
+            Enum.reduce(provided, %{}, fn
+              {"age", v}, acc -> Map.put(acc, :age, parse_int(v, user.age))
+              {"salary", v}, acc -> Map.put(acc, :salary, parse_int(v, user.salary))
+              {k, v}, acc -> Map.put(acc, String.to_atom(k), v)
+            end)
+
+          case DemoUser.changeset(user, changes) |> Repo.update() do
+            {:ok, updated} ->
+              json(conn, %{data: row_to_map(updated), patched_fields: Map.keys(provided)})
+
+            {:error, changeset} ->
+              errors = Ecto.Changeset.traverse_errors(changeset, fn {msg, _} -> msg end)
+              conn |> put_status(:unprocessable_entity) |> json(%{error: errors})
+          end
         end
     end
   end

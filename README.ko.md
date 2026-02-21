@@ -89,16 +89,18 @@ mix test
 - [x] API 문서 페이지
 - [x] 사이드바 네비게이션 대시보드 레이아웃
 
+### v0.6 - DBMS & API 강화 (Phase A)
+- [x] PATCH 메서드 지원 (부분 업데이트, `PATCH /api/users/:id`)
+- [x] API Key 인증 적용 (RequireApiKey plug, 권한/만료 검증)
+
 ## 🗺️ 로드맵
 
-### v0.6 - 업그레이드: DBMS & API 강화
+### v0.6 - DBMS & API 강화 (Phase B~D)
 - [ ] 멀티 DB 드라이버 - PostgreSQL (`postgrex`), MySQL/MariaDB (`myxql`)
 - [ ] 멀티 DB 드라이버 - MSSQL (`tds_ecto`), Oracle (`ecto_oracle`)
 - [ ] 대용량 데이터 스트리밍 (`Repo.stream` 메모리 효율 처리)
 - [ ] GraphQL 데이터 소스 지원
-- [ ] PATCH 메서드 지원 (부분 업데이트)
 - [ ] 커서 기반 페이지네이션 (오프셋 외 추가)
-- [ ] API Key 인증 적용 (API 요청 시 키 검증)
 
 ### v0.7 - 고급 데이터 처리
 - [ ] 그룹핑
@@ -142,6 +144,8 @@ lib/
     │   ├── grid_component.ex   # Grid LiveComponent
     │   └── layouts/
     │       └── dashboard.html.heex  # 사이드바 대시보드 레이아웃
+    ├── plugs/
+    │   └── require_api_key.ex       # API Key 인증 plug (v0.6)
     ├── controllers/
     │   └── mock_api_controller.ex   # Mock REST API
     └── router.ex

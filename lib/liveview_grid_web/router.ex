@@ -14,6 +14,11 @@ defmodule LiveviewGridWeb.Router do
     plug :accepts, ["json"]
   end
 
+  pipeline :authenticated_api do
+    plug :accepts, ["json"]
+    plug LiveviewGridWeb.Plugs.RequireApiKey
+  end
+
   scope "/", LiveviewGridWeb do
     pipe_through :browser
 
@@ -33,14 +38,15 @@ defmodule LiveviewGridWeb.Router do
     end
   end
 
-  # Mock REST API for API Demo
+  # Mock REST API - authenticated endpoints
   scope "/api", LiveviewGridWeb do
-    pipe_through :api
+    pipe_through :authenticated_api
 
     get "/users", MockApiController, :index
     get "/users/:id", MockApiController, :show
     post "/users", MockApiController, :create
     put "/users/:id", MockApiController, :update
+    patch "/users/:id", MockApiController, :patch
     delete "/users/:id", MockApiController, :delete
   end
 

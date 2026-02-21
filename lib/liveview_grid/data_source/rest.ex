@@ -125,6 +125,23 @@ defmodule LiveViewGrid.DataSource.Rest do
   end
 
   @impl true
+  def partial_update_row(config, row_id, changes) do
+    url = "#{base_endpoint_url(config)}/#{row_id}"
+    headers = build_headers(config)
+    request_opts = Map.merge(@default_request_opts, Map.get(config, :request_opts, %{}))
+    body = Jason.encode!(stringify_keys(changes))
+
+    case do_request(:patch, url, headers, body, request_opts) do
+      {:ok, response_body} ->
+        {:ok, atomize_keys(response_body)}
+
+      {:error, reason} ->
+        Logger.error("[REST DataSource] partial_update_row failed: #{inspect(reason)}")
+        {:error, reason}
+    end
+  end
+
+  @impl true
   def delete_row(config, row_id) do
     url = "#{base_endpoint_url(config)}/#{row_id}"
     headers = build_headers(config)

@@ -49,7 +49,15 @@ defmodule LiveViewGrid.DataSource do
   @callback update_row(config(), row_id(), map()) :: {:ok, row()} | {:error, any()}
 
   @doc """
+  Partially update a row by ID with only the changed fields (PATCH).
+  Optional callback - defaults to `update_row/3` if not implemented.
+  """
+  @callback partial_update_row(config(), row_id(), map()) :: {:ok, row()} | {:error, any()}
+
+  @doc """
   Delete a row by ID.
   """
   @callback delete_row(config(), row_id()) :: :ok | {:error, any()}
+
+  @optional_callbacks [partial_update_row: 3]
 end

@@ -35,4 +35,36 @@ defmodule LiveviewGrid.ApiKeys do
     Repo.get!(ApiKey, id)
     |> Repo.delete()
   end
+
+  @doc "Validate an API key string. Returns {:ok, api_key} or {:error, reason}."
+  def validate_key(key_string) do
+    case Repo.get_by(ApiKey, key: key_string) do
+      nil ->
+        {:error, :not_found}
+
+      %ApiKey{status: "revoked"} ->
+        {:error, :revoked}
+
+      %ApiKey{expires_at: expires_at} = api_key when not is_nil(expires_at) ->
+        if DateTime.compare(expires_at, DateTime.utc_now()) == :lt do
+          {:error, :expired}
+        else
+          {:ok, api_key}
+        end
+
+      %ApiKey{} = api_key ->
+        {:ok, api_key}
+    end
+  end
+
+  @doc "Update last_used_at timestamp for an API key."
+  def touch_last_used(id) do
+    case Repo.get(ApiKey, id) do
+      nil -> :ok
+      api_key ->
+        api_key
+        |> ApiKey.changeset(%{last_used_at: DateTime.utc_now() |> DateTime.truncate(:second)})
+        |> Repo.update()
+    end
+  end
 end
