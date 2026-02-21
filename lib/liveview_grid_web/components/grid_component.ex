@@ -17,6 +17,7 @@ defmodule LiveviewGridWeb.GridComponent do
   @impl true
   def update(assigns, socket) do
     new_options = Map.get(assigns, :options, %{})
+    data_source = Map.get(assigns, :data_source, nil)
 
     {grid, virtual_changed?} = if Map.has_key?(socket.assigns, :grid) do
       old_grid = socket.assigns.grid
@@ -31,6 +32,9 @@ defmodule LiveviewGridWeb.GridComponent do
         new_options
       )
 
+      # data_source 보존
+      updated = if data_source, do: Map.put(updated, :data_source, data_source), else: updated
+
       # virtual_scroll 옵션이 변경되었으면 scroll_offset 리셋
       if old_virtual != new_virtual do
         {put_in(updated.state.scroll_offset, 0), true}
@@ -39,12 +43,23 @@ defmodule LiveviewGridWeb.GridComponent do
       end
     else
       # 첫 마운트: 새 Grid 생성
-      grid = Grid.new(
+      grid_opts = [
         data: assigns.data,
         columns: assigns.columns,
         options: new_options
-      )
-      {put_in(grid.state.pagination.total_rows, length(assigns.data)), false}
+      ]
+      grid_opts = if data_source, do: Keyword.put(grid_opts, :data_source, data_source), else: grid_opts
+
+      grid = Grid.new(grid_opts)
+
+      # InMemory일 때는 data 기반 total_rows, DataSource일 때는 fetch가 이미 설정
+      grid = if data_source do
+        grid
+      else
+        put_in(grid.state.pagination.total_rows, length(assigns.data))
+      end
+
+      {grid, false}
     end
 
     socket = assign(socket, grid: grid)

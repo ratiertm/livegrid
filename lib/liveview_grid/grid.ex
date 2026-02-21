@@ -1,8 +1,10 @@
 defmodule LiveViewGrid.Grid do
   @moduledoc """
   Grid 인스턴스 생성 및 관리
-  
-  프로토타입 v0.1-alpha: 최소 기능만 구현
+
+  v0.3: DataSource behaviour 기반 플러거블 백엔드 지원
+  - InMemory (기본): 기존 Enum 기반 파이프라인
+  - Ecto: DB 쿼리 기반 정렬/필터/페이지네이션
   """
 
   @type t :: %{
@@ -10,7 +12,8 @@ defmodule LiveViewGrid.Grid do
     data: list(map()),
     columns: list(map()),
     state: map(),
-    options: map()
+    options: map(),
+    data_source: {module(), map()} | nil
   }
 
   @doc """
@@ -26,18 +29,41 @@ defmodule LiveViewGrid.Grid do
   """
   @spec new(opts :: keyword()) :: t()
   def new(opts) do
-    data = Keyword.fetch!(opts, :data)
+    data = Keyword.get(opts, :data, [])
     columns = Keyword.fetch!(opts, :columns)
     options = Keyword.get(opts, :options, %{})
     id = Keyword.get(opts, :id, generate_id())
+    data_source = Keyword.get(opts, :data_source, nil)
 
-    %{
+    grid = %{
       id: id,
       data: data,
       columns: normalize_columns(columns),
       state: initial_state(),
-      options: merge_default_options(options)
+      options: merge_default_options(options),
+      data_source: data_source
     }
+
+    # data_source가 설정된 경우 초기 데이터를 fetch
+    if data_source do
+      refresh_from_source(grid)
+    else
+      grid
+    end
+  end
+
+  @doc """
+  DataSource에서 데이터를 다시 가져와 Grid를 갱신합니다.
+  data_source가 nil이면 그대로 반환합니다.
+  """
+  @spec refresh_from_source(grid :: t()) :: t()
+  def refresh_from_source(%{data_source: nil} = grid), do: grid
+  def refresh_from_source(%{data_source: {module, config}} = grid) do
+    {rows, total_count, _filtered_count} =
+      module.fetch_data(config, grid.state, grid.options, grid.columns)
+
+    %{grid | data: rows}
+    |> put_in([:state, :pagination, :total_rows], total_count)
   end
 
   @doc """
@@ -50,19 +76,30 @@ defmodule LiveViewGrid.Grid do
     # (hot-reload 시 이전 state에 새 키가 없을 수 있음)
     merged_state = Map.merge(initial_state(), grid.state)
 
+    # data_source 보존 (기존 grid에 있으면 유지)
+    data_source = Map.get(grid, :data_source)
+
     %{grid |
       data: data,
       columns: normalize_columns(columns),
       options: merge_default_options(options),
       state: merged_state
     }
+    |> Map.put(:data_source, data_source)
     |> put_in([:state, :pagination, :total_rows], length(data))
   end
 
   @doc """
   화면에 표시할 데이터 (정렬 + 페이징 적용)
+
+  data_source가 설정된 경우 adapter를 통해 데이터를 가져옵니다.
+  설정되지 않은 경우 기존 InMemory 파이프라인을 사용합니다.
   """
   @spec visible_data(grid :: t()) :: list(map())
+  def visible_data(%{data_source: {module, config}, state: state, options: options, columns: columns}) do
+    {rows, _total, _filtered} = module.fetch_data(config, state, options, columns)
+    rows
+  end
   def visible_data(%{data: data, columns: columns, state: state, options: options}) do
     searched = apply_global_search(data, state.global_search, columns)
     filtered = apply_filters(searched, state.filters, columns)
@@ -91,8 +128,14 @@ defmodule LiveViewGrid.Grid do
 
   @doc """
   필터 적용 후 데이터 개수 (footer에 표시할 건수)
+
+  data_source가 설정된 경우 adapter에서 filtered_count를 가져옵니다.
   """
   @spec filtered_count(grid :: t()) :: non_neg_integer()
+  def filtered_count(%{data_source: {module, config}, state: state, options: options, columns: columns}) do
+    {_rows, _total, filtered} = module.fetch_data(config, state, options, columns)
+    filtered
+  end
   def filtered_count(%{data: data, columns: columns, state: state}) do
     has_search = state.global_search != ""
     has_filters = map_size(state.filters) > 0

@@ -21,6 +21,7 @@ defmodule LiveviewGridWeb.Router do
     live "/grid", GridLive
     live "/demo", DemoLive
     live "/renderer-demo", RendererDemoLive
+    live "/dbms-demo", DbmsDemoLive
   end
 
   # Other scopes may use custom stacks.

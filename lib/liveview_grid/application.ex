@@ -9,6 +9,7 @@ defmodule LiveviewGrid.Application do
   def start(_type, _args) do
     children = [
       LiveviewGridWeb.Telemetry,
+      LiveviewGrid.Repo,
       {DNSCluster, query: Application.get_env(:liveview_grid, :dns_cluster_query) || :ignore},
       {Phoenix.PubSub, name: LiveviewGrid.PubSub},
       # Start a worker by calling: LiveviewGrid.Worker.start_link(arg)

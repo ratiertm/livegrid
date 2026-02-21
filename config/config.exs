@@ -8,7 +8,13 @@
 import Config
 
 config :liveview_grid,
-  generators: [timestamp_type: :utc_datetime]
+  generators: [timestamp_type: :utc_datetime],
+  ecto_repos: [LiveviewGrid.Repo]
+
+# SQLite database for demo
+config :liveview_grid, LiveviewGrid.Repo,
+  database: Path.expand("../liveview_grid_#{config_env()}.db", __DIR__),
+  pool_size: 5
 
 # Configures the endpoint
 config :liveview_grid, LiveviewGridWeb.Endpoint,
