@@ -79,7 +79,11 @@ mix test
 - [ ] 테마 시스템 (다크 모드, 커스텀 테마)
 
 ### v0.3 - DBMS 연동
-- [ ] Ecto/Repo 통합 (PostgreSQL, MySQL)
+- [ ] Ecto/Repo 통합 - 어댑터 방식으로 다양한 DB 지원
+  - PostgreSQL, MySQL/MariaDB (Ecto 기본 지원)
+  - MSSQL (`ecto_sql` + `tds`)
+  - Oracle (`ecto_oracle`)
+  - SQLite (`ecto_sqlite3`)
 - [ ] 서버 사이드 정렬/필터/페이징 (DB 쿼리)
 - [ ] 변경사항 DB 저장 (INSERT/UPDATE/DELETE)
 - [ ] 대용량 데이터 스트리밍 (Repo.stream)
