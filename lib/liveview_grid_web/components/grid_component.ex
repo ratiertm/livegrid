@@ -854,29 +854,74 @@ defmodule LiveviewGridWeb.GridComponent do
     else
       # 보기 모드
       cell_error = Grid.cell_error(assigns.grid, row.id, column.field)
-      assigns = assign(assigns, row: row, column: column, cell_error: cell_error)
-      ~H"""
-      <div class={"lv-grid__cell-wrapper #{if @cell_error, do: "lv-grid__cell-wrapper--error"}"}>
-        <span
-          class={"lv-grid__cell-value #{if @column.editable, do: "lv-grid__cell-value--editable"} #{if @cell_error, do: "lv-grid__cell-value--error"}"}
-          id={if @column.editable, do: "cell-#{@row.id}-#{@column.field}"}
-          phx-hook={if @column.editable, do: "CellEditable"}
-          data-row-id={@row.id}
-          data-field={@column.field}
-          phx-target={@myself}
-          title={@cell_error}
-        >
-          <%= Map.get(@row, @column.field) %>
-          <%= if @cell_error do %>
-            <span class="lv-grid__cell-error-icon">!</span>
-          <% end %>
-        </span>
-        <%= if @cell_error do %>
-          <span class="lv-grid__cell-error-msg"><%= @cell_error %></span>
-        <% end %>
-      </div>
-      """
+
+      if column.renderer do
+        # 커스텀 렌더러
+        render_with_renderer(assigns, row, column, cell_error)
+      else
+        # 기존 plain text
+        render_plain(assigns, row, column, cell_error)
+      end
     end
+  end
+
+  defp render_with_renderer(assigns, row, column, cell_error) do
+    rendered_content =
+      try do
+        column.renderer.(row, column, assigns)
+      rescue
+        _ -> Phoenix.HTML.raw(to_string(Map.get(row, column.field)))
+      end
+
+    assigns = assign(assigns, row: row, column: column, cell_error: cell_error, rendered_content: rendered_content)
+
+    ~H"""
+    <div class={"lv-grid__cell-wrapper #{if @cell_error, do: "lv-grid__cell-wrapper--error"}"}>
+      <span
+        class={"lv-grid__cell-value #{if @column.editable, do: "lv-grid__cell-value--editable"} #{if @cell_error, do: "lv-grid__cell-value--error"}"}
+        id={if @column.editable, do: "cell-#{@row.id}-#{@column.field}"}
+        phx-hook={if @column.editable, do: "CellEditable"}
+        data-row-id={@row.id}
+        data-field={@column.field}
+        phx-target={@myself}
+        title={@cell_error}
+      >
+        <%= @rendered_content %>
+        <%= if @cell_error do %>
+          <span class="lv-grid__cell-error-icon">!</span>
+        <% end %>
+      </span>
+      <%= if @cell_error do %>
+        <span class="lv-grid__cell-error-msg"><%= @cell_error %></span>
+      <% end %>
+    </div>
+    """
+  end
+
+  defp render_plain(assigns, row, column, cell_error) do
+    assigns = assign(assigns, row: row, column: column, cell_error: cell_error)
+
+    ~H"""
+    <div class={"lv-grid__cell-wrapper #{if @cell_error, do: "lv-grid__cell-wrapper--error"}"}>
+      <span
+        class={"lv-grid__cell-value #{if @column.editable, do: "lv-grid__cell-value--editable"} #{if @cell_error, do: "lv-grid__cell-value--error"}"}
+        id={if @column.editable, do: "cell-#{@row.id}-#{@column.field}"}
+        phx-hook={if @column.editable, do: "CellEditable"}
+        data-row-id={@row.id}
+        data-field={@column.field}
+        phx-target={@myself}
+        title={@cell_error}
+      >
+        <%= Map.get(@row, @column.field) %>
+        <%= if @cell_error do %>
+          <span class="lv-grid__cell-error-icon">!</span>
+        <% end %>
+      </span>
+      <%= if @cell_error do %>
+        <span class="lv-grid__cell-error-msg"><%= @cell_error %></span>
+      <% end %>
+    </div>
+    """
   end
 
   defp page_range_for(total_rows, current_page, page_size) do

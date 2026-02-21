@@ -363,6 +363,7 @@ defmodule LiveViewGrid.Grid do
         editor_type: :text,
         editor_options: [],
         validators: [],
+        renderer: nil,
         align: :left
       }, col)
     end)

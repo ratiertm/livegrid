@@ -20,6 +20,7 @@ defmodule LiveviewGridWeb.Router do
     get "/", PageController, :home
     live "/grid", GridLive
     live "/demo", DemoLive
+    live "/renderer-demo", RendererDemoLive
   end
 
   # Other scopes may use custom stacks.
