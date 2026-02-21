@@ -46,10 +46,15 @@ defmodule LiveViewGrid.Grid do
   """
   @spec update_data(grid :: t(), data :: list(map()), columns :: list(map()), options :: map()) :: t()
   def update_data(grid, data, columns, options) do
+    # 기존 state에 누락된 키를 initial_state 기본값으로 보충
+    # (hot-reload 시 이전 state에 새 키가 없을 수 있음)
+    merged_state = Map.merge(initial_state(), grid.state)
+
     %{grid |
       data: data,
       columns: normalize_columns(columns),
-      options: merge_default_options(options)
+      options: merge_default_options(options),
+      state: merged_state
     }
     |> put_in([:state, :pagination, :total_rows], length(data))
   end
@@ -164,6 +169,82 @@ defmodule LiveViewGrid.Grid do
     |> Map.new()
   end
 
+  @doc """
+  변경된 행 데이터를 상태와 함께 반환합니다.
+  저장 시 부모 LiveView에 전달할 데이터로 사용합니다.
+
+  ## Returns
+      [%{row: %{id: 1, name: "Alice"}, status: :updated}, ...]
+  """
+  @spec changed_rows(grid :: t()) :: list(map())
+  def changed_rows(grid) do
+    grid.state.row_statuses
+    |> Enum.map(fn {row_id, status} ->
+      row = Enum.find(grid.data, fn r -> r.id == row_id end)
+      %{row: row, status: status}
+    end)
+    |> Enum.filter(fn %{row: row} -> row != nil end)
+  end
+
+  @doc "변경사항이 있는지 확인합니다."
+  @spec has_changes?(grid :: t()) :: boolean()
+  def has_changes?(grid) do
+    map_size(grid.state.row_statuses) > 0
+  end
+
+  @doc """
+  새 행을 추가합니다. 임시 ID(음수)를 자동 부여하고 :new 상태로 마킹합니다.
+  position이 :top이면 맨 앞, :bottom이면 맨 뒤에 추가합니다.
+  """
+  @spec add_row(grid :: t(), defaults :: map(), position :: :top | :bottom) :: t()
+  def add_row(grid, defaults \\ %{}, position \\ :top) do
+    temp_id = next_temp_id(grid)
+    new_row = Map.merge(defaults, %{id: temp_id})
+
+    updated_data = case position do
+      :top -> [new_row | grid.data]
+      :bottom -> grid.data ++ [new_row]
+    end
+
+    %{grid | data: updated_data}
+    |> put_in([:state, :row_statuses], Map.put(grid.state.row_statuses, temp_id, :new))
+    |> put_in([:state, :pagination, :total_rows], length(updated_data))
+  end
+
+  @doc """
+  선택된 행들을 삭제 마킹합니다. (:deleted 상태로 변경)
+  :new 상태인 행은 데이터에서 완전히 제거합니다.
+  """
+  @spec delete_rows(grid :: t(), row_ids :: list(any())) :: t()
+  def delete_rows(grid, row_ids) do
+    Enum.reduce(row_ids, grid, fn row_id, acc ->
+      current_status = Map.get(acc.state.row_statuses, row_id)
+
+      if current_status == :new do
+        # :new 행은 데이터에서 완전 제거
+        updated_data = Enum.reject(acc.data, fn r -> r.id == row_id end)
+        updated_statuses = Map.delete(acc.state.row_statuses, row_id)
+        updated_selection = List.delete(acc.state.selection.selected_ids, row_id)
+
+        %{acc | data: updated_data}
+        |> put_in([:state, :row_statuses], updated_statuses)
+        |> put_in([:state, :selection, :selected_ids], updated_selection)
+        |> put_in([:state, :pagination, :total_rows], length(updated_data))
+      else
+        # 기존 행은 :deleted 마킹
+        acc
+        |> put_in([:state, :row_statuses], Map.put(acc.state.row_statuses, row_id, :deleted))
+      end
+    end)
+  end
+
+  # 다음 임시 ID를 생성합니다. (음수로 자동 감소)
+  defp next_temp_id(grid) do
+    existing_ids = Enum.map(grid.data, & &1.id)
+    min_id = Enum.min(existing_ids, fn -> 0 end)
+    if min_id > 0, do: -1, else: min_id - 1
+  end
+
   # Private functions
 
   defp generate_id do
@@ -179,6 +260,7 @@ defmodule LiveViewGrid.Grid do
         filter_type: :text,
         editable: false,
         editor_type: :text,
+        editor_options: [],
         align: :left
       }, col)
     end)
@@ -213,6 +295,7 @@ defmodule LiveViewGrid.Grid do
       virtual_scroll: false,
       virtual_buffer: 5,
       row_height: 40,
+      frozen_columns: 0,
       debug: false
     }, options)
   end

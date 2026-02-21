@@ -201,11 +201,88 @@ Hooks.CellEditable = {
   }
 }
 
+// Column Resize Hook (컬럼 너비 드래그 조절)
+Hooks.ColumnResize = {
+  mounted() {
+    this.handleMouseDown = (e) => {
+      e.preventDefault()
+      const headerCell = this.el.parentElement
+      const columnIndex = this.el.dataset.colIndex
+      const startX = e.clientX
+      const startWidth = headerCell.offsetWidth
+
+      // 리사이즈 커서 표시
+      document.body.style.cursor = "col-resize"
+      document.body.style.userSelect = "none"
+
+      const handleMouseMove = (e) => {
+        const diff = e.clientX - startX
+        const newWidth = Math.max(50, startWidth + diff) // 최소 50px
+
+        // 같은 컬럼 인덱스의 모든 셀 너비 변경
+        const grid = headerCell.closest(".lv-grid")
+        if (grid) {
+          // 헤더 셀
+          const headerCells = grid.querySelectorAll(`.lv-grid__header-cell[data-col-index="${columnIndex}"]`)
+          headerCells.forEach(cell => {
+            cell.style.width = newWidth + "px"
+            cell.style.flex = `0 0 ${newWidth}px`
+          })
+          // 필터 셀
+          const filterCells = grid.querySelectorAll(`.lv-grid__filter-cell[data-col-index="${columnIndex}"]`)
+          filterCells.forEach(cell => {
+            cell.style.width = newWidth + "px"
+            cell.style.flex = `0 0 ${newWidth}px`
+          })
+          // 바디 셀
+          const bodyCells = grid.querySelectorAll(`.lv-grid__cell[data-col-index="${columnIndex}"]`)
+          bodyCells.forEach(cell => {
+            cell.style.width = newWidth + "px"
+            cell.style.flex = `0 0 ${newWidth}px`
+          })
+        }
+      }
+
+      const handleMouseUp = () => {
+        document.body.style.cursor = ""
+        document.body.style.userSelect = ""
+        document.removeEventListener("mousemove", handleMouseMove)
+        document.removeEventListener("mouseup", handleMouseUp)
+      }
+
+      document.addEventListener("mousemove", handleMouseMove)
+      document.addEventListener("mouseup", handleMouseUp)
+    }
+
+    this.el.addEventListener("mousedown", this.handleMouseDown)
+  },
+
+  destroyed() {
+    this.el.removeEventListener("mousedown", this.handleMouseDown)
+  }
+}
+
 // Cell Editor Hook (인라인 셀 편집 - 자동 포커스 & 텍스트 선택)
 Hooks.CellEditor = {
   mounted() {
     this.el.focus()
-    this.el.select()
+    // select 요소는 .select() 메서드가 없으므로 방어 코드
+    if (typeof this.el.select === "function") {
+      this.el.select()
+    }
+
+    // select 요소일 때 change 이벤트 처리
+    if (this.el.tagName === "SELECT") {
+      this.el.addEventListener("change", (e) => {
+        const rowId = this.el.getAttribute("phx-value-row-id")
+        const field = this.el.getAttribute("phx-value-field")
+        this.pushEventTo(this.el, "cell_select_change", {
+          "select_value": e.target.value,
+          "row-id": rowId,
+          "field": field
+        })
+      })
+    }
   },
   updated() {
     this.el.focus()

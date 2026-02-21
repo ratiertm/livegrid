@@ -259,14 +259,48 @@ defmodule LiveviewGridWeb.GridComponent do
       value
     end
 
-    updated_grid = grid
-      |> Grid.update_cell(row_id_int, field_atom, parsed_value)
-      |> put_in([:state, :editing], nil)
+    # 원래 값과 비교 → 변경 없으면 편집 모드만 종료
+    row = Enum.find(grid.data, fn r -> r.id == row_id_int end)
+    original_value = if row, do: Map.get(row, field_atom), else: nil
 
-    # 부모 LiveView에 변경 알림
-    send(self(), {:grid_cell_updated, row_id_int, field_atom, parsed_value})
+    if original_value == parsed_value do
+      # 값 변경 없음 → 편집 모드만 종료 (상태 마킹 안 함)
+      updated_grid = put_in(grid.state.editing, nil)
+      {:noreply, assign(socket, grid: updated_grid)}
+    else
+      # 값 변경됨 → update_cell + 부모 알림
+      updated_grid = grid
+        |> Grid.update_cell(row_id_int, field_atom, parsed_value)
+        |> put_in([:state, :editing], nil)
 
-    {:noreply, assign(socket, grid: updated_grid)}
+      send(self(), {:grid_cell_updated, row_id_int, field_atom, parsed_value})
+      {:noreply, assign(socket, grid: updated_grid)}
+    end
+  end
+
+  @impl true
+  def handle_event("cell_select_change", %{"select_value" => value, "row-id" => row_id, "field" => field}, socket) do
+    grid = socket.assigns.grid
+    row_id_int = String.to_integer(row_id)
+    field_atom = String.to_atom(field)
+
+    # 원래 값과 비교
+    row = Enum.find(grid.data, fn r -> r.id == row_id_int end)
+    original_value = if row, do: Map.get(row, field_atom), else: nil
+
+    if to_string(original_value) == value do
+      # 값 변경 없음 → 편집 모드만 종료
+      updated_grid = put_in(grid.state.editing, nil)
+      {:noreply, assign(socket, grid: updated_grid)}
+    else
+      # 값 변경됨 → update_cell + 부모 알림
+      updated_grid = grid
+        |> Grid.update_cell(row_id_int, field_atom, value)
+        |> put_in([:state, :editing], nil)
+
+      send(self(), {:grid_cell_updated, row_id_int, field_atom, value})
+      {:noreply, assign(socket, grid: updated_grid)}
+    end
   end
 
   @impl true
@@ -292,30 +326,143 @@ defmodule LiveviewGridWeb.GridComponent do
   end
 
   @impl true
+  def handle_event("grid_add_row", _params, socket) do
+    grid = socket.assigns.grid
+
+    # 컬럼 기본값 생성 (빈 문자열, 0, 또는 select 첫 번째 값)
+    defaults = Enum.reduce(grid.columns, %{}, fn col, acc ->
+      default_val = case col.editor_type do
+        :number -> 0
+        :select ->
+          if col.editor_options != [], do: elem(hd(col.editor_options), 1), else: ""
+        _ -> ""
+      end
+      Map.put(acc, col.field, default_val)
+    end)
+
+    updated_grid = Grid.add_row(grid, defaults, :top)
+
+    # 부모에게 알림
+    send(self(), {:grid_row_added, hd(updated_grid.data)})
+
+    {:noreply, assign(socket, grid: updated_grid)}
+  end
+
+  @impl true
+  def handle_event("grid_delete_selected", _params, socket) do
+    grid = socket.assigns.grid
+    selected_ids = grid.state.selection.selected_ids
+
+    if selected_ids == [] do
+      {:noreply, socket}
+    else
+      updated_grid = grid
+        |> Grid.delete_rows(selected_ids)
+        |> put_in([:state, :selection, :selected_ids], [])
+        |> put_in([:state, :selection, :select_all], false)
+
+      # 부모에게 알림
+      send(self(), {:grid_rows_deleted, selected_ids})
+
+      {:noreply, assign(socket, grid: updated_grid)}
+    end
+  end
+
+  @impl true
+  def handle_event("grid_save", _params, socket) do
+    grid = socket.assigns.grid
+    changed = Grid.changed_rows(grid)
+
+    # 부모 LiveView에 저장 요청
+    send(self(), {:grid_save_requested, changed})
+
+    # 저장 후 상태 초기화
+    updated_grid = Grid.clear_row_statuses(grid)
+    {:noreply, assign(socket, grid: updated_grid)}
+  end
+
+  @impl true
+  def handle_event("grid_discard", _params, socket) do
+    grid = socket.assigns.grid
+
+    # 부모에 취소 알림 (원본 데이터로 복원 요청)
+    send(self(), :grid_discard_requested)
+
+    # 상태만 초기화 (데이터는 부모가 원본으로 다시 전달해줌)
+    updated_grid = Grid.clear_row_statuses(grid)
+    {:noreply, assign(socket, grid: updated_grid)}
+  end
+
+  @impl true
   def render(assigns) do
     ~H"""
     <div class="lv-grid">
-      <!-- Search Bar -->
-      <div class="lv-grid__search-bar">
-        <span class="lv-grid__search-icon">&#x1F50D;</span>
-        <input
-          type="text"
-          class="lv-grid__search-input"
-          placeholder="전체 검색..."
-          value={@grid.state.global_search}
-          phx-keyup="grid_global_search"
-          phx-debounce="300"
-          phx-target={@myself}
-        />
-        <%= if @grid.state.global_search != "" do %>
-          <button
-            class="lv-grid__search-clear"
-            phx-click="grid_global_search"
-            phx-value-value=""
+      <!-- Toolbar: Search + Save -->
+      <div class="lv-grid__toolbar">
+        <div class="lv-grid__search-bar">
+          <span class="lv-grid__search-icon">&#x1F50D;</span>
+          <input
+            type="text"
+            class="lv-grid__search-input"
+            placeholder="전체 검색..."
+            value={@grid.state.global_search}
+            phx-keyup="grid_global_search"
+            phx-debounce="300"
             phx-target={@myself}
+          />
+          <%= if @grid.state.global_search != "" do %>
+            <button
+              class="lv-grid__search-clear"
+              phx-click="grid_global_search"
+              phx-value-value=""
+              phx-target={@myself}
+            >
+              ✕
+            </button>
+          <% end %>
+        </div>
+        <div class="lv-grid__action-area">
+          <button
+            class="lv-grid__add-btn"
+            phx-click="grid_add_row"
+            phx-target={@myself}
+            title="새 행 추가"
           >
-            ✕
+            + 추가
           </button>
+          <%= if length(@grid.state.selection.selected_ids) > 0 do %>
+            <button
+              class="lv-grid__delete-btn"
+              phx-click="grid_delete_selected"
+              phx-target={@myself}
+              data-confirm={"선택된 #{length(@grid.state.selection.selected_ids)}개 행을 삭제하시겠습니까?"}
+              title="선택 행 삭제"
+            >
+              삭제 (<%= length(@grid.state.selection.selected_ids) %>)
+            </button>
+          <% end %>
+        </div>
+
+        <%= if Grid.has_changes?(@grid) do %>
+          <div class="lv-grid__save-area">
+            <span class="lv-grid__save-count">
+              <%= map_size(@grid.state.row_statuses) %>건 변경
+            </span>
+            <button
+              class="lv-grid__save-btn"
+              phx-click="grid_save"
+              phx-target={@myself}
+            >
+              💾 저장
+            </button>
+            <button
+              class="lv-grid__discard-btn"
+              phx-click="grid_discard"
+              phx-target={@myself}
+            >
+              ↩ 취소
+            </button>
+          </div>
         <% end %>
       </div>
 
@@ -358,14 +505,16 @@ defmodule LiveviewGridWeb.GridComponent do
             </div>
           <% end %>
 
-          <%= for column <- @grid.columns do %>
-            <div 
-              class={"lv-grid__header-cell #{if column.sortable, do: "lv-grid__header-cell--sortable"}"}
-              style={column_width_style(column)}
+          <%= for {column, col_idx} <- Enum.with_index(@grid.columns) do %>
+            <div
+              class={"lv-grid__header-cell #{if column.sortable, do: "lv-grid__header-cell--sortable"} #{frozen_class(col_idx, @grid)}"}
+              style={"#{column_width_style(column)}; #{frozen_style(col_idx, @grid)}"}
               phx-click={if column.sortable, do: "grid_sort"}
               phx-value-field={column.field}
               phx-value-direction={next_direction(@grid.state.sort, column.field)}
               phx-target={@myself}
+              data-confirm={if column.sortable && Grid.has_changes?(@grid), do: "저장하지 않은 변경사항이 있습니다. 계속하시겠습니까?"}
+              data-col-index={col_idx}
             >
               <%= column.label %>
               <%= if column.sortable && sort_active?(@grid.state.sort, column.field) do %>
@@ -373,6 +522,12 @@ defmodule LiveviewGridWeb.GridComponent do
                   <%= sort_icon(@grid.state.sort.direction) %>
                 </span>
               <% end %>
+              <span
+                class="lv-grid__resize-handle"
+                phx-hook="ColumnResize"
+                id={"resize-#{column.field}"}
+                data-col-index={col_idx}
+              ></span>
             </div>
           <% end %>
         </div>
@@ -391,8 +546,8 @@ defmodule LiveviewGridWeb.GridComponent do
             </div>
           <% end %>
 
-          <%= for column <- @grid.columns do %>
-            <div class="lv-grid__filter-cell" style={column_width_style(column)}>
+          <%= for {column, col_idx} <- Enum.with_index(@grid.columns) do %>
+            <div class={"lv-grid__filter-cell #{frozen_class(col_idx, @grid)}"} style={"#{column_width_style(column)}; #{frozen_style(col_idx, @grid)}"} data-col-index={col_idx}>
               <%= if column.filterable do %>
                 <input
                   type="text"
@@ -437,7 +592,7 @@ defmodule LiveviewGridWeb.GridComponent do
             <!-- 보이는 행만 올바른 위치에 렌더링 -->
             <div style={"position: absolute; top: #{Grid.virtual_offset_top(@grid)}px; width: 100%;"}>
               <%= for row <- Grid.visible_data(@grid) do %>
-                <div class={"lv-grid__row #{if row.id in @grid.state.selection.selected_ids, do: "lv-grid__row--selected"}"}>
+                <div class={"lv-grid__row #{if row.id in @grid.state.selection.selected_ids, do: "lv-grid__row--selected"} #{if Map.get(@grid.state.row_statuses, row.id) == :deleted, do: "lv-grid__row--deleted"}"}>
                   <div class="lv-grid__cell" style="width: 50px; flex: 0 0 50px; justify-content: center;">
                     <input
                       type="checkbox"
@@ -453,8 +608,8 @@ defmodule LiveviewGridWeb.GridComponent do
                       <%= render_status_badge(Map.get(@grid.state.row_statuses, row.id, :normal)) %>
                     </div>
                   <% end %>
-                  <%= for column <- @grid.columns do %>
-                    <div class="lv-grid__cell" style={column_width_style(column)}>
+                  <%= for {column, col_idx} <- Enum.with_index(@grid.columns) do %>
+                    <div class={"lv-grid__cell #{frozen_class(col_idx, @grid)}"} style={"#{column_width_style(column)}; #{frozen_style(col_idx, @grid)}"} data-col-index={col_idx}>
                       <%= render_cell(assigns, row, column) %>
                     </div>
                   <% end %>
@@ -467,7 +622,7 @@ defmodule LiveviewGridWeb.GridComponent do
         <!-- 기본 Body (페이징 방식) -->
         <div class="lv-grid__body">
           <%= for row <- Grid.visible_data(@grid) do %>
-            <div class={"lv-grid__row #{if row.id in @grid.state.selection.selected_ids, do: "lv-grid__row--selected"}"}>
+            <div class={"lv-grid__row #{if row.id in @grid.state.selection.selected_ids, do: "lv-grid__row--selected"} #{if Map.get(@grid.state.row_statuses, row.id) == :deleted, do: "lv-grid__row--deleted"}"}>
               <div class="lv-grid__cell" style="width: 50px; flex: 0 0 50px; justify-content: center;">
                 <input
                   type="checkbox"
@@ -483,8 +638,8 @@ defmodule LiveviewGridWeb.GridComponent do
                   <%= render_status_badge(Map.get(@grid.state.row_statuses, row.id, :normal)) %>
                 </div>
               <% end %>
-              <%= for column <- @grid.columns do %>
-                <div class="lv-grid__cell" style={column_width_style(column)}>
+              <%= for {column, col_idx} <- Enum.with_index(@grid.columns) do %>
+                <div class={"lv-grid__cell #{frozen_class(col_idx, @grid)}"} style={"#{column_width_style(column)}; #{frozen_style(col_idx, @grid)}"} data-col-index={col_idx}>
                   <%= render_cell(assigns, row, column) %>
                 </div>
               <% end %>
@@ -578,6 +733,35 @@ defmodule LiveviewGridWeb.GridComponent do
   defp column_width_style(%{width: :auto}), do: "flex: 1"
   defp column_width_style(%{width: width}), do: "width: #{width}px; flex: 0 0 #{width}px"
 
+  defp frozen_style(col_idx, grid) do
+    frozen_count = grid.options.frozen_columns
+    if frozen_count > 0 and col_idx < frozen_count do
+      # 체크박스(50px) + 상태(60px if visible) + 이전 컬럼들 너비 합산
+      base_offset = 50 + if(grid.state.show_status_column, do: 60, else: 0)
+      prev_width = grid.columns
+        |> Enum.take(col_idx)
+        |> Enum.reduce(0, fn col, acc ->
+          case col.width do
+            :auto -> acc + 150  # auto 컬럼은 기본 150px로 계산
+            w -> acc + w
+          end
+        end)
+      left = base_offset + prev_width
+      "position: sticky; left: #{left}px; z-index: 2; background: inherit;"
+    else
+      ""
+    end
+  end
+
+  defp frozen_class(col_idx, grid) do
+    frozen_count = grid.options.frozen_columns
+    if frozen_count > 0 and col_idx < frozen_count do
+      "lv-grid__cell--frozen"
+    else
+      ""
+    end
+  end
+
   defp sort_active?(nil, _field), do: false
   defp sort_active?(%{field: sort_field}, field), do: sort_field == field
 
@@ -615,22 +799,43 @@ defmodule LiveviewGridWeb.GridComponent do
 
   defp render_cell(assigns, row, column) do
     if column.editable && editing?(assigns.grid.state.editing, row.id, column.field) do
-      # 편집 모드
-      assigns = assign(assigns, row: row, column: column)
-      ~H"""
-      <input
-        type={editor_input_type(@column)}
-        value={Map.get(@row, @column.field)}
-        phx-blur="cell_edit_save"
-        phx-keyup="cell_keydown"
-        phx-value-row-id={@row.id}
-        phx-value-field={@column.field}
-        phx-target={@myself}
-        class="lv-grid__cell-editor"
-        id={"editor-#{@row.id}-#{@column.field}"}
-        phx-hook="CellEditor"
-      />
-      """
+      if column.editor_type == :select do
+        # SELECT 편집 모드
+        assigns = assign(assigns, row: row, column: column)
+        ~H"""
+        <select
+          phx-value-row-id={@row.id}
+          phx-value-field={@column.field}
+          phx-target={@myself}
+          class="lv-grid__cell-editor"
+          id={"editor-#{@row.id}-#{@column.field}"}
+          phx-hook="CellEditor"
+        >
+          <%= for {label, value} <- @column.editor_options do %>
+            <option value={value} selected={value == to_string(Map.get(@row, @column.field))}>
+              <%= label %>
+            </option>
+          <% end %>
+        </select>
+        """
+      else
+        # INPUT 편집 모드 (text/number)
+        assigns = assign(assigns, row: row, column: column)
+        ~H"""
+        <input
+          type={editor_input_type(@column)}
+          value={Map.get(@row, @column.field)}
+          phx-blur="cell_edit_save"
+          phx-keyup="cell_keydown"
+          phx-value-row-id={@row.id}
+          phx-value-field={@column.field}
+          phx-target={@myself}
+          class="lv-grid__cell-editor"
+          id={"editor-#{@row.id}-#{@column.field}"}
+          phx-hook="CellEditor"
+        />
+        """
+      end
     else
       # 보기 모드
       assigns = assign(assigns, row: row, column: column)

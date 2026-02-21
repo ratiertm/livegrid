@@ -12,6 +12,7 @@ defmodule LiveviewGridWeb.DemoLive do
     all_users = generate_sample_data(50)
     {:ok, assign(socket,
       all_users: all_users,
+      saved_users: all_users,
       filtered_users: all_users,
       visible_users: Enum.take(all_users, 100),
       data_count: 50,
@@ -25,18 +26,36 @@ defmodule LiveviewGridWeb.DemoLive do
   @impl true
   def handle_event("change_data_count", %{"count" => count}, socket) do
     count_num = String.to_integer(count)
-    all_users = generate_sample_data(count_num)
+    current_users = socket.assigns.all_users
+    current_count = length(current_users)
+
+    all_users = cond do
+      count_num == current_count ->
+        # 개수 동일 → 변경 없음
+        current_users
+
+      count_num < current_count ->
+        # 줄이기 → 기존 데이터에서 앞쪽만 유지
+        Enum.take(current_users, count_num)
+
+      true ->
+        # 늘리기 → 기존 데이터 유지 + 부족분만 새로 생성하여 추가
+        additional = generate_sample_data(count_num - current_count, current_count + 1)
+        current_users ++ additional
+    end
+
     filtered = filter_users(all_users, socket.assigns.search_query)
     visible = Enum.take(filtered, 100)
-    
-    socket = assign(socket, 
+
+    socket = assign(socket,
       all_users: all_users,
+      saved_users: all_users,
       filtered_users: filtered,
       visible_users: visible,
       data_count: count_num,
       loaded_count: min(100, length(filtered))
     )
-    
+
     # 스크롤 상태 리셋 (새로운 데이터니까 다시 로드 가능)
     {:noreply, push_event(socket, "reset_scroll", %{})}
   end
@@ -187,6 +206,75 @@ defmodule LiveviewGridWeb.DemoLive do
   end
 
   @impl true
+  def handle_info({:grid_save_requested, changed_rows}, socket) do
+    # 실제 프로젝트에서는 여기서 DB에 저장
+    # 예: Repo.update_all(changed_rows)
+    require Logger
+    Logger.info("💾 저장 요청: #{length(changed_rows)}건")
+    for %{row: row, status: status} <- changed_rows do
+      Logger.info("  - [#{status}] ID=#{row.id} #{inspect(row)}")
+    end
+
+    # 데모에서는 이미 메모리에 반영되어 있으므로 saved_users를 현재 상태로 갱신
+    {:noreply, socket
+      |> assign(saved_users: socket.assigns.all_users)
+      |> put_flash(:info, "#{length(changed_rows)}건 저장 완료")}
+  end
+
+  @impl true
+  def handle_info({:grid_row_added, new_row}, socket) do
+    # 새 행을 부모 데이터에도 추가
+    updated_all = [new_row | socket.assigns.all_users]
+    updated_filtered = [new_row | socket.assigns.filtered_users]
+    updated_visible = [new_row | socket.assigns.visible_users]
+
+    {:noreply, assign(socket,
+      all_users: updated_all,
+      filtered_users: updated_filtered,
+      visible_users: updated_visible,
+      loaded_count: socket.assigns.loaded_count + 1
+    )}
+  end
+
+  @impl true
+  def handle_info({:grid_rows_deleted, row_ids}, socket) do
+    require Logger
+    Logger.info("🗑️ 행 삭제 요청: #{inspect(row_ids)}")
+
+    # :new 행(음수 ID)은 부모 데이터에서도 제거
+    new_ids = Enum.filter(row_ids, fn id -> id < 0 end)
+
+    remove_fn = fn users ->
+      Enum.reject(users, fn user -> user.id in new_ids end)
+    end
+
+    updated_all = remove_fn.(socket.assigns.all_users)
+    updated_filtered = remove_fn.(socket.assigns.filtered_users)
+    updated_visible = remove_fn.(socket.assigns.visible_users)
+
+    {:noreply, assign(socket,
+      all_users: updated_all,
+      filtered_users: updated_filtered,
+      visible_users: updated_visible,
+      loaded_count: length(updated_visible)
+    )}
+  end
+
+  @impl true
+  def handle_info(:grid_discard_requested, socket) do
+    # 마지막 저장 시점의 데이터로 복원
+    all_users = socket.assigns.saved_users
+    filtered = filter_users(all_users, socket.assigns.search_query)
+    visible = Enum.take(filtered, socket.assigns.loaded_count)
+
+    {:noreply, assign(socket,
+      all_users: all_users,
+      filtered_users: filtered,
+      visible_users: visible
+    )}
+  end
+
+  @impl true
   def render(assigns) do
     ~H"""
     <div style="padding: 20px;">
@@ -321,13 +409,19 @@ defmodule LiveviewGridWeb.DemoLive do
             %{field: :name, label: "이름", width: 150, sortable: true, filterable: true, filter_type: :text, editable: true},
             %{field: :email, label: "이메일", width: 250, sortable: true, filterable: true, filter_type: :text, editable: true},
             %{field: :age, label: "나이", width: 80, sortable: true, filterable: true, filter_type: :number, editable: true, editor_type: :number},
-            %{field: :city, label: "도시", width: 120, sortable: true, filterable: true, filter_type: :text, editable: true}
+            %{field: :city, label: "도시", width: 120, sortable: true, filterable: true, filter_type: :text, editable: true, editor_type: :select,
+              editor_options: [
+                {"서울", "서울"}, {"부산", "부산"}, {"대구", "대구"},
+                {"인천", "인천"}, {"광주", "광주"}, {"대전", "대전"},
+                {"울산", "울산"}, {"수원", "수원"}, {"창원", "창원"}, {"고양", "고양"}
+              ]}
           ]}
           options={%{
             page_size: if(@virtual_scroll, do: 20, else: 99999),
             virtual_scroll: @virtual_scroll,
             row_height: 40,
             show_footer: !@virtual_scroll,
+            frozen_columns: 1,
             debug: true
           }}
         />
@@ -375,16 +469,16 @@ defmodule LiveviewGridWeb.DemoLive do
     end)
   end
 
-  # 샘플 데이터 생성 (동적 개수)
-  defp generate_sample_data(count) do
+  # 샘플 데이터 생성 (동적 개수, start_id로 ID 시작값 지정 가능)
+  defp generate_sample_data(count, start_id \\ 1) do
     first_names = ["Alice", "Bob", "Charlie", "David", "Eve", "Frank", "Grace", "Henry", "Iris", "Jack"]
     last_names = ["Kim", "Lee", "Park", "Choi", "Jung", "Kang", "Cho", "Yoon", "Jang", "Lim"]
     cities = ["서울", "부산", "대구", "인천", "광주", "대전", "울산", "수원", "창원", "고양"]
-    
-    for i <- 1..count do
+
+    for i <- start_id..(start_id + count - 1) do
       first = Enum.random(first_names)
       last = Enum.random(last_names)
-      
+
       %{
         id: i,
         name: "#{first} #{last}",

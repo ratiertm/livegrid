@@ -498,5 +498,176 @@ defmodule LiveViewGrid.GridTest do
       updated = Grid.update_data(grid, grid.data, [%{field: :name, label: "이름"}], %{})
       assert Grid.row_status(updated, 1) == :updated
     end
+
+    test "update_data가 누락된 state 키를 보충 (hot-reload 대응)", %{grid: grid} do
+      # hot-reload로 기존 state에 새 키(row_statuses, show_status_column)가 없는 상황 시뮬레이션
+      old_state = Map.drop(grid.state, [:row_statuses, :show_status_column])
+      old_grid = %{grid | state: old_state}
+
+      updated = Grid.update_data(old_grid, grid.data, [%{field: :name, label: "이름"}], %{})
+
+      # 누락된 키가 initial_state 기본값으로 보충됨
+      assert updated.state.row_statuses == %{}
+      assert updated.state.show_status_column == true
+    end
+
+    test "changed_rows가 변경된 행만 반환", %{grid: grid} do
+      grid = Grid.update_cell(grid, 1, :name, "Alice Updated")
+      grid = Grid.mark_row_status(grid, 3, :deleted)
+
+      changed = Grid.changed_rows(grid)
+      assert length(changed) == 2
+
+      updated_row = Enum.find(changed, fn c -> c.status == :updated end)
+      assert updated_row.row.id == 1
+      assert updated_row.row.name == "Alice Updated"
+
+      deleted_row = Enum.find(changed, fn c -> c.status == :deleted end)
+      assert deleted_row.row.id == 3
+    end
+
+    test "has_changes?는 변경사항 유무를 반환", %{grid: grid} do
+      refute Grid.has_changes?(grid)
+
+      grid = Grid.update_cell(grid, 1, :name, "Changed")
+      assert Grid.has_changes?(grid)
+
+      grid = Grid.clear_row_statuses(grid)
+      refute Grid.has_changes?(grid)
+    end
+  end
+
+  describe "행 추가 (add_row)" do
+    setup do
+      data = [
+        %{id: 1, name: "Alice", age: 30},
+        %{id: 2, name: "Bob", age: 25}
+      ]
+      columns = [
+        %{field: :name, label: "이름", editable: true},
+        %{field: :age, label: "나이", editable: true, editor_type: :number}
+      ]
+      grid = Grid.new(data: data, columns: columns)
+      %{grid: grid}
+    end
+
+    test "맨 앞에 새 행 추가 (기본)", %{grid: grid} do
+      updated = Grid.add_row(grid, %{name: "", age: 0})
+      assert length(updated.data) == 3
+      first = hd(updated.data)
+      assert first.id < 0
+      assert Grid.row_status(updated, first.id) == :new
+    end
+
+    test "맨 뒤에 새 행 추가", %{grid: grid} do
+      updated = Grid.add_row(grid, %{name: "New"}, :bottom)
+      last = List.last(updated.data)
+      assert last.id < 0
+      assert last.name == "New"
+    end
+
+    test "임시 ID는 음수로 자동 부여", %{grid: grid} do
+      g1 = Grid.add_row(grid)
+      g2 = Grid.add_row(g1)
+      ids = Enum.map(g2.data, & &1.id) |> Enum.filter(& &1 < 0)
+      assert length(ids) == 2
+      assert Enum.uniq(ids) == ids
+    end
+
+    test "total_rows가 증가", %{grid: grid} do
+      updated = Grid.add_row(grid)
+      assert updated.state.pagination.total_rows == 3
+    end
+  end
+
+  describe "행 삭제 (delete_rows)" do
+    setup do
+      data = [
+        %{id: 1, name: "Alice", age: 30},
+        %{id: 2, name: "Bob", age: 25},
+        %{id: 3, name: "Charlie", age: 35}
+      ]
+      columns = [
+        %{field: :name, label: "이름", editable: true},
+        %{field: :age, label: "나이", editable: true, editor_type: :number}
+      ]
+      grid = Grid.new(data: data, columns: columns)
+      %{grid: grid}
+    end
+
+    test "기존 행을 :deleted로 마킹", %{grid: grid} do
+      updated = Grid.delete_rows(grid, [1, 2])
+      assert Grid.row_status(updated, 1) == :deleted
+      assert Grid.row_status(updated, 2) == :deleted
+      assert Grid.row_status(updated, 3) == :normal
+      # 데이터에서 제거하지 않음
+      assert length(updated.data) == 3
+    end
+
+    test ":new 행은 데이터에서 완전 제거", %{grid: grid} do
+      grid = Grid.add_row(grid, %{name: "New"})
+      new_id = hd(grid.data).id
+      assert new_id < 0
+
+      updated = Grid.delete_rows(grid, [new_id])
+      assert length(updated.data) == 3
+      refute Enum.any?(updated.data, fn r -> r.id == new_id end)
+      refute Map.has_key?(updated.state.row_statuses, new_id)
+    end
+
+    test "선택 목록에서도 삭제된 행 제거", %{grid: grid} do
+      grid = Grid.add_row(grid, %{name: "New"})
+      new_id = hd(grid.data).id
+      grid = put_in(grid.state.selection.selected_ids, [new_id, 1])
+
+      updated = Grid.delete_rows(grid, [new_id])
+      refute new_id in updated.state.selection.selected_ids
+      assert 1 in updated.state.selection.selected_ids
+    end
+  end
+
+  describe "frozen_columns 옵션" do
+    test "기본값은 0" do
+      grid = Grid.new(data: [], columns: [%{field: :id, label: "ID"}])
+      assert grid.options.frozen_columns == 0
+    end
+
+    test "frozen_columns 옵션 설정" do
+      grid = Grid.new(data: [], columns: [%{field: :id, label: "ID"}], options: %{frozen_columns: 2})
+      assert grid.options.frozen_columns == 2
+    end
+  end
+
+  describe "select editor (드롭다운 편집기)" do
+    test "normalize_columns에서 editor_options 기본값은 빈 리스트" do
+      columns = [%{field: :city, label: "도시"}]
+      grid = Grid.new(data: [], columns: columns)
+
+      [column | _] = grid.columns
+      assert column.editor_options == []
+      assert column.editor_type == :text
+    end
+
+    test "editor_options가 설정되면 유지됨" do
+      options = [{"서울", "서울"}, {"부산", "부산"}, {"대구", "대구"}]
+      columns = [%{field: :city, label: "도시", editor_type: :select, editor_options: options}]
+      grid = Grid.new(data: [], columns: columns)
+
+      [column | _] = grid.columns
+      assert column.editor_type == :select
+      assert column.editor_options == options
+      assert length(column.editor_options) == 3
+    end
+
+    test "select 컬럼의 editor_options 첫 번째 값 확인" do
+      options = [{"서울", "서울"}, {"부산", "부산"}]
+      columns = [%{field: :city, label: "도시", editor_type: :select, editor_options: options}]
+      grid = Grid.new(data: [], columns: columns)
+
+      [column | _] = grid.columns
+      {label, value} = hd(column.editor_options)
+      assert label == "서울"
+      assert value == "서울"
+    end
   end
 end
