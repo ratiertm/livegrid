@@ -203,6 +203,19 @@ assets/
 - **Professional**: Commercial license ($999/yr, advanced features)
 - **Enterprise**: Custom ($negotiable, collaboration/customization)
 
+## 📖 API Documentation
+
+- **API Specification**: [English](docs/API_SPEC.md) | [한국어](docs/API_SPEC.ko.md)
+- **Live API Docs**: http://localhost:5001/api-docs (when server is running)
+
+The API provides 26 endpoints across 6 categories:
+1. **Grid Setup** - Configuration, columns, options
+2. **Data CRUD** - Single/batch create, read, update, delete
+3. **Theme** - Built-in themes, custom theme creation
+4. **Sort & Pagination** - Sorting, paging, virtual scroll settings
+5. **DBMS Connection** - Database adapter configuration
+6. **Renderers** - Built-in and custom cell renderers
+
 ## 📚 References
 
 This project was independently developed for Phoenix LiveView, **inspired by** [Toast UI Grid](https://github.com/nhn/tui.grid) (MIT License).

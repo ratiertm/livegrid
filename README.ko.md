@@ -24,8 +24,10 @@ mix phx.server
 ```
 
 브라우저에서 접속:
-- **그리드 데모**: http://localhost:5001/demo
-- **홈페이지**: http://localhost:5001
+- **대시보드**: http://localhost:5001 (/demo로 리다이렉트)
+- **DBMS 데모**: http://localhost:5001/dbms-demo
+- **API 데모**: http://localhost:5001/api-demo
+- **API 문서**: http://localhost:5001/api-docs
 
 ### 개발 환경
 
@@ -40,77 +42,76 @@ mix assets.setup
 mix test
 ```
 
-## ✨ 현재 구현된 기능 (v0.1-alpha)
+## ✨ 구현된 기능
 
-### 기본 기능
+### v0.1 - 핵심 그리드
 - [x] 테이블 렌더링 (LiveComponent 기반)
-- [x] 컬럼 정렬 (오름차순/내림차순 토글, 정렬 아이콘 표시)
+- [x] 컬럼 정렬 (오름차순/내림차순 토글, 정렬 아이콘)
 - [x] 행 선택 (체크박스, 전체 선택/해제)
 - [x] 컬럼 고정 (Frozen Columns)
-- [x] 컬럼 너비 조절 (드래그 리사이즈)
-
-### 검색 & 필터
-- [x] 글로벌 텍스트 검색 (디바운싱 300ms)
+- [x] 컬럼 너비 조절 (드래그 핸들)
+- [x] 글로벌 텍스트 검색 (300ms 디바운스)
 - [x] 컬럼별 필터 (텍스트/숫자 타입)
-- [x] 필터 토글 버튼 (헤더 내장)
-- [x] 필터 초기화 버튼
-
-### 대용량 데이터
-- [x] 가상 스크롤 (Virtual Scrolling) - 보이는 행만 렌더링
-- [x] 무한 스크롤 (Infinite Scroll) - 스크롤 시 추가 로드
-- [x] 데이터 건수 동적 변경 (50~10,000건)
+- [x] 가상 스크롤 - 보이는 행만 렌더링
+- [x] 무한 스크롤 - 스크롤 시 추가 로드
 - [x] 페이지네이션 (가상 스크롤 OFF 시)
-
-### 편집 기능
 - [x] 인라인 셀 편집 (더블클릭으로 진입)
-- [x] 텍스트/숫자 편집기 (input)
-- [x] 드롭다운 편집기 (select) - 고정 선택지 컬럼용
-- [x] 행 추가 (맨 앞/맨 뒤)
-- [x] 행 삭제 (선택 후 삭제, :deleted 마킹)
-- [x] 변경 상태 추적 (N=신규, U=수정, D=삭제 배지)
-- [x] 일괄 저장 / 되돌리기 (Save & Discard)
+- [x] 텍스트/숫자/드롭다운 편집기
+- [x] 행 추가 / 행 삭제 / 변경 추적 (N/U/D 배지)
+- [x] 일괄 저장 & 되돌리기
+- [x] CSV 다운로드
 
-### 내보내기
-- [x] CSV 다운로드 (전체 데이터)
-
-## 🗺️ 개발 로드맵
-
-### v0.2 - 데이터 검증 & 테마
-- [ ] 셀 검증 (Validation) - 필수값, 숫자 범위, 형식 체크
-- [ ] 검증 오류 UI (셀 하이라이트, 툴팁 메시지)
-- [ ] 테마 시스템 (다크 모드, 커스텀 테마)
+### v0.2 - 검증 & 테마
+- [x] 셀 검증 - 필수값, 숫자 범위, 형식 체크
+- [x] 검증 오류 UI (셀 하이라이트, 툴팁 메시지)
+- [x] 테마 시스템 (다크 모드, 커스텀 테마, CSS 변수 커스터마이저)
 
 ### v0.3 - DBMS 연동
-- [ ] Ecto/Repo 통합 - 어댑터 방식으로 다양한 DB 지원
-  - PostgreSQL, MySQL/MariaDB (Ecto 기본 지원)
-  - MSSQL (`ecto_sql` + `tds`)
-  - Oracle (`ecto_oracle`)
-  - SQLite (`ecto_sqlite3`)
-- [ ] 서버 사이드 정렬/필터/페이징 (DB 쿼리)
-- [ ] 변경사항 DB 저장 (INSERT/UPDATE/DELETE)
-- [ ] 대용량 데이터 스트리밍 (Repo.stream)
+- [x] Ecto/Repo 통합 - DataSource behaviour 어댑터 패턴
+- [x] SQLite 지원 (`ecto_sqlite3`)
+- [x] 서버 사이드 정렬/필터/페이징 (SQL ORDER BY, WHERE, LIMIT/OFFSET)
+- [x] DB에 변경사항 저장 (INSERT/UPDATE/DELETE, Ecto Changeset)
 
-### v0.4 - REST API 연동
-- [ ] 외부 API 데이터 소스 (REST/GraphQL)
-- [ ] 비동기 데이터 로딩 (로딩 상태 표시)
-- [ ] API 기반 CRUD 연동 (POST/PUT/PATCH/DELETE)
-- [ ] API 페이지네이션 (cursor/offset 방식)
-- [ ] 인증 헤더 지원 (Bearer token, API key)
-- [ ] 에러 처리 & 재시도 로직
+### v0.4 - 컬럼 리사이즈 & 순서 변경
+- [x] 컬럼 리사이즈 (드래그 핸들, 최소/최대 너비)
+- [x] 컬럼 드래그 순서 변경
+- [x] 페이지네이션 버그 수정
 
-### v0.5 - 고급 데이터 처리
-- [ ] 그룹핑 (Grouping)
+### v0.5 - REST API 연동
+- [x] REST DataSource 어댑터 (base_url, endpoint, headers 설정)
+- [x] 비동기 데이터 조회, 로딩 상태 & 응답 시간 추적
+- [x] API 기반 CRUD (POST 생성, PUT 수정, DELETE 삭제)
+- [x] 오프셋 기반 페이지네이션 (page/page_size)
+- [x] 인증 헤더 지원 (Bearer 토큰, 커스텀 헤더)
+- [x] 에러 처리 & 재시도 로직 (지수 백오프)
+- [x] Mock REST API 서버 (MockApiController)
+- [x] API Key 관리 (생성/폐기/삭제, SQLite 저장)
+- [x] API 문서 페이지
+- [x] 사이드바 네비게이션 대시보드 레이아웃
+
+## 🗺️ 로드맵
+
+### v0.6 - 업그레이드: DBMS & API 강화
+- [ ] 멀티 DB 드라이버 - PostgreSQL (`postgrex`), MySQL/MariaDB (`myxql`)
+- [ ] 멀티 DB 드라이버 - MSSQL (`tds_ecto`), Oracle (`ecto_oracle`)
+- [ ] 대용량 데이터 스트리밍 (`Repo.stream` 메모리 효율 처리)
+- [ ] GraphQL 데이터 소스 지원
+- [ ] PATCH 메서드 지원 (부분 업데이트)
+- [ ] 커서 기반 페이지네이션 (오프셋 외 추가)
+- [ ] API Key 인증 적용 (API 요청 시 키 검증)
+
+### v0.7 - 고급 데이터 처리
+- [ ] 그룹핑
 - [ ] 피벗 테이블
 - [ ] 트리 그리드
 
-### v0.6 - 협업 & 실시간
+### v0.8 - 협업 & 실시간
 - [ ] 실시간 동기화 (멀티 유저 동시 편집)
 - [ ] 변경 이력 (Undo/Redo)
-- [ ] 셀 잠금 (Lock)
+- [ ] 셀 잠금
 
 ### v1.0 - 엔터프라이즈
 - [ ] Excel Export/Import
-- [ ] 컬럼 드래그 순서 변경
 - [ ] 컨텍스트 메뉴
 - [ ] 키보드 내비게이션
 - [ ] API 문서화 (HexDocs)
@@ -121,12 +122,28 @@ mix test
 lib/
 ├── liveview_grid/              # 비즈니스 로직
 │   ├── grid.ex                 # Grid 핵심 모듈 (데이터/상태 관리)
+│   ├── data_source.ex          # DataSource behaviour (어댑터 패턴)
+│   ├── data_source/
+│   │   ├── in_memory.ex        # InMemory 어댑터 (v0.1)
+│   │   ├── ecto.ex             # Ecto/DB 어댑터 (v0.3)
+│   │   └── rest.ex             # REST API 어댑터 (v0.5)
+│   ├── api_key.ex              # API Key 스키마
+│   ├── api_keys.ex             # API Key 컨텍스트 (CRUD)
 │   └── application.ex
 └── liveview_grid_web/          # 웹 레이어
     ├── live/
-    │   └── demo_live.ex        # 데모 페이지 (LiveView)
+    │   ├── demo_live.ex        # InMemory 데모
+    │   ├── dbms_demo_live.ex   # DBMS 데모 (SQLite)
+    │   ├── api_demo_live.ex    # REST API 데모
+    │   ├── renderer_demo_live.ex # 렌더러 데모
+    │   ├── api_key_live.ex     # API Key 관리
+    │   └── api_doc_live.ex     # API 문서
     ├── components/
-    │   └── grid_component.ex   # Grid LiveComponent (렌더링/이벤트)
+    │   ├── grid_component.ex   # Grid LiveComponent
+    │   └── layouts/
+    │       └── dashboard.html.heex  # 사이드바 대시보드 레이아웃
+    ├── controllers/
+    │   └── mock_api_controller.ex   # Mock REST API
     └── router.ex
 
 assets/
@@ -168,6 +185,19 @@ assets/
 />
 ```
 
+## 📖 API 문서
+
+- **API 스펙**: [한국어](docs/API_SPEC.ko.md) | [English](docs/API_SPEC.md)
+- **라이브 API 문서**: http://localhost:5001/api-docs (서버 실행 시)
+
+API는 6개 카테고리, 26개 엔드포인트를 제공합니다:
+1. **Grid 세팅** - 설정, 컬럼, 옵션
+2. **데이터 CRUD** - 단건/배치 생성, 조회, 수정, 삭제
+3. **테마** - 내장 테마, 커스텀 테마 생성
+4. **정렬 & 페이지네이션** - 정렬, 페이징, 가상 스크롤 설정
+5. **DBMS 연결** - 데이터베이스 어댑터 설정
+6. **렌더러** - 내장 및 커스텀 셀 렌더러
+
 ## 🎯 타겟 시장
 
 ### 1차 타겟
@@ -178,7 +208,7 @@ assets/
 ### 2차 타겟
 - SaaS 스타트업
 - 공공기관 시스템
-- 글로벌 시장 (영문 문서)
+- 글로벌 시장
 
 ## 💰 라이선스 전략
 
