@@ -468,6 +468,93 @@ defmodule LiveviewGridWeb.GridComponent do
     {:noreply, assign(socket, export_menu_open: new_value)}
   end
 
+  # ── Advanced Filter 이벤트 (F-310) ──
+
+  @impl true
+  def handle_event("toggle_advanced_filter", _params, socket) do
+    grid = socket.assigns.grid
+    show = !Map.get(grid.state, :show_advanced_filter, false)
+    updated_grid = put_in(grid.state[:show_advanced_filter], show)
+    {:noreply, assign(socket, grid: updated_grid)}
+  end
+
+  @impl true
+  def handle_event("add_filter_condition", _params, socket) do
+    grid = socket.assigns.grid
+    adv = Map.get(grid.state, :advanced_filters, %{logic: :and, conditions: []})
+    new_condition = %{field: nil, operator: :contains, value: ""}
+    updated_adv = %{adv | conditions: adv.conditions ++ [new_condition]}
+    updated_grid = put_in(grid.state[:advanced_filters], updated_adv)
+    {:noreply, assign(socket, grid: updated_grid)}
+  end
+
+  @impl true
+  def handle_event("update_filter_condition", params, socket) do
+    grid = socket.assigns.grid
+    adv = Map.get(grid.state, :advanced_filters, %{logic: :and, conditions: []})
+    index = String.to_integer(params["index"])
+
+    conditions = List.update_at(adv.conditions, index, fn condition ->
+      # Form phx-change: 모든 필드가 함께 전송됨
+      field_str = params["field"] || ""
+      operator_str = params["operator"] || ""
+      value_str = params["value"] || ""
+
+      new_field = if field_str != "", do: String.to_existing_atom(field_str), else: condition.field
+
+      # 필드가 변경되면 컬럼의 filter_type에 맞는 기본 연산자 설정
+      new_operator = cond do
+        field_str != "" && new_field != condition.field ->
+          col = Enum.find(grid.columns, fn c -> c.field == new_field end)
+          if col && Map.get(col, :filter_type) == :number, do: :eq, else: :contains
+        operator_str != "" ->
+          String.to_existing_atom(operator_str)
+        true ->
+          condition.operator
+      end
+
+      %{condition | field: new_field, operator: new_operator, value: value_str}
+    end)
+
+    updated_adv = %{adv | conditions: conditions}
+    updated_grid = put_in(grid.state[:advanced_filters], updated_adv)
+    {:noreply, assign(socket, grid: updated_grid)}
+  end
+
+  @impl true
+  def handle_event("remove_filter_condition", %{"index" => index}, socket) do
+    grid = socket.assigns.grid
+    adv = Map.get(grid.state, :advanced_filters, %{logic: :and, conditions: []})
+    idx = String.to_integer(index)
+    updated_conditions = List.delete_at(adv.conditions, idx)
+    updated_adv = %{adv | conditions: updated_conditions}
+    updated_grid = put_in(grid.state[:advanced_filters], updated_adv)
+    {:noreply, assign(socket, grid: updated_grid)}
+  end
+
+  @impl true
+  def handle_event("change_filter_logic", %{"logic" => logic}, socket) do
+    grid = socket.assigns.grid
+    adv = Map.get(grid.state, :advanced_filters, %{logic: :and, conditions: []})
+    logic_atom = String.to_existing_atom(logic)
+    updated_adv = %{adv | logic: logic_atom}
+    updated_grid = put_in(grid.state[:advanced_filters], updated_adv)
+    {:noreply, assign(socket, grid: updated_grid)}
+  end
+
+  @impl true
+  def handle_event("clear_advanced_filter", _params, socket) do
+    grid = socket.assigns.grid
+    updated_grid = put_in(grid.state[:advanced_filters], %{logic: :and, conditions: []})
+    {:noreply, assign(socket, grid: updated_grid)}
+  end
+
+  # 고급 필터 form에서 엔터 키 입력 시 submit 방지
+  @impl true
+  def handle_event("noop_submit", _params, socket) do
+    {:noreply, socket}
+  end
+
   defp export_data(grid, type) do
     data =
       case type do
@@ -581,6 +668,15 @@ defmodule LiveviewGridWeb.GridComponent do
               >
                 ▼
               </button>
+              <button
+                class={"lv-grid__filter-toggle #{if @grid.state.show_advanced_filter, do: "lv-grid__filter-toggle--active"}"}
+                phx-click="toggle_advanced_filter"
+                phx-target={@myself}
+                title={if @grid.state.show_advanced_filter, do: "고급 필터 숨기기", else: "고급 필터"}
+                style="font-size: 9px;"
+              >
+                ▼S<%= if length((@grid.state.advanced_filters || %{conditions: []}).conditions) > 0 do %><span class="lv-grid__filter-badge"><%= length(@grid.state.advanced_filters.conditions) %></span><% end %>
+              </button>
             <% end %>
             <button
               class={"lv-grid__status-toggle #{if @grid.state.show_status_column, do: "lv-grid__status-toggle--active"}"}
@@ -668,6 +764,110 @@ defmodule LiveviewGridWeb.GridComponent do
               ✕
             </button>
           <% end %>
+        </div>
+      <% end %>
+
+      <!-- Advanced Filter Panel (F-310) -->
+      <%= if @grid.state.show_advanced_filter do %>
+        <div class="lv-grid__advanced-filter">
+          <div class="lv-grid__advanced-filter-header">
+            <span>고급 필터</span>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <div class="lv-grid__advanced-filter-logic">
+                <button
+                  class={"lv-grid__advanced-filter-logic-btn #{if @grid.state.advanced_filters.logic == :and, do: "lv-grid__advanced-filter-logic-btn--active"}"}
+                  phx-click="change_filter_logic"
+                  phx-value-logic="and"
+                  phx-target={@myself}
+                >AND</button>
+                <button
+                  class={"lv-grid__advanced-filter-logic-btn #{if @grid.state.advanced_filters.logic == :or, do: "lv-grid__advanced-filter-logic-btn--active"}"}
+                  phx-click="change_filter_logic"
+                  phx-value-logic="or"
+                  phx-target={@myself}
+                >OR</button>
+              </div>
+              <button
+                class="lv-grid__filter-condition-remove"
+                phx-click="toggle_advanced_filter"
+                phx-target={@myself}
+                title="닫기"
+              >✕</button>
+            </div>
+          </div>
+
+          <!-- 조건 목록 -->
+          <%= for {condition, idx} <- Enum.with_index(@grid.state.advanced_filters.conditions) do %>
+            <div class="lv-grid__filter-condition">
+              <form phx-change="update_filter_condition" phx-submit="noop_submit" phx-target={@myself} style="display: contents;">
+              <input type="hidden" name="index" value={idx} />
+              <select name="field">
+                <option value="">컬럼 선택</option>
+                <%= for col <- @grid.columns do %>
+                  <option value={col.field} selected={condition.field == col.field}><%= col.label %></option>
+                <% end %>
+              </select>
+
+              <select name="operator">
+                <%= if condition.field != nil do %>
+                  <% filter_type = get_column_filter_type(@grid.columns, condition.field) %>
+                  <%= if filter_type == :number do %>
+                    <option value="eq" selected={condition.operator == :eq}>= 같음</option>
+                    <option value="neq" selected={condition.operator == :neq}>≠ 다름</option>
+                    <option value="gt" selected={condition.operator == :gt}>&gt; 큼</option>
+                    <option value="lt" selected={condition.operator == :lt}>&lt; 작음</option>
+                    <option value="gte" selected={condition.operator == :gte}>≥ 크거나같음</option>
+                    <option value="lte" selected={condition.operator == :lte}>≤ 작거나같음</option>
+                  <% else %>
+                    <option value="contains" selected={condition.operator == :contains}>포함</option>
+                    <option value="equals" selected={condition.operator == :equals}>같음</option>
+                    <option value="starts_with" selected={condition.operator == :starts_with}>시작</option>
+                    <option value="ends_with" selected={condition.operator == :ends_with}>끝남</option>
+                    <option value="is_empty" selected={condition.operator == :is_empty}>비어있음</option>
+                    <option value="is_not_empty" selected={condition.operator == :is_not_empty}>비어있지않음</option>
+                  <% end %>
+                <% else %>
+                  <option value="">연산자</option>
+                <% end %>
+              </select>
+
+              <%= if condition.operator not in [:is_empty, :is_not_empty] do %>
+                <input
+                  type="text"
+                  class="lv-grid__filter-condition-value"
+                  placeholder="값 입력..."
+                  value={condition.value}
+                  name="value"
+                  phx-debounce="300"
+                />
+              <% end %>
+              </form>
+
+              <button
+                class="lv-grid__filter-condition-remove"
+                phx-click="remove_filter_condition"
+                phx-value-index={idx}
+                phx-target={@myself}
+                title="조건 삭제"
+              >✕</button>
+            </div>
+          <% end %>
+
+          <!-- 하단 액션 -->
+          <div class="lv-grid__advanced-filter-actions">
+            <button
+              class="lv-grid__filter-add-btn"
+              phx-click="add_filter_condition"
+              phx-target={@myself}
+            >+ 조건 추가</button>
+            <div style="display: flex; gap: 8px;">
+              <button
+                class="lv-grid__filter-reset-btn"
+                phx-click="clear_advanced_filter"
+                phx-target={@myself}
+              >초기화</button>
+            </div>
+          </div>
         </div>
       <% end %>
 
@@ -932,6 +1132,13 @@ defmodule LiveviewGridWeb.GridComponent do
 
   defp filter_placeholder(%{filter_type: :number}), do: "예: >30, <=25"
   defp filter_placeholder(_column), do: "검색..."
+
+  defp get_column_filter_type(columns, field) do
+    case Enum.find(columns, fn c -> c.field == field end) do
+      nil -> :text
+      col -> Map.get(col, :filter_type, :text)
+    end
+  end
 
   defp editing?(nil, _row_id, _field), do: false
   defp editing?(%{row_id: rid, field: f}, row_id, field), do: rid == row_id and f == field

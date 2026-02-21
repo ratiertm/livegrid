@@ -66,7 +66,8 @@ defmodule LiveViewGrid.Grid do
   def visible_data(%{data: data, columns: columns, state: state, options: options}) do
     searched = apply_global_search(data, state.global_search, columns)
     filtered = apply_filters(searched, state.filters, columns)
-    sorted = apply_sort(filtered, state.sort)
+    advanced = apply_advanced_filters(filtered, state.advanced_filters, columns)
+    sorted = apply_sort(advanced, state.sort)
 
     # Virtual Scrolling 사용 시
     if options.virtual_scroll do
@@ -84,6 +85,7 @@ defmodule LiveViewGrid.Grid do
     data
     |> apply_global_search(state.global_search, columns)
     |> apply_filters(state.filters, columns)
+    |> apply_advanced_filters(state.advanced_filters, columns)
     |> apply_sort(state.sort)
   end
 
@@ -94,11 +96,13 @@ defmodule LiveViewGrid.Grid do
   def filtered_count(%{data: data, columns: columns, state: state}) do
     has_search = state.global_search != ""
     has_filters = map_size(state.filters) > 0
+    has_advanced = length(Map.get(state, :advanced_filters, %{conditions: []})[:conditions] || []) > 0
 
-    if has_search or has_filters do
+    if has_search or has_filters or has_advanced do
       data
       |> apply_global_search(state.global_search, columns)
       |> apply_filters(state.filters, columns)
+      |> apply_advanced_filters(Map.get(state, :advanced_filters, %{logic: :and, conditions: []}), columns)
       |> length()
     else
       length(data)
@@ -375,6 +379,8 @@ defmodule LiveViewGrid.Grid do
       filters: %{},
       global_search: "",
       show_filter_row: false,
+      advanced_filters: %{logic: :and, conditions: []},
+      show_advanced_filter: false,
       pagination: %{
         current_page: 1,
         total_rows: 0
@@ -414,6 +420,12 @@ defmodule LiveViewGrid.Grid do
   defp apply_filters(data, filters, columns) do
     LiveViewGrid.Filter.apply(data, filters, columns)
   end
+
+  defp apply_advanced_filters(data, %{conditions: conditions} = adv, columns)
+       when is_list(conditions) and length(conditions) > 0 do
+    LiveViewGrid.Filter.apply_advanced(data, adv, columns)
+  end
+  defp apply_advanced_filters(data, _, _columns), do: data
 
   defp apply_sort(data, nil), do: data
   defp apply_sort(data, %{field: field, direction: direction}) do
