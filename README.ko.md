@@ -90,12 +90,20 @@ mix test
 - [ ] 변경사항 DB 저장 (INSERT/UPDATE/DELETE)
 - [ ] 대용량 데이터 스트리밍 (Repo.stream)
 
-### v0.4 - 고급 데이터 처리
+### v0.4 - REST API 연동
+- [ ] 외부 API 데이터 소스 (REST/GraphQL)
+- [ ] 비동기 데이터 로딩 (로딩 상태 표시)
+- [ ] API 기반 CRUD 연동 (POST/PUT/PATCH/DELETE)
+- [ ] API 페이지네이션 (cursor/offset 방식)
+- [ ] 인증 헤더 지원 (Bearer token, API key)
+- [ ] 에러 처리 & 재시도 로직
+
+### v0.5 - 고급 데이터 처리
 - [ ] 그룹핑 (Grouping)
 - [ ] 피벗 테이블
 - [ ] 트리 그리드
 
-### v0.5 - 협업 & 실시간
+### v0.6 - 협업 & 실시간
 - [ ] 실시간 동기화 (멀티 유저 동시 편집)
 - [ ] 변경 이력 (Undo/Redo)
 - [ ] 셀 잠금 (Lock)

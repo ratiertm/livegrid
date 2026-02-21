@@ -90,12 +90,20 @@ mix test
 - [ ] Persist changes to DB (INSERT/UPDATE/DELETE)
 - [ ] Large dataset streaming (Repo.stream)
 
-### v0.4 - Advanced Data Processing
+### v0.4 - REST API Integration
+- [ ] External API data source (REST/GraphQL)
+- [ ] Async data fetching with loading states
+- [ ] API-based CRUD operations (POST/PUT/PATCH/DELETE)
+- [ ] Pagination via API (cursor/offset)
+- [ ] Authentication header support (Bearer token, API key)
+- [ ] Error handling & retry logic
+
+### v0.5 - Advanced Data Processing
 - [ ] Grouping
 - [ ] Pivot table
 - [ ] Tree grid
 
-### v0.5 - Collaboration & Real-time
+### v0.6 - Collaboration & Real-time
 - [ ] Real-time sync (multi-user concurrent editing)
 - [ ] Change history (Undo/Redo)
 - [ ] Cell locking
