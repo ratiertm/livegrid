@@ -20,7 +20,57 @@ defmodule LiveviewGridWeb.DemoLive do
       page_size: 10,
       loaded_count: min(100, length(all_users)),
       virtual_scroll: false,
-      theme: "light"
+      theme: "light",
+      # 테마 커스터마이저 상태
+      customizer_open: false,
+      custom_css_vars: %{},
+      saved_presets: %{
+        "Ocean Blue" => %{
+          "--lv-grid-primary" => "#0288d1",
+          "--lv-grid-primary-dark" => "#01579b",
+          "--lv-grid-primary-light" => "#e1f5fe",
+          "--lv-grid-bg" => "#ffffff",
+          "--lv-grid-bg-secondary" => "#f0f7ff",
+          "--lv-grid-text" => "#1a237e",
+          "--lv-grid-border" => "#b3d4fc",
+          "--lv-grid-hover" => "#e3f2fd",
+          "--lv-grid-selected" => "#bbdefb"
+        },
+        "Forest Green" => %{
+          "--lv-grid-primary" => "#2e7d32",
+          "--lv-grid-primary-dark" => "#1b5e20",
+          "--lv-grid-primary-light" => "#e8f5e9",
+          "--lv-grid-bg" => "#ffffff",
+          "--lv-grid-bg-secondary" => "#f1f8f1",
+          "--lv-grid-text" => "#1b5e20",
+          "--lv-grid-border" => "#a5d6a7",
+          "--lv-grid-hover" => "#e8f5e9",
+          "--lv-grid-selected" => "#c8e6c9"
+        },
+        "Sunset Orange" => %{
+          "--lv-grid-primary" => "#e65100",
+          "--lv-grid-primary-dark" => "#bf360c",
+          "--lv-grid-primary-light" => "#fff3e0",
+          "--lv-grid-bg" => "#fffaf5",
+          "--lv-grid-bg-secondary" => "#fff8f0",
+          "--lv-grid-text" => "#3e2723",
+          "--lv-grid-border" => "#ffcc80",
+          "--lv-grid-hover" => "#fff3e0",
+          "--lv-grid-selected" => "#ffe0b2"
+        },
+        "Dark Purple" => %{
+          "--lv-grid-primary" => "#bb86fc",
+          "--lv-grid-primary-dark" => "#9c64fc",
+          "--lv-grid-primary-light" => "#2d1b4e",
+          "--lv-grid-bg" => "#121212",
+          "--lv-grid-bg-secondary" => "#1e1e2e",
+          "--lv-grid-text" => "#e0e0e0",
+          "--lv-grid-border" => "#3a3a5c",
+          "--lv-grid-hover" => "#2a2a3e",
+          "--lv-grid-selected" => "#2d1b4e"
+        }
+      },
+      preset_name_input: ""
     )}
   end
 
@@ -133,7 +183,62 @@ defmodule LiveviewGridWeb.DemoLive do
 
   @impl true
   def handle_event("toggle_theme", %{"theme" => theme}, socket) do
-    {:noreply, assign(socket, theme: theme)}
+    {:noreply, assign(socket, theme: theme, custom_css_vars: %{})}
+  end
+
+  # 테마 커스터마이저 토글
+  @impl true
+  def handle_event("toggle_customizer", _params, socket) do
+    {:noreply, assign(socket, customizer_open: !socket.assigns.customizer_open)}
+  end
+
+  # 개별 CSS 변수 변경 (color picker 에서)
+  @impl true
+  def handle_event("update_css_var", %{"var" => var_name, "value" => value}, socket) do
+    custom_vars = Map.put(socket.assigns.custom_css_vars, var_name, value)
+    {:noreply, assign(socket, custom_css_vars: custom_vars, theme: "custom")}
+  end
+
+  # 프리셋 적용
+  @impl true
+  def handle_event("apply_preset", %{"name" => name}, socket) do
+    case Map.get(socket.assigns.saved_presets, name) do
+      nil -> {:noreply, socket}
+      vars -> {:noreply, assign(socket, custom_css_vars: vars, theme: "custom")}
+    end
+  end
+
+  # 현재 커스텀 변수를 프리셋으로 저장
+  @impl true
+  def handle_event("save_preset", %{"name" => name}, socket) do
+    name = String.trim(name)
+    if name == "" do
+      {:noreply, put_flash(socket, :error, "프리셋 이름을 입력하세요")}
+    else
+      presets = Map.put(socket.assigns.saved_presets, name, socket.assigns.custom_css_vars)
+      {:noreply, socket
+        |> assign(saved_presets: presets, preset_name_input: "")
+        |> put_flash(:info, "프리셋 '#{name}' 저장 완료")}
+    end
+  end
+
+  # 프리셋 삭제
+  @impl true
+  def handle_event("delete_preset", %{"name" => name}, socket) do
+    presets = Map.delete(socket.assigns.saved_presets, name)
+    {:noreply, assign(socket, saved_presets: presets)}
+  end
+
+  # 커스터마이저 리셋 (현재 테마의 기본 색상으로 복원)
+  @impl true
+  def handle_event("reset_customizer", _params, socket) do
+    {:noreply, assign(socket, custom_css_vars: %{}, theme: "light")}
+  end
+
+  # 프리셋 이름 입력
+  @impl true
+  def handle_event("update_preset_name", %{"value" => value}, socket) do
+    {:noreply, assign(socket, preset_name_input: value)}
   end
 
   # CSV/Excel Export: GridComponent → 부모 LiveView → push_event → JS 다운로드 (F-510)
@@ -318,7 +423,7 @@ defmodule LiveviewGridWeb.DemoLive do
         </div>
       </div>
       
-      <!-- 테마 토글 (F-200) -->
+      <!-- 테마 토글 + 커스터마이저 (F-200) -->
       <div style="margin: 20px 0; padding: 15px; background: #f3e5f5; border-radius: 4px; border-left: 4px solid #9c27b0;">
         <div style="display: flex; align-items: center; gap: 15px;">
           <label style="font-weight: 600;">🌗 테마:</label>
@@ -336,7 +441,96 @@ defmodule LiveviewGridWeb.DemoLive do
           >
             🌙 Dark
           </button>
+          <button
+            phx-click="toggle_customizer"
+            style={"padding: 8px 20px; border: 2px solid #9c27b0; border-radius: 4px; cursor: pointer; font-weight: 600; #{if @customizer_open, do: "background: #7b1fa2; color: white;", else: "background: white; color: #9c27b0;"}"}
+          >
+            🎨 커스터마이저
+          </button>
+          <%= if @theme == "custom" do %>
+            <span style="padding: 4px 12px; background: #9c27b0; color: white; border-radius: 12px; font-size: 12px; font-weight: 600;">
+              ✨ 커스텀 테마 적용중
+            </span>
+          <% end %>
         </div>
+
+        <!-- 테마 커스터마이저 패널 -->
+        <%= if @customizer_open do %>
+          <div style="margin-top: 15px; padding: 20px; background: white; border: 2px solid #ce93d8; border-radius: 8px; box-shadow: 0 4px 12px rgba(156,39,176,0.15);">
+
+            <!-- 프리셋 섹션 -->
+            <div style="margin-bottom: 20px;">
+              <h4 style="margin: 0 0 10px 0; color: #7b1fa2; font-size: 14px;">📦 프리셋 테마</h4>
+              <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+                <%= for {name, vars} <- @saved_presets do %>
+                  <div style="display: flex; align-items: center; gap: 4px;">
+                    <button
+                      phx-click="apply_preset"
+                      phx-value-name={name}
+                      style="padding: 6px 14px; border: 1px solid #ce93d8; border-radius: 16px; cursor: pointer; font-size: 12px; font-weight: 500; background: #fce4ec; color: #7b1fa2; transition: all 0.2s;"
+                    >
+                      <span style={"display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 4px; background: #{Map.get(vars, "--lv-grid-primary", "#9c27b0")}; vertical-align: middle;"}></span>
+                      <%= name %>
+                    </button>
+                    <button
+                      phx-click="delete_preset"
+                      phx-value-name={name}
+                      style="padding: 2px 6px; border: none; background: none; cursor: pointer; color: #999; font-size: 14px;"
+                      title="삭제"
+                    >×</button>
+                  </div>
+                <% end %>
+              </div>
+            </div>
+
+            <!-- 색상 조정 섹션 -->
+            <div style="margin-bottom: 15px;">
+              <h4 style="margin: 0 0 10px 0; color: #7b1fa2; font-size: 14px;">🎨 색상 조정</h4>
+              <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px;">
+
+                <.color_picker_item var_name="--lv-grid-primary" label="기본 색상 (Primary)" current={Map.get(@custom_css_vars, "--lv-grid-primary", "#2196f3")} />
+                <.color_picker_item var_name="--lv-grid-primary-dark" label="기본 색상 (진하게)" current={Map.get(@custom_css_vars, "--lv-grid-primary-dark", "#1976d2")} />
+                <.color_picker_item var_name="--lv-grid-bg" label="배경색" current={Map.get(@custom_css_vars, "--lv-grid-bg", "#ffffff")} />
+                <.color_picker_item var_name="--lv-grid-bg-secondary" label="보조 배경색" current={Map.get(@custom_css_vars, "--lv-grid-bg-secondary", "#fafafa")} />
+                <.color_picker_item var_name="--lv-grid-text" label="텍스트 색상" current={Map.get(@custom_css_vars, "--lv-grid-text", "#333333")} />
+                <.color_picker_item var_name="--lv-grid-text-secondary" label="보조 텍스트" current={Map.get(@custom_css_vars, "--lv-grid-text-secondary", "#555555")} />
+                <.color_picker_item var_name="--lv-grid-border" label="테두리 색상" current={Map.get(@custom_css_vars, "--lv-grid-border", "#e0e0e0")} />
+                <.color_picker_item var_name="--lv-grid-hover" label="호버 색상" current={Map.get(@custom_css_vars, "--lv-grid-hover", "#f5f5f5")} />
+                <.color_picker_item var_name="--lv-grid-selected" label="선택 색상" current={Map.get(@custom_css_vars, "--lv-grid-selected", "#e3f2fd")} />
+                <.color_picker_item var_name="--lv-grid-danger" label="위험 색상" current={Map.get(@custom_css_vars, "--lv-grid-danger", "#f44336")} />
+                <.color_picker_item var_name="--lv-grid-success" label="성공 색상" current={Map.get(@custom_css_vars, "--lv-grid-success", "#4caf50")} />
+                <.color_picker_item var_name="--lv-grid-warning" label="경고 색상" current={Map.get(@custom_css_vars, "--lv-grid-warning", "#ff9800")} />
+              </div>
+            </div>
+
+            <!-- 저장/리셋 -->
+            <div style="display: flex; align-items: center; gap: 10px; padding-top: 15px; border-top: 1px solid #e0e0e0;">
+              <input
+                type="text"
+                value={@preset_name_input}
+                phx-keyup="update_preset_name"
+                placeholder="프리셋 이름 입력..."
+                style="padding: 8px 12px; border: 1px solid #ce93d8; border-radius: 4px; font-size: 13px; width: 180px;"
+              />
+              <button
+                phx-click="save_preset"
+                phx-value-name={@preset_name_input}
+                style="padding: 8px 16px; background: #9c27b0; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: 600; font-size: 13px;"
+              >
+                💾 프리셋 저장
+              </button>
+              <button
+                phx-click="reset_customizer"
+                style="padding: 8px 16px; background: #f5f5f5; color: #666; border: 1px solid #ddd; border-radius: 4px; cursor: pointer; font-weight: 600; font-size: 13px;"
+              >
+                🔄 초기화
+              </button>
+              <span style="margin-left: auto; font-size: 12px; color: #999;">
+                현재 커스텀 변수: <%= map_size(@custom_css_vars) %>개
+              </span>
+            </div>
+          </div>
+        <% end %>
       </div>
 
       <div style="margin: 20px 0; padding: 15px; background: #f5f5f5; border-radius: 4px;">
@@ -392,7 +586,8 @@ defmodule LiveviewGridWeb.DemoLive do
             show_footer: !@virtual_scroll,
             frozen_columns: 1,
             debug: true,
-            theme: @theme
+            theme: @theme,
+            custom_css_vars: @custom_css_vars
           }}
         />
         
@@ -437,6 +632,27 @@ defmodule LiveviewGridWeb.DemoLive do
       String.contains?(String.downcase(user.city), query_lower) or
       String.contains?(to_string(user.age), query_lower)
     end)
+  end
+
+  # 테마 커스터마이저: 색상 피커 아이템 컴포넌트
+  defp color_picker_item(assigns) do
+    ~H"""
+    <div style="display: flex; align-items: center; gap: 8px; padding: 6px 10px; background: #fafafa; border-radius: 6px; border: 1px solid #eee;">
+      <form phx-change="update_css_var" style="display: contents;">
+        <input type="hidden" name="var" value={@var_name} />
+        <input
+          type="color"
+          name="value"
+          value={@current}
+          style="width: 32px; height: 32px; border: 2px solid #ddd; border-radius: 4px; cursor: pointer; padding: 0;"
+        />
+      </form>
+      <div style="flex: 1; min-width: 0;">
+        <div style="font-size: 12px; font-weight: 600; color: #333; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"><%= @label %></div>
+        <div style="font-size: 11px; color: #999; font-family: monospace;"><%= @current %></div>
+      </div>
+    </div>
+    """
   end
 
   # 샘플 데이터 생성 (동적 개수, start_id로 ID 시작값 지정 가능)

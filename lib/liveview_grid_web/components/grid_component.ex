@@ -573,7 +573,7 @@ defmodule LiveviewGridWeb.GridComponent do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="lv-grid" data-theme={@grid.options[:theme] || "light"}>
+    <div class="lv-grid" data-theme={@grid.options[:theme] || "light"} style={build_custom_css_vars(@grid.options[:custom_css_vars])}>
       <!-- Toolbar: Search + Save -->
       <div class="lv-grid__toolbar">
         <div class="lv-grid__search-bar">
@@ -1279,5 +1279,14 @@ defmodule LiveviewGridWeb.GridComponent do
       finish = min(total, current_page + 2)
       start..finish
     end
+  end
+
+  # 커스텀 CSS 변수를 인라인 style 문자열로 변환
+  defp build_custom_css_vars(nil), do: nil
+  defp build_custom_css_vars(vars) when is_map(vars) and map_size(vars) == 0, do: nil
+  defp build_custom_css_vars(vars) when is_map(vars) do
+    vars
+    |> Enum.map(fn {key, value} -> "#{key}: #{value}" end)
+    |> Enum.join("; ")
   end
 end
