@@ -38,3 +38,7 @@ npm-debug.log
 # Reference implementations (MIT licensed, for research only)
 /reference/
 
+# Analysis documents (nexacro, toast)
+nexacrogrid_function.md
+toastgrid_function.md
+
