@@ -651,7 +651,7 @@ defmodule LiveviewGridWeb.GridComponent do
       <%= if @grid.options.show_header do %>
         <div class="lv-grid__header">
           <!-- 체크박스 + 필터 토글 컬럼 -->
-          <div class="lv-grid__header-cell" style="width: 50px; flex: 0 0 50px; justify-content: center; gap: 4px;">
+          <div class="lv-grid__header-cell" style="width: 90px; flex: 0 0 90px; justify-content: center; gap: 4px;">
             <input
               type="checkbox"
               phx-click="grid_select_all"
@@ -727,7 +727,7 @@ defmodule LiveviewGridWeb.GridComponent do
       <%= if @grid.state.show_filter_row && has_filterable_columns?(@grid.columns) do %>
         <div class="lv-grid__filter-row">
           <!-- 체크박스 컬럼 빈칸 -->
-          <div class="lv-grid__filter-cell" style="width: 50px; flex: 0 0 50px;">
+          <div class="lv-grid__filter-cell" style="width: 90px; flex: 0 0 90px;">
           </div>
 
           <!-- 상태 컬럼 빈칸 -->
@@ -887,7 +887,7 @@ defmodule LiveviewGridWeb.GridComponent do
             <div style={"position: absolute; top: #{Grid.virtual_offset_top(@grid)}px; width: 100%;"}>
               <%= for row <- Grid.visible_data(@grid) do %>
                 <div class={"lv-grid__row #{if row.id in @grid.state.selection.selected_ids, do: "lv-grid__row--selected"} #{if Map.get(@grid.state.row_statuses, row.id) == :deleted, do: "lv-grid__row--deleted"}"}>
-                  <div class="lv-grid__cell" style="width: 50px; flex: 0 0 50px; justify-content: center;">
+                  <div class="lv-grid__cell" style="width: 90px; flex: 0 0 90px; justify-content: center;">
                     <input
                       type="checkbox"
                       phx-click="grid_row_select"
@@ -917,7 +917,7 @@ defmodule LiveviewGridWeb.GridComponent do
         <div class="lv-grid__body">
           <%= for row <- Grid.visible_data(@grid) do %>
             <div class={"lv-grid__row #{if row.id in @grid.state.selection.selected_ids, do: "lv-grid__row--selected"} #{if Map.get(@grid.state.row_statuses, row.id) == :deleted, do: "lv-grid__row--deleted"}"}>
-              <div class="lv-grid__cell" style="width: 50px; flex: 0 0 50px; justify-content: center;">
+              <div class="lv-grid__cell" style="width: 90px; flex: 0 0 90px; justify-content: center;">
                 <input
                   type="checkbox"
                   phx-click="grid_row_select"
@@ -1089,8 +1089,8 @@ defmodule LiveviewGridWeb.GridComponent do
   defp frozen_style(col_idx, grid) do
     frozen_count = grid.options.frozen_columns
     if frozen_count > 0 and col_idx < frozen_count do
-      # 체크박스(50px) + 상태(60px if visible) + 이전 컬럼들 너비 합산
-      base_offset = 50 + if(grid.state.show_status_column, do: 60, else: 0)
+      # 체크박스(90px) + 상태(60px if visible) + 이전 컬럼들 너비 합산
+      base_offset = 90 + if(grid.state.show_status_column, do: 60, else: 0)
       prev_width = grid.columns
         |> Enum.take(col_idx)
         |> Enum.reduce(0, fn col, acc ->

@@ -68,7 +68,7 @@
   --lv-grid-bg: #1e1e1e;
   --lv-grid-text: #e0e0e0;
   --lv-grid-text-secondary: #b0b0b0;
-  --lv-grid-border: #333333;
+  --lv-grid-border: #444444;
   --lv-grid-hover: #2a2a2a;
   --lv-grid-selected: #1a2332;
 
@@ -80,8 +80,8 @@
   --lv-grid-text-disabled: #666666;
   --lv-grid-text-placeholder: #888888;
 
-  --lv-grid-border-light: #2a2a2a;
-  --lv-grid-border-input: #444444;
+  --lv-grid-border-light: #383838;
+  --lv-grid-border-input: #555555;
 
   --lv-grid-danger: #ef5350;
   --lv-grid-danger-dark: #e53935;
@@ -240,12 +240,12 @@
 .lv-grid__search-input {
   flex: 1;
   padding: 6px 10px;
-  border: 1px solid var(--lv-grid-border);
+  border: 1px solid var(--lv-grid-border-input);
   border-radius: 4px;
   font-size: var(--lv-grid-font-size-md);
   font-family: var(--lv-grid-font-family);
   color: var(--lv-grid-text);
-  background: var(--lv-grid-bg);
+  background: var(--lv-grid-bg-input);
   transition: border-color 0.2s ease;
 }
 
@@ -390,12 +390,12 @@
 .lv-grid__filter-input {
   width: 100%;
   padding: 5px 8px;
-  border: 1px solid var(--lv-grid-border);
+  border: 1px solid var(--lv-grid-border-input);
   border-radius: 3px;
   font-size: 12px;
   font-family: var(--lv-grid-font-family);
   color: var(--lv-grid-text);
-  background: var(--lv-grid-bg);
+  background: var(--lv-grid-bg-input);
   transition: border-color 0.2s ease;
 }
 
@@ -511,7 +511,7 @@
   font-size: var(--lv-grid-font-size-md);
   font-family: var(--lv-grid-font-family);
   color: var(--lv-grid-text);
-  background: var(--lv-grid-bg);
+  background: var(--lv-grid-bg-input);
   outline: none;
   box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.2);
 }
@@ -901,7 +901,8 @@ select.lv-grid__cell-editor {
   border: 1px solid var(--lv-grid-border-input);
   border-radius: 4px;
   font-size: 13px;
-  background: var(--lv-grid-bg);
+  color: var(--lv-grid-text);
+  background: var(--lv-grid-bg-input);
   flex: 0 0 140px;
   cursor: pointer;
 }
@@ -916,6 +917,8 @@ select.lv-grid__cell-editor {
   border: 1px solid var(--lv-grid-border-input);
   border-radius: 4px;
   font-size: 13px;
+  color: var(--lv-grid-text);
+  background: var(--lv-grid-bg-input);
   flex: 1;
   min-width: 0;
 }
