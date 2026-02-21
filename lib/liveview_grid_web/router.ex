@@ -22,12 +22,19 @@ defmodule LiveviewGridWeb.Router do
     live "/demo", DemoLive
     live "/renderer-demo", RendererDemoLive
     live "/dbms-demo", DbmsDemoLive
+    live "/api-demo", ApiDemoLive
   end
 
-  # Other scopes may use custom stacks.
-  # scope "/api", LiveviewGridWeb do
-  #   pipe_through :api
-  # end
+  # Mock REST API for API Demo
+  scope "/api", LiveviewGridWeb do
+    pipe_through :api
+
+    get "/users", MockApiController, :index
+    get "/users/:id", MockApiController, :show
+    post "/users", MockApiController, :create
+    put "/users/:id", MockApiController, :update
+    delete "/users/:id", MockApiController, :delete
+  end
 
   # Enable LiveDashboard in development
   if Application.compile_env(:liveview_grid, :dev_routes) do

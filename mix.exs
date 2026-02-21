@@ -56,7 +56,9 @@ defmodule LiveviewGrid.MixProject do
       {:elixlsx, "~> 0.6"},
       # DBMS Integration (v0.3)
       {:ecto_sql, "~> 3.11"},
-      {:ecto_sqlite3, "~> 0.17"}
+      {:ecto_sqlite3, "~> 0.17"},
+      # REST API Integration (v0.5)
+      {:req, "~> 0.5"}
     ]
   end
 

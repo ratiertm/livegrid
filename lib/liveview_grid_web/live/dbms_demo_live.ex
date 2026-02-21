@@ -167,6 +167,9 @@ defmodule LiveviewGridWeb.DbmsDemoLive do
           <a href="/demo" style="padding: 8px 16px; background: #f5f5f5; border: 1px solid #ddd; border-radius: 6px; text-decoration: none; color: #333; font-size: 13px;">
             ← InMemory 데모
           </a>
+          <a href="/api-demo" style="padding: 8px 16px; background: #f5f5f5; border: 1px solid #ddd; border-radius: 6px; text-decoration: none; color: #333; font-size: 13px;">
+            🌐 API 데모
+          </a>
         </div>
       </div>
 
