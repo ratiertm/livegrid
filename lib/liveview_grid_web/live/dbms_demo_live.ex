@@ -237,7 +237,7 @@ defmodule LiveviewGridWeb.DbmsDemoLive do
           %{field: :join_date, label: "입사일", width: 120, sortable: true, filterable: true, filter_type: :text}
         ]}
         options={%{
-          page_size: 20,
+          page_size: 50,
           show_footer: true,
           frozen_columns: 1,
           debug: true,

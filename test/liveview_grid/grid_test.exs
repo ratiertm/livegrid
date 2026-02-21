@@ -911,4 +911,129 @@ defmodule LiveViewGrid.GridTest do
       assert grid.options.show_header == true
     end
   end
+
+  # ── v0.4: Column Resize & Reorder ──
+
+  describe "resize_column/3" do
+    setup do
+      data = [%{id: 1, name: "Alice", age: 30}]
+      columns = [
+        %{field: :name, label: "이름", width: 150},
+        %{field: :age, label: "나이", width: 100}
+      ]
+      grid = Grid.new(data: data, columns: columns)
+      %{grid: grid}
+    end
+
+    test "sets column width in state", %{grid: grid} do
+      updated = Grid.resize_column(grid, :name, 200)
+      assert updated.state.column_widths[:name] == 200
+    end
+
+    test "overwrites existing width", %{grid: grid} do
+      updated = grid
+        |> Grid.resize_column(:name, 200)
+        |> Grid.resize_column(:name, 300)
+      assert updated.state.column_widths[:name] == 300
+    end
+
+    test "enforces minimum width of 50", %{grid: grid} do
+      updated = Grid.resize_column(grid, :name, 50)
+      assert updated.state.column_widths[:name] == 50
+    end
+
+    test "raises for width below 50", %{grid: grid} do
+      assert_raise FunctionClauseError, fn ->
+        Grid.resize_column(grid, :name, 30)
+      end
+    end
+
+    test "supports multiple columns independently", %{grid: grid} do
+      updated = grid
+        |> Grid.resize_column(:name, 200)
+        |> Grid.resize_column(:age, 80)
+      assert updated.state.column_widths[:name] == 200
+      assert updated.state.column_widths[:age] == 80
+    end
+  end
+
+  describe "reorder_columns/2" do
+    setup do
+      data = [%{id: 1, name: "Alice", age: 30, dept: "개발"}]
+      columns = [
+        %{field: :name, label: "이름"},
+        %{field: :age, label: "나이"},
+        %{field: :dept, label: "부서"}
+      ]
+      grid = Grid.new(data: data, columns: columns)
+      %{grid: grid}
+    end
+
+    test "sets column order in state", %{grid: grid} do
+      updated = Grid.reorder_columns(grid, [:dept, :name, :age])
+      assert updated.state.column_order == [:dept, :name, :age]
+    end
+
+    test "overwrites existing order", %{grid: grid} do
+      updated = grid
+        |> Grid.reorder_columns([:dept, :name, :age])
+        |> Grid.reorder_columns([:age, :dept, :name])
+      assert updated.state.column_order == [:age, :dept, :name]
+    end
+  end
+
+  describe "display_columns/1" do
+    setup do
+      data = [%{id: 1, name: "Alice", age: 30, dept: "개발"}]
+      columns = [
+        %{field: :name, label: "이름"},
+        %{field: :age, label: "나이"},
+        %{field: :dept, label: "부서"}
+      ]
+      %{data: data, columns: columns}
+    end
+
+    test "returns original order when column_order is nil", %{data: data, columns: columns} do
+      grid = Grid.new(data: data, columns: columns)
+      display = Grid.display_columns(grid)
+      assert Enum.map(display, & &1.field) == [:name, :age, :dept]
+    end
+
+    test "returns reordered columns", %{data: data, columns: columns} do
+      grid = Grid.new(data: data, columns: columns)
+        |> Grid.reorder_columns([:dept, :age, :name])
+      display = Grid.display_columns(grid)
+      assert Enum.map(display, & &1.field) == [:dept, :age, :name]
+    end
+
+    test "frozen columns stay first regardless of order", %{data: data, columns: columns} do
+      grid = Grid.new(data: data, columns: columns, options: %{frozen_columns: 1})
+        |> Grid.reorder_columns([:dept, :age, :name])
+      display = Grid.display_columns(grid)
+      fields = Enum.map(display, & &1.field)
+      # :name (frozen, index 0) stays first
+      assert hd(fields) == :name
+      # remaining columns follow the order (with :name removed from non-frozen)
+      assert tl(fields) == [:dept, :age]
+    end
+
+    test "ignores fields not in columns", %{data: data, columns: columns} do
+      grid = Grid.new(data: data, columns: columns)
+        |> Grid.reorder_columns([:dept, :nonexistent, :age, :name])
+      display = Grid.display_columns(grid)
+      assert Enum.map(display, & &1.field) == [:dept, :age, :name]
+    end
+  end
+
+  describe "initial_state column fields" do
+    test "column_widths starts empty" do
+      grid = Grid.new(data: [], columns: [%{field: :id, label: "ID"}])
+      assert grid.state.column_widths == %{}
+    end
+
+    test "column_order starts nil" do
+      grid = Grid.new(data: [], columns: [%{field: :id, label: "ID"}])
+      assert grid.state.column_order == nil
+    end
+  end
 end

@@ -79,14 +79,62 @@ defmodule LiveViewGrid.Grid do
     # data_source 보존 (기존 grid에 있으면 유지)
     data_source = Map.get(grid, :data_source)
 
-    %{grid |
+    updated = %{grid |
       data: data,
       columns: normalize_columns(columns),
       options: merge_default_options(options),
       state: merged_state
     }
     |> Map.put(:data_source, data_source)
-    |> put_in([:state, :pagination, :total_rows], length(data))
+
+    # data_source가 있으면 total_rows를 length(data)로 덮어쓰지 않음
+    # (data_source 모드에서 data는 빈 리스트이므로 0이 되어 페이지네이션이 사라짐)
+    if data_source do
+      updated
+    else
+      put_in(updated, [:state, :pagination, :total_rows], length(data))
+    end
+  end
+
+  @doc """
+  컬럼 너비를 업데이트합니다. 최소 50px.
+  """
+  @spec resize_column(grid :: t(), field :: atom(), width :: pos_integer()) :: t()
+  def resize_column(grid, field, width) when is_atom(field) and is_integer(width) and width >= 50 do
+    put_in(grid.state.column_widths, Map.put(grid.state.column_widths, field, width))
+  end
+
+  @doc """
+  컬럼 표시 순서를 변경합니다. order는 field atom 리스트.
+  """
+  @spec reorder_columns(grid :: t(), order :: list(atom())) :: t()
+  def reorder_columns(grid, order) when is_list(order) do
+    put_in(grid.state.column_order, order)
+  end
+
+  @doc """
+  표시 순서대로 컬럼을 반환합니다.
+  column_order가 nil이면 원래 순서, 설정되면 해당 순서대로 반환.
+  frozen 컬럼은 항상 맨 앞에 유지합니다.
+  """
+  @spec display_columns(grid :: t()) :: list(map())
+  def display_columns(%{state: %{column_order: nil}, columns: columns}), do: columns
+  def display_columns(%{state: %{column_order: order}, columns: columns, options: options}) do
+    frozen_count = Map.get(options, :frozen_columns, 0)
+
+    # frozen 컬럼은 원래 위치 유지
+    frozen = Enum.take(columns, frozen_count)
+    frozen_fields = MapSet.new(Enum.map(frozen, & &1.field))
+
+    # non-frozen만 재정렬
+    non_frozen_order = Enum.reject(order, &MapSet.member?(frozen_fields, &1))
+
+    reordered = Enum.map(non_frozen_order, fn field ->
+      Enum.find(columns, fn c -> c.field == field end)
+    end)
+    |> Enum.reject(&is_nil/1)
+
+    frozen ++ reordered
   end
 
   @doc """
@@ -436,7 +484,9 @@ defmodule LiveViewGrid.Grid do
       editing: nil,
       row_statuses: %{},
       cell_errors: %{},
-      show_status_column: true
+      show_status_column: true,
+      column_widths: %{},
+      column_order: nil
     }
   end
 

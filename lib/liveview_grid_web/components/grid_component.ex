@@ -32,8 +32,14 @@ defmodule LiveviewGridWeb.GridComponent do
         new_options
       )
 
-      # data_source 보존
-      updated = if data_source, do: Map.put(updated, :data_source, data_source), else: updated
+      # data_source 모드: 보존 + refresh로 total_rows 재설정
+      updated = if data_source do
+        updated
+        |> Map.put(:data_source, data_source)
+        |> Grid.refresh_from_source()
+      else
+        updated
+      end
 
       # virtual_scroll 옵션이 변경되었으면 scroll_offset 리셋
       if old_virtual != new_virtual do
@@ -107,7 +113,39 @@ defmodule LiveviewGridWeb.GridComponent do
     
     # 페이지 상태 업데이트
     updated_grid = put_in(grid.state.pagination.current_page, page_num)
-    
+
+    {:noreply, assign(socket, grid: updated_grid)}
+  end
+
+  @impl true
+  def handle_event("grid_page_size_change", %{"page_size" => page_size}, socket) do
+    grid = socket.assigns.grid
+    new_size = String.to_integer(page_size)
+
+    # page_size 변경 + 1페이지로 리셋
+    updated_grid = grid
+    |> put_in([:options, :page_size], new_size)
+    |> put_in([:state, :pagination, :current_page], 1)
+
+    {:noreply, assign(socket, grid: updated_grid)}
+  end
+
+  @impl true
+  def handle_event("grid_column_resize", %{"field" => field, "width" => width}, socket) do
+    grid = socket.assigns.grid
+    field_atom = String.to_existing_atom(field)
+    width_int = String.to_integer(width)
+
+    updated_grid = Grid.resize_column(grid, field_atom, max(width_int, 50))
+    {:noreply, assign(socket, grid: updated_grid)}
+  end
+
+  @impl true
+  def handle_event("grid_column_reorder", %{"order" => order}, socket) do
+    grid = socket.assigns.grid
+    field_atoms = Enum.map(order, &String.to_existing_atom/1)
+
+    updated_grid = Grid.reorder_columns(grid, field_atoms)
     {:noreply, assign(socket, grid: updated_grid)}
   end
 
@@ -710,16 +748,20 @@ defmodule LiveviewGridWeb.GridComponent do
             </div>
           <% end %>
 
-          <%= for {column, col_idx} <- Enum.with_index(@grid.columns) do %>
+          <%= for {column, col_idx} <- Enum.with_index(Grid.display_columns(@grid)) do %>
             <div
               class={"lv-grid__header-cell #{if column.sortable, do: "lv-grid__header-cell--sortable"} #{frozen_class(col_idx, @grid)}"}
-              style={"#{column_width_style(column)}; #{frozen_style(col_idx, @grid)}"}
+              style={"#{column_width_style(column, @grid)}; #{frozen_style(col_idx, @grid)}"}
               phx-click={if column.sortable, do: "grid_sort"}
               phx-value-field={column.field}
               phx-value-direction={next_direction(@grid.state.sort, column.field)}
               phx-target={@myself}
               data-confirm={if column.sortable && Grid.has_changes?(@grid), do: "저장하지 않은 변경사항이 있습니다. 계속하시겠습니까?"}
               data-col-index={col_idx}
+              data-field={column.field}
+              data-frozen={if(col_idx < (@grid.options[:frozen_columns] || 0), do: "true", else: "false")}
+              id={"header-#{column.field}"}
+              phx-hook="ColumnReorder"
             >
               <%= column.label %>
               <%= if column.sortable && sort_active?(@grid.state.sort, column.field) do %>
@@ -732,6 +774,7 @@ defmodule LiveviewGridWeb.GridComponent do
                 phx-hook="ColumnResize"
                 id={"resize-#{column.field}"}
                 data-col-index={col_idx}
+                data-field={column.field}
               ></span>
             </div>
           <% end %>
@@ -751,8 +794,8 @@ defmodule LiveviewGridWeb.GridComponent do
             </div>
           <% end %>
 
-          <%= for {column, col_idx} <- Enum.with_index(@grid.columns) do %>
-            <div class={"lv-grid__filter-cell #{frozen_class(col_idx, @grid)}"} style={"#{column_width_style(column)}; #{frozen_style(col_idx, @grid)}"} data-col-index={col_idx}>
+          <%= for {column, col_idx} <- Enum.with_index(Grid.display_columns(@grid)) do %>
+            <div class={"lv-grid__filter-cell #{frozen_class(col_idx, @grid)}"} style={"#{column_width_style(column, @grid)}; #{frozen_style(col_idx, @grid)}"} data-col-index={col_idx}>
               <%= if column.filterable do %>
                 <input
                   type="text"
@@ -917,8 +960,8 @@ defmodule LiveviewGridWeb.GridComponent do
                       <%= render_status_badge(Map.get(@grid.state.row_statuses, row.id, :normal)) %>
                     </div>
                   <% end %>
-                  <%= for {column, col_idx} <- Enum.with_index(@grid.columns) do %>
-                    <div class={"lv-grid__cell #{frozen_class(col_idx, @grid)}"} style={"#{column_width_style(column)}; #{frozen_style(col_idx, @grid)}"} data-col-index={col_idx}>
+                  <%= for {column, col_idx} <- Enum.with_index(Grid.display_columns(@grid)) do %>
+                    <div class={"lv-grid__cell #{frozen_class(col_idx, @grid)}"} style={"#{column_width_style(column, @grid)}; #{frozen_style(col_idx, @grid)}"} data-col-index={col_idx}>
                       <%= render_cell(assigns, row, column) %>
                     </div>
                   <% end %>
@@ -947,8 +990,8 @@ defmodule LiveviewGridWeb.GridComponent do
                   <%= render_status_badge(Map.get(@grid.state.row_statuses, row.id, :normal)) %>
                 </div>
               <% end %>
-              <%= for {column, col_idx} <- Enum.with_index(@grid.columns) do %>
-                <div class={"lv-grid__cell #{frozen_class(col_idx, @grid)}"} style={"#{column_width_style(column)}; #{frozen_style(col_idx, @grid)}"} data-col-index={col_idx}>
+              <%= for {column, col_idx} <- Enum.with_index(Grid.display_columns(@grid)) do %>
+                <div class={"lv-grid__cell #{frozen_class(col_idx, @grid)}"} style={"#{column_width_style(column, @grid)}; #{frozen_style(col_idx, @grid)}"} data-col-index={col_idx}>
                   <%= render_cell(assigns, row, column) %>
                 </div>
               <% end %>
@@ -970,43 +1013,60 @@ defmodule LiveviewGridWeb.GridComponent do
       
       <!-- Footer -->
       <%= if @grid.options.show_footer do %>
-        <div class="lv-grid__footer">
+        <div class="lv-grid__footer" style="flex-direction: column; align-items: center; gap: 8px;">
           <%= if !@grid.options.virtual_scroll do %>
-            <div class="lv-grid__pagination">
-              <!-- 이전 버튼 -->
-              <button
-                class="lv-grid__page-btn"
-                phx-click="grid_page_change"
-                phx-value-page={@grid.state.pagination.current_page - 1}
-                phx-target={@myself}
-                disabled={@grid.state.pagination.current_page == 1}
-              >
-                &lt;
-              </button>
-
-              <!-- 페이지 번호 -->
-              <% filtered_total = Grid.filtered_count(@grid) %>
-              <%= for page <- page_range_for(filtered_total, @grid.state.pagination.current_page, @grid.options.page_size) do %>
-                <button
-                  class={"lv-grid__page-btn #{if page == @grid.state.pagination.current_page, do: "lv-grid__page-btn--current"}"}
-                  phx-click="grid_page_change"
-                  phx-value-page={page}
+            <!-- 페이지네이션 (센터) -->
+            <div style="display: flex; align-items: center; gap: 12px; width: 100%; justify-content: center;">
+              <!-- 페이지 사이즈 선택 -->
+              <div style="display: flex; align-items: center; gap: 4px; font-size: 12px; color: var(--lv-grid-text-secondary, #666);">
+                <select
+                  phx-change="grid_page_size_change"
                   phx-target={@myself}
+                  name="page_size"
+                  style="padding: 2px 6px; border: 1px solid var(--lv-grid-border, #ddd); border-radius: 4px; font-size: 12px; background: var(--lv-grid-bg, #fff); color: var(--lv-grid-text, #333); cursor: pointer;"
                 >
-                  <%= page %>
-                </button>
-              <% end %>
+                  <%= for size <- [50, 100, 200, 300, 400, 500] do %>
+                    <option value={size} selected={size == @grid.options.page_size}><%= size %>개</option>
+                  <% end %>
+                </select>
+              </div>
 
-              <!-- 다음 버튼 -->
-              <button
-                class="lv-grid__page-btn"
-                phx-click="grid_page_change"
-                phx-value-page={@grid.state.pagination.current_page + 1}
-                phx-target={@myself}
-                disabled={@grid.state.pagination.current_page >= Pagination.total_pages(filtered_total, @grid.options.page_size)}
-              >
-                &gt;
-              </button>
+              <div class="lv-grid__pagination">
+                <!-- 이전 버튼 -->
+                <button
+                  class="lv-grid__page-btn"
+                  phx-click="grid_page_change"
+                  phx-value-page={@grid.state.pagination.current_page - 1}
+                  phx-target={@myself}
+                  disabled={@grid.state.pagination.current_page == 1}
+                >
+                  &lt;
+                </button>
+
+                <!-- 페이지 번호 -->
+                <% filtered_total = Grid.filtered_count(@grid) %>
+                <%= for page <- page_range_for(filtered_total, @grid.state.pagination.current_page, @grid.options.page_size) do %>
+                  <button
+                    class={"lv-grid__page-btn #{if page == @grid.state.pagination.current_page, do: "lv-grid__page-btn--current"}"}
+                    phx-click="grid_page_change"
+                    phx-value-page={page}
+                    phx-target={@myself}
+                  >
+                    <%= page %>
+                  </button>
+                <% end %>
+
+                <!-- 다음 버튼 -->
+                <button
+                  class="lv-grid__page-btn"
+                  phx-click="grid_page_change"
+                  phx-value-page={@grid.state.pagination.current_page + 1}
+                  phx-target={@myself}
+                  disabled={@grid.state.pagination.current_page >= Pagination.total_pages(filtered_total, @grid.options.page_size)}
+                >
+                  &gt;
+                </button>
+              </div>
             </div>
           <% end %>
 
@@ -1101,17 +1161,28 @@ defmodule LiveviewGridWeb.GridComponent do
   defp column_width_style(%{width: :auto}), do: "flex: 1"
   defp column_width_style(%{width: width}), do: "width: #{width}px; flex: 0 0 #{width}px"
 
+  # column_widths state에서 리사이즈된 너비 우선 적용
+  defp column_width_style(column, grid) do
+    case Map.get(grid.state.column_widths, column.field) do
+      nil -> column_width_style(column)
+      w -> "width: #{w}px; flex: 0 0 #{w}px"
+    end
+  end
+
   defp frozen_style(col_idx, grid) do
     frozen_count = grid.options.frozen_columns
     if frozen_count > 0 and col_idx < frozen_count do
       # 체크박스(90px) + 상태(60px if visible) + 이전 컬럼들 너비 합산
       base_offset = 90 + if(grid.state.show_status_column, do: 60, else: 0)
-      prev_width = grid.columns
+      display_cols = Grid.display_columns(grid)
+      prev_width = display_cols
         |> Enum.take(col_idx)
         |> Enum.reduce(0, fn col, acc ->
-          case col.width do
-            :auto -> acc + 150  # auto 컬럼은 기본 150px로 계산
-            w -> acc + w
+          # column_widths에서 리사이즈된 값 우선 사용
+          w = Map.get(grid.state.column_widths, col.field) || col.width
+          case w do
+            :auto -> acc + 150
+            w when is_integer(w) -> acc + w
           end
         end)
       left = base_offset + prev_width

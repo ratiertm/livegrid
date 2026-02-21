@@ -996,3 +996,69 @@ select.lv-grid__cell-editor {
   margin-left: 2px;
   font-weight: 700;
 }
+
+/* ── Section 10: Column Reorder (Drag & Drop) ── */
+
+/* 드래그 중인 원본 셀: 흐리게 표시 */
+.lv-grid__header-cell--dragging {
+  opacity: 0.3;
+  background: var(--lv-grid-border-light) !important;
+}
+
+/* 드래그 고스트: 반투명 + 그림자 */
+.lv-grid__header-cell--ghost {
+  opacity: 0.85;
+  background: var(--lv-grid-bg-secondary);
+  border: 2px solid var(--lv-grid-primary);
+  border-radius: 6px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+  padding: 8px 16px;
+  display: flex;
+  align-items: center;
+  font-weight: 600;
+  font-size: var(--lv-grid-font-size-sm, 13px);
+  color: var(--lv-grid-text, #333);
+  white-space: nowrap;
+}
+
+/* 삽입 위치 인디케이터: 파란 세로선 */
+.lv-grid__reorder-indicator {
+  position: absolute;
+  width: 3px;
+  background: var(--lv-grid-primary);
+  border-radius: 2px;
+  z-index: 20;
+  display: none;
+  pointer-events: none;
+  transition: left 0.1s ease;
+}
+
+/* 인디케이터 상하 끝에 원형 마커 */
+.lv-grid__reorder-indicator::before,
+.lv-grid__reorder-indicator::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 8px;
+  height: 8px;
+  background: var(--lv-grid-primary);
+  border-radius: 50%;
+}
+
+.lv-grid__reorder-indicator::before {
+  top: -4px;
+}
+
+.lv-grid__reorder-indicator::after {
+  bottom: -4px;
+}
+
+/* 드래그 가능한 헤더 셀에 grab 커서 */
+.lv-grid__header-cell[data-frozen="false"] {
+  cursor: grab;
+}
+
+.lv-grid__header-cell[data-frozen="false"]:active {
+  cursor: grabbing;
+}
