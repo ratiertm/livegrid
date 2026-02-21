@@ -19,10 +19,18 @@ defmodule LiveviewGridWeb.Router do
 
     get "/", PageController, :home
     live "/grid", GridLive
-    live "/demo", DemoLive
-    live "/renderer-demo", RendererDemoLive
-    live "/dbms-demo", DbmsDemoLive
-    live "/api-demo", ApiDemoLive
+
+    # Dashboard pages - sidebar layout
+    live_session :dashboard,
+      layout: {LiveviewGridWeb.Layouts, :dashboard},
+      on_mount: [{LiveviewGridWeb.Hooks, :assign_current_path}] do
+      live "/demo", DemoLive
+      live "/renderer-demo", RendererDemoLive
+      live "/dbms-demo", DbmsDemoLive
+      live "/api-demo", ApiDemoLive
+      live "/api-keys", ApiKeyLive
+      live "/api-docs", ApiDocLive
+    end
   end
 
   # Mock REST API for API Demo

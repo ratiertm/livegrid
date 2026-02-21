@@ -163,14 +163,7 @@ defmodule LiveviewGridWeb.DbmsDemoLive do
             SQLite + Ecto DataSource adapter - SQL 레벨 정렬/필터/페이지네이션
           </p>
         </div>
-        <div style="display: flex; gap: 10px; align-items: center;">
-          <a href="/demo" style="padding: 8px 16px; background: #f5f5f5; border: 1px solid #ddd; border-radius: 6px; text-decoration: none; color: #333; font-size: 13px;">
-            ← InMemory 데모
-          </a>
-          <a href="/api-demo" style="padding: 8px 16px; background: #f5f5f5; border: 1px solid #ddd; border-radius: 6px; text-decoration: none; color: #333; font-size: 13px;">
-            🌐 API 데모
-          </a>
-        </div>
+        <div></div>
       </div>
 
       <!-- 상태 패널 -->

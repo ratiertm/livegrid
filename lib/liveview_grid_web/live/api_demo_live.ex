@@ -159,14 +159,7 @@ defmodule LiveviewGridWeb.ApiDemoLive do
             REST DataSource adapter - HTTP API 기반 정렬/필터/페이지네이션/CRUD
           </p>
         </div>
-        <div style="display: flex; gap: 10px; align-items: center;">
-          <a href="/demo" style="padding: 8px 16px; background: #f5f5f5; border: 1px solid #ddd; border-radius: 6px; text-decoration: none; color: #333; font-size: 13px;">
-            ← InMemory 데모
-          </a>
-          <a href="/dbms-demo" style="padding: 8px 16px; background: #f5f5f5; border: 1px solid #ddd; border-radius: 6px; text-decoration: none; color: #333; font-size: 13px;">
-            🗄️ DBMS 데모
-          </a>
-        </div>
+        <div></div>
       </div>
 
       <!-- API 엔드포인트 정보 -->

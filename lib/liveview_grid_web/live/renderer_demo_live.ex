@@ -22,7 +22,6 @@ defmodule LiveviewGridWeb.RendererDemoLive do
       <h1 style="margin-bottom: 5px;">🎨 커스텀 셀 렌더러 쇼케이스</h1>
       <p style="color: #666; margin-bottom: 30px;">
         모든 내장 렌더러를 한눈에 확인하세요.
-        <a href="/demo" style="color: #1976d2;">← 메인 데모로 돌아가기</a>
       </p>
 
       <!-- =============================== -->
