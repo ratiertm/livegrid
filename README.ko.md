@@ -27,6 +27,7 @@ mix phx.server
 - **대시보드**: http://localhost:5001 (/demo로 리다이렉트)
 - **DBMS 데모**: http://localhost:5001/dbms-demo
 - **API 데모**: http://localhost:5001/api-demo
+- **고급 데모**: http://localhost:5001/advanced-demo (그룹핑/트리/피벗)
 - **API 문서**: http://localhost:5001/api-docs
 
 ### 개발 환경
@@ -93,6 +94,11 @@ mix test
 - [x] PATCH 메서드 지원 (부분 업데이트, `PATCH /api/users/:id`)
 - [x] API Key 인증 적용 (RequireApiKey plug, 권한/만료 검증)
 
+### v0.7 - 고급 데이터 처리
+- [x] 그룹핑 (다중 필드 그룹핑 + expand/collapse + 집계 함수)
+- [x] 피벗 테이블 (행/열 차원 + 동적 컬럼 + sum/avg/count/min/max)
+- [x] 트리 그리드 (parent-child 계층 + 깊이별 들여쓰기 + expand/collapse)
+
 ## 🗺️ 로드맵
 
 ### v0.6 - DBMS & API 강화 (Phase B~D)
@@ -101,11 +107,6 @@ mix test
 - [ ] 대용량 데이터 스트리밍 (`Repo.stream` 메모리 효율 처리)
 - [ ] GraphQL 데이터 소스 지원
 - [ ] 커서 기반 페이지네이션 (오프셋 외 추가)
-
-### v0.7 - 고급 데이터 처리
-- [ ] 그룹핑
-- [ ] 피벗 테이블
-- [ ] 트리 그리드
 
 ### v0.8 - 협업 & 실시간
 - [ ] 실시간 동기화 (멀티 유저 동시 편집)
@@ -129,6 +130,10 @@ lib/
 │   │   ├── in_memory.ex        # InMemory 어댑터 (v0.1)
 │   │   ├── ecto.ex             # Ecto/DB 어댑터 (v0.3)
 │   │   └── rest.ex             # REST API 어댑터 (v0.5)
+│   ├── operations/
+│   │   ├── grouping.ex         # 다중 필드 그룹핑 (v0.7)
+│   │   ├── tree.ex             # 트리 그리드 계층 (v0.7)
+│   │   └── pivot.ex            # 피벗 테이블 변환 (v0.7)
 │   ├── api_key.ex              # API Key 스키마
 │   ├── api_keys.ex             # API Key 컨텍스트 (CRUD)
 │   └── application.ex
@@ -138,6 +143,7 @@ lib/
     │   ├── dbms_demo_live.ex   # DBMS 데모 (SQLite)
     │   ├── api_demo_live.ex    # REST API 데모
     │   ├── renderer_demo_live.ex # 렌더러 데모
+    │   ├── advanced_demo_live.ex # 고급 기능 데모 (v0.7)
     │   ├── api_key_live.ex     # API Key 관리
     │   └── api_doc_live.ex     # API 문서
     ├── components/

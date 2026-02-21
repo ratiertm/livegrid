@@ -27,6 +27,7 @@ Open in browser:
 - **Dashboard**: http://localhost:5001 (redirects to /demo)
 - **DBMS Demo**: http://localhost:5001/dbms-demo
 - **API Demo**: http://localhost:5001/api-demo
+- **Advanced Demo**: http://localhost:5001/advanced-demo (Grouping/Tree/Pivot)
 - **API Docs**: http://localhost:5001/api-docs
 
 ### Development Setup
@@ -93,6 +94,11 @@ mix test
 - [x] PATCH method support (partial update via `PATCH /api/users/:id`)
 - [x] API Key authentication enforcement (RequireApiKey plug, permission/expiration check)
 
+### v0.7 - Advanced Data Processing
+- [x] Grouping (multi-level field grouping with expand/collapse, aggregate functions)
+- [x] Pivot table (row/column dimensions, dynamic columns, sum/avg/count/min/max)
+- [x] Tree grid (parent-child hierarchy, depth-based indentation, expand/collapse)
+
 ## 🗺️ Roadmap
 
 ### v0.6 - DBMS & API Enhancements (Phase B~D)
@@ -101,11 +107,6 @@ mix test
 - [ ] Large dataset streaming (`Repo.stream` for memory-efficient processing)
 - [ ] GraphQL data source support
 - [ ] Cursor-based pagination (in addition to offset)
-
-### v0.7 - Advanced Data Processing
-- [ ] Grouping
-- [ ] Pivot table
-- [ ] Tree grid
 
 ### v0.8 - Collaboration & Real-time
 - [ ] Real-time sync (multi-user concurrent editing)
@@ -129,6 +130,10 @@ lib/
 │   │   ├── in_memory.ex        # InMemory adapter (v0.1)
 │   │   ├── ecto.ex             # Ecto/DB adapter (v0.3)
 │   │   └── rest.ex             # REST API adapter (v0.5)
+│   ├── operations/
+│   │   ├── grouping.ex         # Multi-level grouping (v0.7)
+│   │   ├── tree.ex             # Tree grid hierarchy (v0.7)
+│   │   └── pivot.ex            # Pivot table transform (v0.7)
 │   ├── api_key.ex              # API Key schema
 │   ├── api_keys.ex             # API Key context (CRUD)
 │   └── application.ex
@@ -138,6 +143,7 @@ lib/
     │   ├── dbms_demo_live.ex   # DBMS demo (SQLite)
     │   ├── api_demo_live.ex    # REST API demo
     │   ├── renderer_demo_live.ex # Renderer demo
+    │   ├── advanced_demo_live.ex # Advanced features demo (v0.7)
     │   ├── api_key_live.ex     # API Key management
     │   └── api_doc_live.ex     # API documentation
     ├── components/

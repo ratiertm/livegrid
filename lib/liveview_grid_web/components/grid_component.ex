@@ -68,6 +68,9 @@ defmodule LiveviewGridWeb.GridComponent do
       {grid, false}
     end
 
+    # v0.7: options에서 group_by, tree_mode 등을 state에 반영
+    grid = apply_v07_options(grid, new_options)
+
     socket = assign(socket, grid: grid)
 
     # export_menu_open 초기화 (첫 마운트 시)
@@ -608,6 +611,88 @@ defmodule LiveviewGridWeb.GridComponent do
     {:noreply, socket}
   end
 
+  # ── v0.7: Grouping 이벤트 ──
+
+  @impl true
+  def handle_event("grid_group_by", %{"fields" => fields_str}, socket) do
+    grid = socket.assigns.grid
+    fields = fields_str
+      |> String.split(",", trim: true)
+      |> Enum.map(&String.to_atom(String.trim(&1)))
+
+    updated_grid = Grid.set_group_by(grid, fields)
+    {:noreply, assign(socket, grid: updated_grid)}
+  end
+
+  @impl true
+  def handle_event("grid_group_aggregates", %{"aggregates" => agg_str}, socket) do
+    grid = socket.assigns.grid
+    aggregates = agg_str
+      |> Jason.decode!()
+      |> Enum.map(fn {k, v} -> {String.to_atom(k), String.to_atom(v)} end)
+      |> Map.new()
+
+    updated_grid = Grid.set_group_aggregates(grid, aggregates)
+    {:noreply, assign(socket, grid: updated_grid)}
+  end
+
+  @impl true
+  def handle_event("grid_toggle_group", %{"group-key" => group_key}, socket) do
+    grid = socket.assigns.grid
+    updated_grid = Grid.toggle_group(grid, group_key)
+    {:noreply, assign(socket, grid: updated_grid)}
+  end
+
+  @impl true
+  def handle_event("grid_clear_grouping", _params, socket) do
+    grid = socket.assigns.grid
+    updated_grid = Grid.set_group_by(grid, [])
+    {:noreply, assign(socket, grid: updated_grid)}
+  end
+
+  # ── v0.7: Tree Grid 이벤트 ──
+
+  @impl true
+  def handle_event("grid_toggle_tree", %{"enabled" => enabled}, socket) do
+    grid = socket.assigns.grid
+    parent_field = Map.get(grid.state, :tree_parent_field, :parent_id)
+    updated_grid = Grid.set_tree_mode(grid, enabled == "true", parent_field)
+    {:noreply, assign(socket, grid: updated_grid)}
+  end
+
+  @impl true
+  def handle_event("grid_toggle_tree_node", %{"node-id" => node_id_str}, socket) do
+    grid = socket.assigns.grid
+    node_id = String.to_integer(node_id_str)
+    updated_grid = Grid.toggle_tree_node(grid, node_id)
+    {:noreply, assign(socket, grid: updated_grid)}
+  end
+
+  # v0.7: options에서 전달된 group_by, tree_mode 등을 Grid state에 반영
+  defp apply_v07_options(grid, options) do
+    grid = if Map.has_key?(options, :group_by) do
+      group_by = Map.get(options, :group_by, [])
+      aggregates = Map.get(options, :group_aggregates, %{})
+      grid
+      |> put_in([:state, :group_by], group_by)
+      |> put_in([:state, :group_aggregates], aggregates)
+    else
+      grid
+    end
+
+    grid = if Map.has_key?(options, :tree_mode) do
+      tree_mode = Map.get(options, :tree_mode, false)
+      parent_field = Map.get(options, :tree_parent_field, :parent_id)
+      grid
+      |> put_in([:state, :tree_mode], tree_mode)
+      |> put_in([:state, :tree_parent_field], parent_field)
+    else
+      grid
+    end
+
+    grid
+  end
+
   defp export_data(grid, type) do
     data =
       case type do
@@ -972,28 +1057,73 @@ defmodule LiveviewGridWeb.GridComponent do
         <!-- 기본 Body (페이징 방식) -->
         <div class="lv-grid__body">
           <%= for row <- Grid.visible_data(@grid) do %>
-            <div class={"lv-grid__row #{if row.id in @grid.state.selection.selected_ids, do: "lv-grid__row--selected"} #{if Map.get(@grid.state.row_statuses, row.id) == :deleted, do: "lv-grid__row--deleted"}"}>
-              <div class="lv-grid__cell" style="width: 90px; flex: 0 0 90px; justify-content: center;">
-                <input
-                  type="checkbox"
-                  phx-click="grid_row_select"
-                  phx-value-row-id={row.id}
-                  phx-target={@myself}
-                  checked={row.id in @grid.state.selection.selected_ids}
-                  style="width: 18px; height: 18px; cursor: pointer;"
-                />
+            <%= if Map.get(row, :_row_type) == :group_header do %>
+              <!-- Group Header Row -->
+              <div class={"lv-grid__row lv-grid__row--group-header lv-grid__row--group-depth-#{row._group_depth}"}>
+                <div class="lv-grid__cell lv-grid__group-header-cell" style={"padding-left: #{16 + row._group_depth * 24}px;"}>
+                  <button
+                    class="lv-grid__tree-toggle"
+                    phx-click="grid_toggle_group"
+                    phx-value-group-key={row._group_key}
+                    phx-target={@myself}
+                  >
+                    <%= if row._group_expanded, do: "▼", else: "▶" %>
+                  </button>
+                  <span class="lv-grid__group-label">
+                    <%= row._group_value %>
+                  </span>
+                  <span class="lv-grid__group-count">(<%= row._group_count %>)</span>
+                  <%= if map_size(row._group_aggregates) > 0 do %>
+                    <span class="lv-grid__group-aggregates">
+                      <%= for {field, value} <- row._group_aggregates do %>
+                        <span class="lv-grid__group-agg-item">
+                          <%= field %>: <%= format_agg_value(value) %>
+                        </span>
+                      <% end %>
+                    </span>
+                  <% end %>
+                </div>
               </div>
-              <%= if @grid.state.show_status_column do %>
-                <div class="lv-grid__cell lv-grid__cell--status" style="width: 60px; flex: 0 0 60px; justify-content: center;">
-                  <%= render_status_badge(Map.get(@grid.state.row_statuses, row.id, :normal)) %>
+            <% else %>
+              <!-- Data Row (normal / tree) -->
+              <div class={"lv-grid__row #{if Map.get(row, :id) in @grid.state.selection.selected_ids, do: "lv-grid__row--selected"} #{if Map.get(@grid.state.row_statuses, Map.get(row, :id)) == :deleted, do: "lv-grid__row--deleted"}"}>
+                <div class="lv-grid__cell" style="width: 90px; flex: 0 0 90px; justify-content: center;">
+                  <input
+                    type="checkbox"
+                    phx-click="grid_row_select"
+                    phx-value-row-id={row.id}
+                    phx-target={@myself}
+                    checked={row.id in @grid.state.selection.selected_ids}
+                    style="width: 18px; height: 18px; cursor: pointer;"
+                  />
                 </div>
-              <% end %>
-              <%= for {column, col_idx} <- Enum.with_index(Grid.display_columns(@grid)) do %>
-                <div class={"lv-grid__cell #{frozen_class(col_idx, @grid)}"} style={"#{column_width_style(column, @grid)}; #{frozen_style(col_idx, @grid)}"} data-col-index={col_idx}>
-                  <%= render_cell(assigns, row, column) %>
-                </div>
-              <% end %>
-            </div>
+                <%= if @grid.state.show_status_column do %>
+                  <div class="lv-grid__cell lv-grid__cell--status" style="width: 60px; flex: 0 0 60px; justify-content: center;">
+                    <%= render_status_badge(Map.get(@grid.state.row_statuses, row.id, :normal)) %>
+                  </div>
+                <% end %>
+                <%= for {column, col_idx} <- Enum.with_index(Grid.display_columns(@grid)) do %>
+                  <div class={"lv-grid__cell #{frozen_class(col_idx, @grid)}"} style={"#{column_width_style(column, @grid)}; #{frozen_style(col_idx, @grid)}; #{tree_indent_style(row, col_idx)}"} data-col-index={col_idx}>
+                    <%= if col_idx == 0 && Map.has_key?(row, :_tree_has_children) do %>
+                      <!-- Tree toggle for first column -->
+                      <%= if row._tree_has_children do %>
+                        <button
+                          class="lv-grid__tree-toggle"
+                          phx-click="grid_toggle_tree_node"
+                          phx-value-node-id={row.id}
+                          phx-target={@myself}
+                        >
+                          <%= if row._tree_expanded, do: "▼", else: "▶" %>
+                        </button>
+                      <% else %>
+                        <span class="lv-grid__tree-spacer"></span>
+                      <% end %>
+                    <% end %>
+                    <%= render_cell(assigns, row, column) %>
+                  </div>
+                <% end %>
+              </div>
+            <% end %>
           <% end %>
         </div>
       <% end %>
@@ -1223,6 +1353,17 @@ defmodule LiveviewGridWeb.GridComponent do
       col -> Map.get(col, :filter_type, :text)
     end
   end
+
+  # v0.7: Tree indent style (첫 번째 컬럼에 depth 기반 padding-left)
+  defp tree_indent_style(%{_tree_depth: depth}, 0) when depth > 0 do
+    "padding-left: #{16 + depth * 24}px;"
+  end
+  defp tree_indent_style(_row, _col_idx), do: ""
+
+  # v0.7: Aggregate value 포맷
+  defp format_agg_value(nil), do: "-"
+  defp format_agg_value(value) when is_float(value), do: :erlang.float_to_binary(value, decimals: 2)
+  defp format_agg_value(value), do: to_string(value)
 
   defp editing?(nil, _row_id, _field), do: false
   defp editing?(%{row_id: rid, field: f}, row_id, field), do: rid == row_id and f == field

@@ -997,7 +997,107 @@ select.lv-grid__cell-editor {
   font-weight: 700;
 }
 
-/* ── Section 10: Column Reorder (Drag & Drop) ── */
+/* ── Section 10: Grouping (v0.7) ── */
+
+.lv-grid__row--group-header {
+  background: var(--lv-grid-bg-tertiary);
+  border-bottom: 1px solid var(--lv-grid-border);
+  font-weight: 600;
+  font-size: var(--lv-grid-font-size-sm);
+  cursor: pointer;
+}
+
+.lv-grid__row--group-header:hover {
+  background: var(--lv-grid-hover);
+}
+
+.lv-grid__row--group-depth-0 {
+  background: var(--lv-grid-bg-secondary);
+}
+
+.lv-grid__row--group-depth-1 {
+  background: var(--lv-grid-bg-tertiary);
+}
+
+.lv-grid__group-header-cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 40px;
+  padding: 8px 16px;
+}
+
+.lv-grid__group-label {
+  font-weight: 600;
+  color: var(--lv-grid-text);
+}
+
+.lv-grid__group-count {
+  color: var(--lv-grid-text-muted);
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.lv-grid__group-aggregates {
+  display: flex;
+  gap: 12px;
+  margin-left: auto;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--lv-grid-text-secondary);
+}
+
+.lv-grid__group-agg-item {
+  padding: 2px 6px;
+  background: var(--lv-grid-primary-light);
+  border-radius: 4px;
+  font-size: 11px;
+}
+
+/* ── Section 11: Tree Grid (v0.7) ── */
+
+.lv-grid__tree-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border: none;
+  background: transparent;
+  color: var(--lv-grid-text-muted);
+  font-size: 10px;
+  cursor: pointer;
+  padding: 0;
+  border-radius: 3px;
+  flex-shrink: 0;
+  transition: all 0.15s ease;
+}
+
+.lv-grid__tree-toggle:hover {
+  background: var(--lv-grid-border);
+  color: var(--lv-grid-primary);
+}
+
+.lv-grid__tree-spacer {
+  display: inline-block;
+  width: 20px;
+  flex-shrink: 0;
+}
+
+/* ── Section 12: Pivot Table (v0.7) ── */
+
+.lv-grid__pivot-value {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.lv-grid__pivot-total {
+  font-weight: 600;
+  color: var(--lv-grid-primary-dark);
+}
+
+/* ── Section 13: Column Reorder (Drag & Drop) ── */
 
 /* 드래그 중인 원본 셀: 흐리게 표시 */
 .lv-grid__header-cell--dragging {

@@ -5,7 +5,14 @@ defmodule LiveViewGrid.Grid do
   v0.3: DataSource behaviour 기반 플러거블 백엔드 지원
   - InMemory (기본): 기존 Enum 기반 파이프라인
   - Ecto: DB 쿼리 기반 정렬/필터/페이지네이션
+
+  v0.7: Advanced Data Processing
+  - Grouping: 다중 필드 그룹핑 + 집계
+  - Tree Grid: 계층 데이터 + expand/collapse
+  - Pivot Table: 행/열 차원 + 동적 컬럼
   """
+
+  alias LiveViewGrid.{Grouping, Tree, Pivot}
 
   @type t :: %{
     id: String.t(),
@@ -154,11 +161,14 @@ defmodule LiveViewGrid.Grid do
     advanced = apply_advanced_filters(filtered, state.advanced_filters, columns)
     sorted = apply_sort(advanced, state.sort)
 
+    # v0.7: Grouping / Tree 적용 (pagination 전에)
+    structured = apply_data_structuring(sorted, state)
+
     # Virtual Scrolling 사용 시
     if options.virtual_scroll do
-      apply_virtual_scroll(sorted, state.scroll_offset, options)
+      apply_virtual_scroll(structured, state.scroll_offset, options)
     else
-      apply_pagination(sorted, state.pagination, options.page_size)
+      apply_pagination(structured, state.pagination, options.page_size)
     end
   end
 
@@ -285,6 +295,62 @@ defmodule LiveViewGrid.Grid do
   @spec has_changes?(grid :: t()) :: boolean()
   def has_changes?(grid) do
     map_size(grid.state.row_statuses) > 0
+  end
+
+  # ── v0.7: Grouping API ──
+
+  @doc "그룹핑 필드를 설정합니다."
+  @spec set_group_by(grid :: t(), fields :: list(atom())) :: t()
+  def set_group_by(grid, fields) when is_list(fields) do
+    grid
+    |> put_in([:state, :group_by], fields)
+    |> put_in([:state, :group_expanded], %{})
+    |> put_in([:state, :pagination, :current_page], 1)
+  end
+
+  @doc "그룹 집계 함수를 설정합니다."
+  @spec set_group_aggregates(grid :: t(), aggregates :: map()) :: t()
+  def set_group_aggregates(grid, aggregates) when is_map(aggregates) do
+    put_in(grid.state.group_aggregates, aggregates)
+  end
+
+  @doc "그룹 expand/collapse를 토글합니다."
+  @spec toggle_group(grid :: t(), group_key :: String.t()) :: t()
+  def toggle_group(grid, group_key) do
+    updated = Grouping.toggle_group(grid.state.group_expanded, group_key)
+    put_in(grid.state.group_expanded, updated)
+  end
+
+  # ── v0.7: Tree Grid API ──
+
+  @doc "트리 모드를 설정합니다."
+  @spec set_tree_mode(grid :: t(), enabled :: boolean(), parent_field :: atom()) :: t()
+  def set_tree_mode(grid, enabled, parent_field \\ :parent_id) do
+    grid
+    |> put_in([:state, :tree_mode], enabled)
+    |> put_in([:state, :tree_parent_field], parent_field)
+    |> put_in([:state, :tree_expanded], %{})
+  end
+
+  @doc "트리 노드 expand/collapse를 토글합니다."
+  @spec toggle_tree_node(grid :: t(), node_id :: any()) :: t()
+  def toggle_tree_node(grid, node_id) do
+    updated = Tree.toggle_node(grid.state.tree_expanded, node_id)
+    put_in(grid.state.tree_expanded, updated)
+  end
+
+  # ── v0.7: Pivot Table API ──
+
+  @doc """
+  피벗 테이블 설정을 적용하고 변환된 {columns, rows}를 반환합니다.
+  config: %{row_fields: [...], col_field: :field, value_field: :field, aggregate: :sum}
+  """
+  @spec pivot_transform(grid :: t(), config :: map()) :: {list(map()), list(map())}
+  def pivot_transform(%{data: data, columns: columns, state: state}, config) do
+    searched = apply_global_search(data, state.global_search, columns)
+    filtered = apply_filters(searched, state.filters, columns)
+    advanced = apply_advanced_filters(filtered, state.advanced_filters, columns)
+    Pivot.transform(advanced, config)
   end
 
   # ── 셀 검증 (Validation) ──
@@ -486,7 +552,17 @@ defmodule LiveViewGrid.Grid do
       cell_errors: %{},
       show_status_column: true,
       column_widths: %{},
-      column_order: nil
+      column_order: nil,
+      # v0.7: Grouping
+      group_by: [],
+      group_expanded: %{},
+      group_aggregates: %{},
+      # v0.7: Tree Grid
+      tree_mode: false,
+      tree_parent_field: :parent_id,
+      tree_expanded: %{},
+      # v0.7: Pivot Table
+      pivot_config: nil
     }
   end
 
@@ -529,6 +605,16 @@ defmodule LiveViewGrid.Grid do
   defp apply_pagination(data, pagination, page_size) do
     LiveViewGrid.Pagination.paginate(data, pagination.current_page, page_size)
   end
+
+  # v0.7: Grouping / Tree 구조화 적용
+  defp apply_data_structuring(data, %{group_by: group_by, group_expanded: expanded, group_aggregates: aggregates})
+       when is_list(group_by) and length(group_by) > 0 do
+    Grouping.group_data(data, group_by, expanded, aggregates)
+  end
+  defp apply_data_structuring(data, %{tree_mode: true, tree_parent_field: parent_field, tree_expanded: expanded}) do
+    Tree.build_tree(data, parent_field, expanded)
+  end
+  defp apply_data_structuring(data, _state), do: data
 
   defp apply_virtual_scroll([], _scroll_offset, _options), do: []
   defp apply_virtual_scroll(data, scroll_offset, options) do
