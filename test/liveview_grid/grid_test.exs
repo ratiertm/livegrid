@@ -862,4 +862,53 @@ defmodule LiveViewGrid.GridTest do
       assert value == "서울"
     end
   end
+
+  # ── F-200: 테마 시스템 테스트 ──
+
+  describe "theme system (F-200)" do
+    setup do
+      data = [%{id: 1, name: "Alice"}]
+      columns = [%{field: :name, label: "이름"}]
+      %{data: data, columns: columns}
+    end
+
+    test "T-08: default theme is 'light' when not specified", %{data: data, columns: columns} do
+      grid = Grid.new(data: data, columns: columns)
+      assert grid.options.theme == "light"
+    end
+
+    test "T-08: default theme is 'light' with empty options", %{data: data, columns: columns} do
+      grid = Grid.new(data: data, columns: columns, options: %{})
+      assert grid.options.theme == "light"
+    end
+
+    test "T-02: theme 'dark' is stored correctly", %{data: data, columns: columns} do
+      grid = Grid.new(data: data, columns: columns, options: %{theme: "dark"})
+      assert grid.options.theme == "dark"
+    end
+
+    test "T-01: theme 'light' is stored correctly", %{data: data, columns: columns} do
+      grid = Grid.new(data: data, columns: columns, options: %{theme: "light"})
+      assert grid.options.theme == "light"
+    end
+
+    test "theme is preserved during update_data", %{data: data, columns: columns} do
+      grid = Grid.new(data: data, columns: columns, options: %{theme: "dark"})
+      updated = Grid.update_data(grid, data, columns, %{theme: "dark"})
+      assert updated.options.theme == "dark"
+    end
+
+    test "theme can be changed via update_data", %{data: data, columns: columns} do
+      grid = Grid.new(data: data, columns: columns, options: %{theme: "light"})
+      updated = Grid.update_data(grid, data, columns, %{theme: "dark"})
+      assert updated.options.theme == "dark"
+    end
+
+    test "other options are not affected by theme", %{data: data, columns: columns} do
+      grid = Grid.new(data: data, columns: columns, options: %{theme: "dark", page_size: 50})
+      assert grid.options.theme == "dark"
+      assert grid.options.page_size == 50
+      assert grid.options.show_header == true
+    end
+  end
 end

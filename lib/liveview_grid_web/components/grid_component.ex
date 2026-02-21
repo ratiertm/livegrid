@@ -573,7 +573,7 @@ defmodule LiveviewGridWeb.GridComponent do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="lv-grid">
+    <div class="lv-grid" data-theme={@grid.options[:theme] || "light"}>
       <!-- Toolbar: Search + Save -->
       <div class="lv-grid__toolbar">
         <div class="lv-grid__search-bar">

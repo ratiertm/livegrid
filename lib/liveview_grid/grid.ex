@@ -406,7 +406,8 @@ defmodule LiveViewGrid.Grid do
       virtual_buffer: 5,
       row_height: 40,
       frozen_columns: 0,
-      debug: false
+      debug: false,
+      theme: "light"
     }, options)
   end
 

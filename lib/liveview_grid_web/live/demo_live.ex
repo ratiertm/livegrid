@@ -19,7 +19,8 @@ defmodule LiveviewGridWeb.DemoLive do
       search_query: "",
       page_size: 10,
       loaded_count: min(100, length(all_users)),
-      virtual_scroll: false
+      virtual_scroll: false,
+      theme: "light"
     )}
   end
 
@@ -128,6 +129,11 @@ defmodule LiveviewGridWeb.DemoLive do
   @impl true
   def handle_event("toggle_virtual_scroll", _params, socket) do
     {:noreply, assign(socket, virtual_scroll: !socket.assigns.virtual_scroll)}
+  end
+
+  @impl true
+  def handle_event("toggle_theme", %{"theme" => theme}, socket) do
+    {:noreply, assign(socket, theme: theme)}
   end
 
   # CSV/Excel Export: GridComponent → 부모 LiveView → push_event → JS 다운로드 (F-510)
@@ -312,6 +318,27 @@ defmodule LiveviewGridWeb.DemoLive do
         </div>
       </div>
       
+      <!-- 테마 토글 (F-200) -->
+      <div style="margin: 20px 0; padding: 15px; background: #f3e5f5; border-radius: 4px; border-left: 4px solid #9c27b0;">
+        <div style="display: flex; align-items: center; gap: 15px;">
+          <label style="font-weight: 600;">🌗 테마:</label>
+          <button
+            phx-click="toggle_theme"
+            phx-value-theme="light"
+            style={"padding: 8px 20px; border: 2px solid #9c27b0; border-radius: 4px; cursor: pointer; font-weight: 600; #{if @theme == "light", do: "background: #9c27b0; color: white;", else: "background: white; color: #666;"}"}
+          >
+            ☀️ Light
+          </button>
+          <button
+            phx-click="toggle_theme"
+            phx-value-theme="dark"
+            style={"padding: 8px 20px; border: 2px solid #9c27b0; border-radius: 4px; cursor: pointer; font-weight: 600; #{if @theme == "dark", do: "background: #9c27b0; color: white;", else: "background: white; color: #666;"}"}
+          >
+            🌙 Dark
+          </button>
+        </div>
+      </div>
+
       <div style="margin: 20px 0; padding: 15px; background: #f5f5f5; border-radius: 4px;">
         <label style="margin-right: 10px; font-weight: 600;">데이터 개수:</label>
         <button phx-click="change_data_count" phx-value-count="50" style={"padding: 8px 16px; margin: 0 5px; border: 1px solid #ddd; border-radius: 4px; cursor: pointer; #{if @data_count == 50, do: "background: #2196f3; color: white;", else: "background: white;"}"}>
@@ -364,7 +391,8 @@ defmodule LiveviewGridWeb.DemoLive do
             row_height: 40,
             show_footer: !@virtual_scroll,
             frozen_columns: 1,
-            debug: true
+            debug: true,
+            theme: @theme
           }}
         />
         

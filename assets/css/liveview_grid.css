@@ -3,23 +3,101 @@
    Prototype: Minimal styles only
    ======================================== */
 
-/* 1. Variables */
-:root {
+/* 1. Variables - Light Theme (default) */
+:root,
+.lv-grid[data-theme="light"] {
+  /* ── 기본 색상 ── */
   --lv-grid-primary: #2196f3;
+  --lv-grid-primary-dark: #1976d2;
+  --lv-grid-primary-light: #e3f2fd;
   --lv-grid-bg: #ffffff;
   --lv-grid-text: #333333;
   --lv-grid-text-secondary: #555555;
   --lv-grid-border: #e0e0e0;
   --lv-grid-hover: #f5f5f5;
   --lv-grid-selected: #e3f2fd;
-  
+
+  /* ── 배경 계층 ── */
+  --lv-grid-bg-secondary: #fafafa;
+  --lv-grid-bg-tertiary: #f8f9fa;
+  --lv-grid-bg-input: #ffffff;
+
+  /* ── 텍스트 계층 ── */
+  --lv-grid-text-muted: #999999;
+  --lv-grid-text-disabled: #aaaaaa;
+  --lv-grid-text-placeholder: #666666;
+
+  /* ── 보더 계층 ── */
+  --lv-grid-border-light: #f0f0f0;
+  --lv-grid-border-input: #dddddd;
+
+  /* ── 시맨틱 색상 ── */
+  --lv-grid-danger: #f44336;
+  --lv-grid-danger-dark: #d32f2f;
+  --lv-grid-danger-light: #ffebee;
+  --lv-grid-danger-hover: #e53935;
+  --lv-grid-success: #4caf50;
+  --lv-grid-success-dark: #43a047;
+  --lv-grid-success-light: #e8f5e9;
+  --lv-grid-warning: #ff9800;
+  --lv-grid-warning-light: #fff3e0;
+  --lv-grid-warning-text: #f57f17;
+
+  /* ── 기타 ── */
+  --lv-grid-shadow: rgba(0, 0, 0, 0.08);
+  --lv-grid-overlay: rgba(0, 0, 0, 0.05);
+  --lv-grid-scrollbar-thumb: #bdbdbd;
+  --lv-grid-disabled-bg: #f5f5f5;
+
+  /* ── 스페이싱 ── */
   --lv-grid-space-2: 8px;
   --lv-grid-space-3: 12px;
   --lv-grid-space-4: 16px;
-  
+
+  /* ── 폰트 ── */
   --lv-grid-font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   --lv-grid-font-size-sm: 13px;
   --lv-grid-font-size-md: 14px;
+}
+
+/* 1.1 Dark Theme */
+.lv-grid[data-theme="dark"] {
+  --lv-grid-primary: #64b5f6;
+  --lv-grid-primary-dark: #42a5f5;
+  --lv-grid-primary-light: #1a2332;
+  --lv-grid-bg: #1e1e1e;
+  --lv-grid-text: #e0e0e0;
+  --lv-grid-text-secondary: #b0b0b0;
+  --lv-grid-border: #333333;
+  --lv-grid-hover: #2a2a2a;
+  --lv-grid-selected: #1a2332;
+
+  --lv-grid-bg-secondary: #252525;
+  --lv-grid-bg-tertiary: #2c2c2c;
+  --lv-grid-bg-input: #2a2a2a;
+
+  --lv-grid-text-muted: #888888;
+  --lv-grid-text-disabled: #666666;
+  --lv-grid-text-placeholder: #888888;
+
+  --lv-grid-border-light: #2a2a2a;
+  --lv-grid-border-input: #444444;
+
+  --lv-grid-danger: #ef5350;
+  --lv-grid-danger-dark: #e53935;
+  --lv-grid-danger-light: #3d1f1f;
+  --lv-grid-danger-hover: #f44336;
+  --lv-grid-success: #66bb6a;
+  --lv-grid-success-dark: #4caf50;
+  --lv-grid-success-light: #1b3a1b;
+  --lv-grid-warning: #ffa726;
+  --lv-grid-warning-light: #3d2e1a;
+  --lv-grid-warning-text: #ffa726;
+
+  --lv-grid-shadow: rgba(0, 0, 0, 0.3);
+  --lv-grid-overlay: rgba(255, 255, 255, 0.05);
+  --lv-grid-scrollbar-thumb: #555555;
+  --lv-grid-disabled-bg: #333333;
 }
 
 /* 2. Reset */
@@ -50,7 +128,7 @@
   align-items: center;
   gap: 12px;
   padding: 8px 12px;
-  background: #fafafa;
+  background: var(--lv-grid-bg-secondary);
   border-bottom: 1px solid var(--lv-grid-border);
 }
 
@@ -72,7 +150,7 @@
 .lv-grid__add-btn {
   padding: 6px 14px;
   background: var(--lv-grid-primary);
-  color: white;
+  color: var(--lv-grid-bg);
   border: none;
   border-radius: 4px;
   font-size: 13px;
@@ -83,13 +161,13 @@
 }
 
 .lv-grid__add-btn:hover {
-  background: #1976d2;
+  background: var(--lv-grid-primary-dark);
 }
 
 .lv-grid__delete-btn {
   padding: 6px 14px;
-  background: #f44336;
-  color: white;
+  background: var(--lv-grid-danger);
+  color: var(--lv-grid-bg);
   border: none;
   border-radius: 4px;
   font-size: 13px;
@@ -100,7 +178,7 @@
 }
 
 .lv-grid__delete-btn:hover {
-  background: #d32f2f;
+  background: var(--lv-grid-danger-dark);
 }
 
 /* Save Area */
@@ -113,15 +191,15 @@
 
 .lv-grid__save-count {
   font-size: 12px;
-  color: #ff9800;
+  color: var(--lv-grid-warning);
   font-weight: 600;
   white-space: nowrap;
 }
 
 .lv-grid__save-btn {
   padding: 6px 16px;
-  background: #4caf50;
-  color: white;
+  background: var(--lv-grid-success);
+  color: var(--lv-grid-bg);
   border: none;
   border-radius: 4px;
   font-size: 13px;
@@ -132,14 +210,14 @@
 }
 
 .lv-grid__save-btn:hover {
-  background: #43a047;
+  background: var(--lv-grid-success-dark);
 }
 
 .lv-grid__discard-btn {
   padding: 6px 12px;
-  background: #f5f5f5;
-  color: #666;
-  border: 1px solid #ddd;
+  background: var(--lv-grid-disabled-bg);
+  color: var(--lv-grid-text-placeholder);
+  border: 1px solid var(--lv-grid-border-input);
   border-radius: 4px;
   font-size: 13px;
   cursor: pointer;
@@ -148,15 +226,15 @@
 }
 
 .lv-grid__discard-btn:hover {
-  background: #ffebee;
-  color: #f44336;
-  border-color: #f44336;
+  background: var(--lv-grid-danger-light);
+  color: var(--lv-grid-danger);
+  border-color: var(--lv-grid-danger);
 }
 
 .lv-grid__search-icon {
   font-size: 14px;
   margin-right: 8px;
-  color: #999;
+  color: var(--lv-grid-text-muted);
 }
 
 .lv-grid__search-input {
@@ -167,7 +245,7 @@
   font-size: var(--lv-grid-font-size-md);
   font-family: var(--lv-grid-font-family);
   color: var(--lv-grid-text);
-  background: white;
+  background: var(--lv-grid-bg);
   transition: border-color 0.2s ease;
 }
 
@@ -178,7 +256,7 @@
 }
 
 .lv-grid__search-input::placeholder {
-  color: #aaa;
+  color: var(--lv-grid-text-disabled);
 }
 
 .lv-grid__search-clear {
@@ -187,8 +265,8 @@
   width: 20px;
   height: 20px;
   border: none;
-  background: #999;
-  color: white;
+  background: var(--lv-grid-text-muted);
+  color: var(--lv-grid-bg);
   border-radius: 50%;
   font-size: 11px;
   cursor: pointer;
@@ -199,13 +277,13 @@
 }
 
 .lv-grid__search-clear:hover {
-  background: #666;
+  background: var(--lv-grid-text-placeholder);
 }
 
 /* 4. Header */
 .lv-grid__header {
   display: flex;
-  background: #fafafa;
+  background: var(--lv-grid-bg-secondary);
   border-bottom: 2px solid var(--lv-grid-border);
   position: sticky;
   top: 0;
@@ -236,7 +314,7 @@
 }
 
 .lv-grid__header-cell--sortable:hover {
-  background: #eeeeee;
+  background: var(--lv-grid-border);
 }
 
 .lv-grid__sort-icon {
@@ -273,7 +351,7 @@
   height: 20px;
   border: none;
   background: transparent;
-  color: #999;
+  color: var(--lv-grid-text-muted);
   font-size: 10px;
   cursor: pointer;
   padding: 0;
@@ -285,19 +363,19 @@
 }
 
 .lv-grid__filter-toggle:hover {
-  background: #e0e0e0;
+  background: var(--lv-grid-border);
   color: var(--lv-grid-primary);
 }
 
 .lv-grid__filter-toggle--active {
   color: var(--lv-grid-primary);
-  background: #e3f2fd;
+  background: var(--lv-grid-primary-light);
 }
 
 /* 4.6 Filter Row */
 .lv-grid__filter-row {
   display: flex;
-  background: #f8f9fa;
+  background: var(--lv-grid-bg-tertiary);
   border-bottom: 1px solid var(--lv-grid-border);
   position: relative;
 }
@@ -317,7 +395,7 @@
   font-size: 12px;
   font-family: var(--lv-grid-font-family);
   color: var(--lv-grid-text);
-  background: white;
+  background: var(--lv-grid-bg);
   transition: border-color 0.2s ease;
 }
 
@@ -328,7 +406,7 @@
 }
 
 .lv-grid__filter-input::placeholder {
-  color: #aaa;
+  color: var(--lv-grid-text-disabled);
   font-size: 11px;
 }
 
@@ -340,8 +418,8 @@
   width: 24px;
   height: 24px;
   border: none;
-  background: #ef5350;
-  color: white;
+  background: var(--lv-grid-danger);
+  color: var(--lv-grid-bg);
   border-radius: 50%;
   font-size: 12px;
   cursor: pointer;
@@ -352,7 +430,7 @@
 }
 
 .lv-grid__filter-clear:hover {
-  background: #d32f2f;
+  background: var(--lv-grid-danger-dark);
 }
 
 /* 5. Body */
@@ -371,7 +449,7 @@
 
 .lv-grid__row {
   display: flex;
-  border-bottom: 1px solid #f0f0f0;
+  border-bottom: 1px solid var(--lv-grid-border-light);
   transition: background 0.2s ease;
 }
 
@@ -385,7 +463,7 @@
 }
 
 .lv-grid__row--selected:hover {
-  background: #bbdefb;
+  background: var(--lv-grid-primary-light);
 }
 
 .lv-grid__cell {
@@ -421,7 +499,7 @@
 }
 
 .lv-grid__cell-value--editable:hover {
-  background: #fff3e0;
+  background: var(--lv-grid-warning-light);
 }
 
 .lv-grid__cell-editor {
@@ -433,13 +511,13 @@
   font-size: var(--lv-grid-font-size-md);
   font-family: var(--lv-grid-font-family);
   color: var(--lv-grid-text);
-  background: white;
+  background: var(--lv-grid-bg);
   outline: none;
   box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.2);
 }
 
 .lv-grid__cell-editor:focus {
-  border-color: #1976d2;
+  border-color: var(--lv-grid-primary-dark);
   box-shadow: 0 0 0 3px rgba(33, 150, 243, 0.3);
 }
 
@@ -457,7 +535,7 @@ select.lv-grid__cell-editor {
 .lv-grid__header-cell--status {
   justify-content: center;
   font-size: 12px;
-  color: #666;
+  color: var(--lv-grid-text-placeholder);
 }
 
 .lv-grid__status-badge {
@@ -469,20 +547,20 @@ select.lv-grid__cell-editor {
   border-radius: 4px;
   font-size: 11px;
   font-weight: 700;
-  color: white;
+  color: var(--lv-grid-bg);
   line-height: 1;
 }
 
 .lv-grid__status-badge--new {
-  background: #4caf50;
+  background: var(--lv-grid-success);
 }
 
 .lv-grid__status-badge--updated {
-  background: #ff9800;
+  background: var(--lv-grid-warning);
 }
 
 .lv-grid__status-badge--deleted {
-  background: #f44336;
+  background: var(--lv-grid-danger);
 }
 
 .lv-grid__status-toggle {
@@ -490,7 +568,7 @@ select.lv-grid__cell-editor {
   height: 20px;
   border: none;
   background: transparent;
-  color: #999;
+  color: var(--lv-grid-text-muted);
   font-size: 10px;
   font-weight: 700;
   cursor: pointer;
@@ -503,13 +581,13 @@ select.lv-grid__cell-editor {
 }
 
 .lv-grid__status-toggle:hover {
-  background: #e0e0e0;
+  background: var(--lv-grid-border);
   color: var(--lv-grid-primary);
 }
 
 .lv-grid__status-toggle--active {
-  color: #4caf50;
-  background: #e8f5e9;
+  color: var(--lv-grid-success);
+  background: var(--lv-grid-success-light);
 }
 
 /* 5.7 Frozen Columns */
@@ -530,7 +608,7 @@ select.lv-grid__cell-editor {
 .lv-grid__row--deleted {
   opacity: 0.5;
   text-decoration: line-through;
-  background: #fff5f5;
+  background: var(--lv-grid-danger-light);
 }
 
 /* 6. Footer */
@@ -542,7 +620,7 @@ select.lv-grid__cell-editor {
   padding: var(--lv-grid-space-3) var(--lv-grid-space-4);
   height: 56px;
   
-  background: #fafafa;
+  background: var(--lv-grid-bg-secondary);
   border-top: 1px solid var(--lv-grid-border);
   
   font-size: var(--lv-grid-font-size-sm);
@@ -560,7 +638,7 @@ select.lv-grid__cell-editor {
   
   border: 1px solid var(--lv-grid-border);
   border-radius: 4px;
-  background: white;
+  background: var(--lv-grid-bg);
   
   font-size: var(--lv-grid-font-size-sm);
   color: var(--lv-grid-text);
@@ -576,7 +654,7 @@ select.lv-grid__cell-editor {
 
 .lv-grid__page-btn--current {
   background: var(--lv-grid-primary);
-  color: white;
+  color: var(--lv-grid-bg);
   border-color: var(--lv-grid-primary);
 }
 
@@ -587,8 +665,8 @@ select.lv-grid__cell-editor {
 
 /* 6.5 Validation Error Styles */
 .lv-grid__cell-value--error {
-  background: #fff5f5;
-  border: 1px solid #f44336;
+  background: var(--lv-grid-danger-light);
+  border: 1px solid var(--lv-grid-danger);
   border-radius: 2px;
 }
 
@@ -598,8 +676,8 @@ select.lv-grid__cell-editor {
   justify-content: center;
   width: 16px;
   height: 16px;
-  background: #f44336;
-  color: white;
+  background: var(--lv-grid-danger);
+  color: var(--lv-grid-bg);
   border-radius: 50%;
   font-size: 10px;
   font-weight: 700;
@@ -611,7 +689,7 @@ select.lv-grid__cell-editor {
 
 .lv-grid__error-count {
   font-size: 12px;
-  color: #f44336;
+  color: var(--lv-grid-danger);
   font-weight: 600;
   white-space: nowrap;
 }
@@ -625,7 +703,7 @@ select.lv-grid__cell-editor {
 
 .lv-grid__cell-error-msg {
   font-size: 11px;
-  color: #f44336;
+  color: var(--lv-grid-danger);
   line-height: 1.2;
   padding: 1px 4px;
   white-space: nowrap;
@@ -634,12 +712,12 @@ select.lv-grid__cell-editor {
 }
 
 .lv-grid__save-btn--disabled {
-  background: #bdbdbd;
+  background: var(--lv-grid-scrollbar-thumb);
   cursor: not-allowed;
 }
 
 .lv-grid__save-btn--disabled:hover {
-  background: #bdbdbd;
+  background: var(--lv-grid-scrollbar-thumb);
 }
 
 .lv-grid__info {
@@ -657,16 +735,16 @@ select.lv-grid__cell-editor {
   font-weight: 600;
   line-height: 1.4;
 }
-.lv-grid__badge--blue { background: #e3f2fd; color: #1565c0; }
-.lv-grid__badge--green { background: #e8f5e9; color: #2e7d32; }
-.lv-grid__badge--red { background: #ffebee; color: #c62828; }
-.lv-grid__badge--yellow { background: #fff8e1; color: #f57f17; }
-.lv-grid__badge--gray { background: #f5f5f5; color: #616161; }
+.lv-grid__badge--blue { background: var(--lv-grid-primary-light); color: #1565c0; }
+.lv-grid__badge--green { background: var(--lv-grid-success-light); color: #2e7d32; }
+.lv-grid__badge--red { background: var(--lv-grid-danger-light); color: #c62828; }
+.lv-grid__badge--yellow { background: #fff8e1; color: var(--lv-grid-warning-text); }
+.lv-grid__badge--gray { background: var(--lv-grid-disabled-bg); color: var(--lv-grid-text-placeholder); }
 .lv-grid__badge--purple { background: #f3e5f5; color: #6a1b9a; }
 
 /* 7.2 Link Renderer */
 .lv-grid__link {
-  color: #1976d2;
+  color: var(--lv-grid-primary-dark);
   text-decoration: none;
 }
 .lv-grid__link:hover {
@@ -684,7 +762,7 @@ select.lv-grid__cell-editor {
   flex: 1;
   height: 6px;
   border-radius: 3px;
-  background: #e0e0e0;
+  background: var(--lv-grid-border);
   overflow: hidden;
 }
 .lv-grid__progress-fill {
@@ -692,13 +770,13 @@ select.lv-grid__cell-editor {
   border-radius: 3px;
   transition: width 0.3s ease;
 }
-.lv-grid__progress-fill--blue { background: #1976d2; }
+.lv-grid__progress-fill--blue { background: var(--lv-grid-primary-dark); }
 .lv-grid__progress-fill--green { background: #2e7d32; }
 .lv-grid__progress-fill--red { background: #c62828; }
 .lv-grid__progress-fill--yellow { background: #f57f17; }
 .lv-grid__progress-text {
   font-size: 12px;
-  color: #666;
+  color: var(--lv-grid-text-placeholder);
   min-width: 30px;
   text-align: right;
 }
@@ -712,9 +790,9 @@ select.lv-grid__cell-editor {
 }
 .lv-grid__export-btn {
   padding: 4px 12px;
-  border: 1px solid #ccc;
+  border: 1px solid var(--lv-grid-border);
   border-radius: 4px;
-  background: white;
+  background: var(--lv-grid-bg);
   cursor: pointer;
   font-size: 12px;
   font-weight: 600;
@@ -722,30 +800,30 @@ select.lv-grid__cell-editor {
   white-space: nowrap;
 }
 .lv-grid__export-btn:hover {
-  background: #f5f5f5;
-  border-color: #999;
+  background: var(--lv-grid-disabled-bg);
+  border-color: var(--lv-grid-text-muted);
 }
 .lv-grid__export-btn--excel {
   color: #217346;
   border-color: #217346;
 }
 .lv-grid__export-btn--excel:hover {
-  background: #e8f5e9;
+  background: var(--lv-grid-success-light);
 }
 .lv-grid__export-btn--csv {
   color: #1565c0;
   border-color: #1565c0;
 }
 .lv-grid__export-btn--csv:hover {
-  background: #e3f2fd;
+  background: var(--lv-grid-primary-light);
 }
 .lv-grid__export-dropdown {
   position: absolute;
   bottom: 100%;
   right: 0;
   margin-bottom: 4px;
-  background: white;
-  border: 1px solid #ddd;
+  background: var(--lv-grid-bg);
+  border: 1px solid var(--lv-grid-border-input);
   border-radius: 4px;
   box-shadow: 0 -2px 8px rgba(0,0,0,0.12);
   min-width: 180px;
@@ -760,14 +838,14 @@ select.lv-grid__cell-editor {
   transition: background 0.15s;
 }
 .lv-grid__export-dropdown-item:hover {
-  background: #f5f5f5;
+  background: var(--lv-grid-disabled-bg);
 }
 
 /* ── Section 9: Advanced Filter (F-310) ── */
 
 .lv-grid__advanced-filter {
-  background: #f8f9fa;
-  border: 1px solid #e0e0e0;
+  background: var(--lv-grid-bg-tertiary);
+  border: 1px solid var(--lv-grid-border);
   border-radius: 8px;
   padding: 16px;
   margin: 4px 0 8px 0;
@@ -780,7 +858,7 @@ select.lv-grid__cell-editor {
   margin-bottom: 12px;
   font-weight: 600;
   font-size: 14px;
-  color: #333;
+  color: var(--lv-grid-text);
 }
 
 .lv-grid__advanced-filter-logic {
@@ -790,21 +868,21 @@ select.lv-grid__cell-editor {
 
 .lv-grid__advanced-filter-logic-btn {
   padding: 2px 10px;
-  border: 1px solid #ccc;
+  border: 1px solid var(--lv-grid-border);
   border-radius: 4px;
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
-  background: white;
+  background: var(--lv-grid-bg);
   transition: all 0.15s;
 }
 .lv-grid__advanced-filter-logic-btn:hover {
-  border-color: #999;
+  border-color: var(--lv-grid-text-muted);
 }
 .lv-grid__advanced-filter-logic-btn--active {
-  background: #1976d2;
-  color: white;
-  border-color: #1976d2;
+  background: var(--lv-grid-primary-dark);
+  color: var(--lv-grid-bg);
+  border-color: var(--lv-grid-primary-dark);
 }
 
 .lv-grid__filter-condition {
@@ -820,29 +898,29 @@ select.lv-grid__cell-editor {
 
 .lv-grid__filter-condition select {
   padding: 6px 8px;
-  border: 1px solid #ddd;
+  border: 1px solid var(--lv-grid-border-input);
   border-radius: 4px;
   font-size: 13px;
-  background: white;
+  background: var(--lv-grid-bg);
   flex: 0 0 140px;
   cursor: pointer;
 }
 .lv-grid__filter-condition select:focus {
-  border-color: #1976d2;
+  border-color: var(--lv-grid-primary-dark);
   outline: none;
   box-shadow: 0 0 0 2px rgba(25, 118, 210, 0.15);
 }
 
 .lv-grid__filter-condition-value {
   padding: 6px 8px;
-  border: 1px solid #ddd;
+  border: 1px solid var(--lv-grid-border-input);
   border-radius: 4px;
   font-size: 13px;
   flex: 1;
   min-width: 0;
 }
 .lv-grid__filter-condition-value:focus {
-  border-color: #1976d2;
+  border-color: var(--lv-grid-primary-dark);
   outline: none;
   box-shadow: 0 0 0 2px rgba(25, 118, 210, 0.15);
 }
@@ -850,7 +928,7 @@ select.lv-grid__cell-editor {
 .lv-grid__filter-condition-remove {
   background: none;
   border: none;
-  color: #999;
+  color: var(--lv-grid-text-muted);
   cursor: pointer;
   font-size: 16px;
   padding: 4px 8px;
@@ -859,8 +937,8 @@ select.lv-grid__cell-editor {
   flex-shrink: 0;
 }
 .lv-grid__filter-condition-remove:hover {
-  color: #e53935;
-  background: #ffebee;
+  color: var(--lv-grid-danger-hover);
+  background: var(--lv-grid-danger-light);
 }
 
 .lv-grid__advanced-filter-actions {
@@ -869,28 +947,28 @@ select.lv-grid__cell-editor {
   align-items: center;
   margin-top: 12px;
   padding-top: 12px;
-  border-top: 1px solid #e0e0e0;
+  border-top: 1px solid var(--lv-grid-border);
 }
 
 .lv-grid__filter-add-btn {
   background: none;
-  border: 1px dashed #999;
+  border: 1px dashed var(--lv-grid-text-muted);
   border-radius: 4px;
   padding: 6px 16px;
   font-size: 13px;
   cursor: pointer;
-  color: #666;
+  color: var(--lv-grid-text-placeholder);
   transition: all 0.15s;
 }
 .lv-grid__filter-add-btn:hover {
-  border-color: #1976d2;
-  color: #1976d2;
-  background: #e3f2fd;
+  border-color: var(--lv-grid-primary-dark);
+  color: var(--lv-grid-primary-dark);
+  background: var(--lv-grid-primary-light);
 }
 
 .lv-grid__filter-reset-btn {
-  background: white;
-  border: 1px solid #ccc;
+  background: var(--lv-grid-bg);
+  border: 1px solid var(--lv-grid-border);
   border-radius: 4px;
   padding: 6px 16px;
   font-size: 13px;
@@ -898,13 +976,13 @@ select.lv-grid__cell-editor {
   transition: all 0.15s;
 }
 .lv-grid__filter-reset-btn:hover {
-  background: #f5f5f5;
-  border-color: #999;
+  background: var(--lv-grid-disabled-bg);
+  border-color: var(--lv-grid-text-muted);
 }
 
 .lv-grid__filter-badge {
-  background: #e53935;
-  color: white;
+  background: var(--lv-grid-danger-hover);
+  color: var(--lv-grid-bg);
   border-radius: 50%;
   font-size: 10px;
   min-width: 16px;
