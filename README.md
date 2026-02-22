@@ -41,6 +41,10 @@ mix assets.setup
 
 # Run tests
 mix test
+
+# Generate API docs
+mix docs
+open doc/index.html
 ```
 
 ## ✨ Implemented Features
@@ -98,6 +102,8 @@ mix test
 - [x] Grouping (multi-level field grouping with expand/collapse, aggregate functions)
 - [x] Pivot table (row/column dimensions, dynamic columns, sum/avg/count/min/max)
 - [x] Tree grid (parent-child hierarchy, depth-based indentation, expand/collapse)
+- [x] Formatter (16 types: number, currency, percent, date, datetime, time, boolean, mask, phone, email, url, uppercase, lowercase, capitalize, truncate, custom)
+- [x] API documentation (ex_doc with bilingual guides in Korean/English)
 
 ## 🗺️ Roadmap
 
@@ -117,7 +123,7 @@ mix test
 - [ ] Excel Export/Import
 - [ ] Context menu
 - [ ] Keyboard navigation
-- [ ] API documentation (HexDocs)
+- [x] API documentation (ex_doc, bilingual guides)
 
 ## 📁 Project Structure
 
@@ -134,6 +140,7 @@ lib/
 │   │   ├── grouping.ex         # Multi-level grouping (v0.7)
 │   │   ├── tree.ex             # Tree grid hierarchy (v0.7)
 │   │   └── pivot.ex            # Pivot table transform (v0.7)
+│   ├── formatter.ex            # 16 data formatters (v0.7)
 │   ├── api_key.ex              # API Key schema
 │   ├── api_keys.ex             # API Key context (CRUD)
 │   └── application.ex
@@ -159,6 +166,16 @@ lib/
 assets/
 ├── js/app.js                   # JS Hooks (VirtualScroll, CellEditor, etc.)
 └── css/liveview_grid.css       # Grid stylesheet
+
+guides/                            # ex_doc guide documents
+├── getting-started.md / -en.md    # Installation & basic usage
+├── formatters.md / -en.md         # 16 formatter types reference
+├── data-sources.md / -en.md       # InMemory, Ecto, REST adapters
+└── advanced-features.md / -en.md  # CRUD, Grouping, Tree, Pivot
+
+projects/skills/                   # Development workflow skills
+├── dev-cycle.md                   # PDCA dev cycle (plan→design→develop→test→docs→review)
+└── dev-status.md                  # Project status summary
 ```
 
 ## 🔧 Tech Stack

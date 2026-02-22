@@ -41,6 +41,10 @@ mix assets.setup
 
 # 테스트 실행
 mix test
+
+# API 문서 생성
+mix docs
+open doc/index.html
 ```
 
 ## ✨ 구현된 기능
@@ -98,6 +102,8 @@ mix test
 - [x] 그룹핑 (다중 필드 그룹핑 + expand/collapse + 집계 함수)
 - [x] 피벗 테이블 (행/열 차원 + 동적 컬럼 + sum/avg/count/min/max)
 - [x] 트리 그리드 (parent-child 계층 + 깊이별 들여쓰기 + expand/collapse)
+- [x] 포맷터 (16종: number, currency, percent, date, datetime, time, boolean, mask, phone, email, url, uppercase, lowercase, capitalize, truncate, custom)
+- [x] API 문서화 (ex_doc, 한국어/영어 가이드)
 
 ## 🗺️ 로드맵
 
@@ -117,7 +123,7 @@ mix test
 - [ ] Excel Export/Import
 - [ ] 컨텍스트 메뉴
 - [ ] 키보드 내비게이션
-- [ ] API 문서화 (HexDocs)
+- [x] API 문서화 (ex_doc, 한/영 가이드)
 
 ## 📁 프로젝트 구조
 
@@ -134,6 +140,7 @@ lib/
 │   │   ├── grouping.ex         # 다중 필드 그룹핑 (v0.7)
 │   │   ├── tree.ex             # 트리 그리드 계층 (v0.7)
 │   │   └── pivot.ex            # 피벗 테이블 변환 (v0.7)
+│   ├── formatter.ex            # 16종 데이터 포맷터 (v0.7)
 │   ├── api_key.ex              # API Key 스키마
 │   ├── api_keys.ex             # API Key 컨텍스트 (CRUD)
 │   └── application.ex
@@ -159,6 +166,16 @@ lib/
 assets/
 ├── js/app.js                   # JS Hooks (VirtualScroll, CellEditor 등)
 └── css/liveview_grid.css       # Grid 전용 스타일시트
+
+guides/                            # ex_doc 가이드 문서
+├── getting-started.md / -en.md    # 설치 및 기본 사용법
+├── formatters.md / -en.md         # 16종 포맷터 레퍼런스
+├── data-sources.md / -en.md       # InMemory, Ecto, REST 어댑터
+└── advanced-features.md / -en.md  # CRUD, 그룹핑, 트리, 피벗
+
+projects/skills/                   # 개발 워크플로우 스킬
+├── dev-cycle.md                   # PDCA 개발 사이클 (계획→설계→개발→테스트→문서→검토)
+└── dev-status.md                  # 프로젝트 상태 요약
 ```
 
 ## 🔧 기술 스택
