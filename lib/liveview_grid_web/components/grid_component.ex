@@ -1,13 +1,56 @@
 defmodule LiveviewGridWeb.GridComponent do
   @moduledoc """
-  LiveView Grid 컴포넌트
-  
-  프로토타입 v0.1-alpha: 최소 기능만 구현
+  Phoenix LiveView Grid 컴포넌트 (LiveComponent).
+
+  부모 LiveView에서 `<.live_component>`로 사용하며,
+  Grid의 모든 UI 렌더링과 사용자 이벤트 처리를 담당합니다.
+
+  ## 사용법
+
+      <.live_component
+        module={LiveviewGridWeb.GridComponent}
+        id={@grid.id}
+        grid={@grid}
+      />
+
+  ## Assigns (필수)
+
+  - `id` - 컴포넌트 고유 ID (보통 `@grid.id`)
+  - `grid` - `LiveViewGrid.Grid.new/1`로 생성한 Grid 맵 (또는 `data` + `columns` 개별 전달)
+
+  ## 개별 Assigns (grid 대신 사용 가능)
+
+  - `data` - 행 데이터 리스트 `[%{id: 1, name: "Alice"}, ...]`
+  - `columns` - 컬럼 정의 리스트
+  - `options` - Grid 옵션 맵
+  - `data_source` - DataSource 튜플 (선택)
+
+  ## 지원 이벤트
+
+  GridComponent는 다음 이벤트를 내부적으로 처리합니다:
+
+  - `sort` - 컬럼 헤더 클릭 정렬
+  - `filter` - 컬럼 필터 입력
+  - `global_search` - 전체 검색
+  - `change_page` / `change_page_size` - 페이지네이션
+  - `select_row` / `toggle_select_all` - 행 선택
+  - `start_edit` / `save_edit` / `cancel_edit` - 인라인 셀 편집
+  - `add_row` / `delete_selected` / `save_changes` / `cancel_changes` - CRUD
+  - `export` - Excel/CSV 내보내기
+  - `scroll` - Virtual Scroll
+  - `resize_column` / `reorder_column` - 컬럼 리사이즈/리오더
+  - `toggle_group` - 그룹 expand/collapse
+  - `toggle_tree_node` - 트리 노드 expand/collapse
+
+  ## 부모 LiveView로의 이벤트 전파
+
+  CRUD 작업 시 `send(self(), {:grid_save, changes})` 등으로
+  부모에게 알림을 보냅니다. 부모 LiveView에서 `handle_info/2`로 수신합니다.
   """
   
   use Phoenix.LiveComponent
   
-  alias LiveViewGrid.{Grid, Export, Pagination}
+  alias LiveViewGrid.{Grid, Export, Formatter, Pagination}
 
   @impl true
   def mount(socket) do
@@ -1362,7 +1405,7 @@ defmodule LiveviewGridWeb.GridComponent do
 
   # v0.7: Aggregate value 포맷
   defp format_agg_value(nil), do: "-"
-  defp format_agg_value(value) when is_float(value), do: :erlang.float_to_binary(value, decimals: 2)
+  defp format_agg_value(value) when is_number(value), do: Formatter.format(value, :number)
   defp format_agg_value(value), do: to_string(value)
 
   defp editing?(nil, _row_id, _field), do: false
@@ -1469,7 +1512,9 @@ defmodule LiveviewGridWeb.GridComponent do
   end
 
   defp render_plain(assigns, row, column, cell_error) do
-    assigns = assign(assigns, row: row, column: column, cell_error: cell_error)
+    raw_value = Map.get(row, column.field)
+    formatted_value = Formatter.format(raw_value, column.formatter)
+    assigns = assign(assigns, row: row, column: column, cell_error: cell_error, formatted_value: formatted_value)
 
     ~H"""
     <div class={"lv-grid__cell-wrapper #{if @cell_error, do: "lv-grid__cell-wrapper--error"}"}>
@@ -1482,7 +1527,7 @@ defmodule LiveviewGridWeb.GridComponent do
         phx-target={@myself}
         title={@cell_error}
       >
-        <%= Map.get(@row, @column.field) %>
+        <%= @formatted_value %>
         <%= if @cell_error do %>
           <span class="lv-grid__cell-error-icon">!</span>
         <% end %>

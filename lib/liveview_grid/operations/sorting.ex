@@ -1,8 +1,16 @@
 defmodule LiveViewGrid.Sorting do
   @moduledoc """
-  Grid 데이터 정렬
-  
-  프로토타입 v0.1-alpha: 기본 정렬만 구현
+  Grid 데이터 정렬.
+
+  `nil` 값은 항상 마지막으로 정렬됩니다 (오름차순/내림차순 무관).
+
+  일반적으로 `Grid.visible_data/1`에서 내부적으로 호출되며,
+  직접 사용할 수도 있습니다.
+
+  ## Examples
+
+      Sorting.sort(data, :name, :asc)   # 이름 오름차순
+      Sorting.sort(data, :age, :desc)   # 나이 내림차순
   """
 
   @doc """

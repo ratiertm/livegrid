@@ -8,30 +8,45 @@ defmodule LiveviewGridWeb.AdvancedDemoLive do
 
   use Phoenix.LiveView
 
-  alias LiveViewGrid.Pivot
+  alias LiveViewGrid.{Formatter, Pivot}
 
   @impl true
   def mount(_params, _session, socket) do
     employees = generate_employee_data()
     org_data = generate_org_data()
 
-    {:ok, assign(socket,
-      # Shared
-      demo_mode: :grouping,
-      # Grouping demo
-      employees: employees,
-      group_fields: "department",
-      # Tree demo
-      org_data: org_data,
-      # Pivot demo
-      pivot_data: employees,
-      pivot_row_field: "department",
-      pivot_col_field: "status",
-      pivot_value_field: "salary",
-      pivot_aggregate: "sum",
-      pivot_columns: [],
-      pivot_rows: []
-    )}
+    # 초기 피벗 테이블 생성
+    initial_pivot_config = %{
+      row_fields: [:department],
+      col_field: :status,
+      value_field: :salary,
+      aggregate: :sum
+    }
+
+    {pivot_columns, pivot_rows} = Pivot.transform(employees, initial_pivot_config)
+
+    formatter_data = generate_formatter_data()
+
+    {:ok,
+     assign(socket,
+       # Shared
+       demo_mode: :grouping,
+       # Grouping demo
+       employees: employees,
+       group_fields: "department",
+       # Tree demo
+       org_data: org_data,
+       # Pivot demo
+       pivot_data: employees,
+       pivot_row_field: "department",
+       pivot_col_field: "status",
+       pivot_value_field: "salary",
+       pivot_aggregate: "sum",
+       pivot_columns: pivot_columns,
+       pivot_rows: pivot_rows,
+       # Formatter demo
+       formatter_data: formatter_data
+     )}
   end
 
   @impl true
@@ -64,14 +79,15 @@ defmodule LiveviewGridWeb.AdvancedDemoLive do
 
     {columns, rows} = Pivot.transform(socket.assigns.pivot_data, config)
 
-    {:noreply, assign(socket,
-      pivot_row_field: row_field,
-      pivot_col_field: col_field,
-      pivot_value_field: value_field,
-      pivot_aggregate: aggregate,
-      pivot_columns: columns,
-      pivot_rows: rows
-    )}
+    {:noreply,
+     assign(socket,
+       pivot_row_field: row_field,
+       pivot_col_field: col_field,
+       pivot_value_field: value_field,
+       pivot_aggregate: aggregate,
+       pivot_columns: columns,
+       pivot_rows: rows
+     )}
   end
 
   # ── Grid 이벤트 핸들러 (부모 LiveView로 전달되는 메시지) ──
@@ -135,6 +151,13 @@ defmodule LiveviewGridWeb.AdvancedDemoLive do
         >
           Pivot Table
         </button>
+        <button
+          phx-click="switch_demo"
+          phx-value-mode="formatter"
+          style={"padding: 10px 24px; border: 2px solid #9c27b0; border-radius: 6px; cursor: pointer; font-weight: 600; #{if @demo_mode == :formatter, do: "background: #9c27b0; color: white;", else: "background: white; color: #9c27b0;"}"}
+        >
+          Formatter
+        </button>
       </div>
 
       <%= case @demo_mode do %>
@@ -144,6 +167,8 @@ defmodule LiveviewGridWeb.AdvancedDemoLive do
           <%= render_tree_demo(assigns) %>
         <% :pivot -> %>
           <%= render_pivot_demo(assigns) %>
+        <% :formatter -> %>
+          <%= render_formatter_demo(assigns) %>
       <% end %>
     </div>
     """
@@ -152,30 +177,43 @@ defmodule LiveviewGridWeb.AdvancedDemoLive do
   defp render_grouping_demo(assigns) do
     ~H"""
     <div>
-      <div style="margin-bottom: 16px; padding: 12px; background: #e3f2fd; border-radius: 6px; border-left: 4px solid #2196f3;">
+      <div style="margin-bottom: 16px; padding: 16px; background: #e3f2fd; border-radius: 6px; border-left: 4px solid #2196f3;">
         <strong>Grouping 데모</strong> - 부서/직급별 그룹핑 + 급여 집계
         <div style="margin-top: 8px; display: flex; gap: 8px; align-items: center;">
           <label>Group by:</label>
-          <button phx-click="set_group_fields" phx-value-fields="department"
-            style={"padding: 4px 12px; border-radius: 4px; cursor: pointer; #{if @group_fields == "department", do: "background: #2196f3; color: white; border: none;", else: "background: white; border: 1px solid #ddd;"}"}>
+          <button
+            phx-click="set_group_fields"
+            phx-value-fields="department"
+            style={"padding: 4px 12px; border-radius: 4px; cursor: pointer; #{if @group_fields == "department", do: "background: #2196f3; color: white; border: none;", else: "background: white; border: 1px solid #ddd;"}"}
+          >
             부서
           </button>
-          <button phx-click="set_group_fields" phx-value-fields="status"
-            style={"padding: 4px 12px; border-radius: 4px; cursor: pointer; #{if @group_fields == "status", do: "background: #2196f3; color: white; border: none;", else: "background: white; border: 1px solid #ddd;"}"}>
+          <button
+            phx-click="set_group_fields"
+            phx-value-fields="status"
+            style={"padding: 4px 12px; border-radius: 4px; cursor: pointer; #{if @group_fields == "status", do: "background: #2196f3; color: white; border: none;", else: "background: white; border: 1px solid #ddd;"}"}
+          >
             상태
           </button>
-          <button phx-click="set_group_fields" phx-value-fields="department,position"
-            style={"padding: 4px 12px; border-radius: 4px; cursor: pointer; #{if @group_fields == "department,position", do: "background: #2196f3; color: white; border: none;", else: "background: white; border: 1px solid #ddd;"}"}>
+          <button
+            phx-click="set_group_fields"
+            phx-value-fields="department,position"
+            style={"padding: 4px 12px; border-radius: 4px; cursor: pointer; #{if @group_fields == "department,position", do: "background: #2196f3; color: white; border: none;", else: "background: white; border: 1px solid #ddd;"}"}
+          >
             부서 + 직급
           </button>
-          <button phx-click="set_group_fields" phx-value-fields=""
-            style={"padding: 4px 12px; border-radius: 4px; cursor: pointer; #{if @group_fields == "", do: "background: #f44336; color: white; border: none;", else: "background: white; border: 1px solid #ddd;"}"}>
+          <button
+            phx-click="set_group_fields"
+            phx-value-fields=""
+            style={"padding: 4px 12px; border-radius: 4px; cursor: pointer; #{if @group_fields == "", do: "background: #f44336; color: white; border: none;", else: "background: white; border: 1px solid #ddd;"}"}
+          >
             그룹 해제
           </button>
         </div>
       </div>
 
-      <% group_by_atoms = @group_fields |> String.split(",", trim: true) |> Enum.map(&String.to_atom/1) %>
+      <% group_by_atoms =
+        @group_fields |> String.split(",", trim: true) |> Enum.map(&String.to_atom/1) %>
 
       <.live_component
         module={LiveviewGridWeb.GridComponent}
@@ -197,7 +235,7 @@ defmodule LiveviewGridWeb.AdvancedDemoLive do
   defp render_tree_demo(assigns) do
     ~H"""
     <div>
-      <div style="margin-bottom: 16px; padding: 12px; background: #e8f5e9; border-radius: 6px; border-left: 4px solid #4caf50;">
+      <div style="margin-bottom: 16px; padding: 16px; background: #e8f5e9; border-radius: 6px; border-left: 4px solid #4caf50;">
         <strong>Tree Grid 데모</strong> - 조직도 (parent_id 기반 계층)
       </div>
 
@@ -221,35 +259,55 @@ defmodule LiveviewGridWeb.AdvancedDemoLive do
   defp render_pivot_demo(assigns) do
     ~H"""
     <div>
-      <div style="margin-bottom: 16px; padding: 12px; background: #fff3e0; border-radius: 6px; border-left: 4px solid #ff9800;">
+      <div style="margin-bottom: 16px; padding: 16px; background: #fff3e0; border-radius: 6px; border-left: 4px solid #ff9800;">
         <strong>Pivot Table 데모</strong> - 행/열 차원별 급여 집계
-        <form phx-change="update_pivot" style="margin-top: 8px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
-          <div>
-            <label style="font-size: 12px; color: #666;">Row:</label>
-            <select name="row_field" style="padding: 4px 8px; border: 1px solid #ddd; border-radius: 4px;">
+        <form phx-change="update_pivot" style="margin-top: 12px; display: flex; gap: 16px; align-items: center; flex-wrap: wrap;">
+          <div style="display: flex; align-items: center; gap: 6px;">
+            <label style="font-size: 13px; color: #666; font-weight: 500; white-space: nowrap;">
+              Row:
+            </label>
+            <select
+              name="row_field"
+              style="padding: 6px 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; min-width: 100px; background: white;"
+            >
               <option value="department" selected={@pivot_row_field == "department"}>부서</option>
               <option value="position" selected={@pivot_row_field == "position"}>직급</option>
               <option value="status" selected={@pivot_row_field == "status"}>상태</option>
             </select>
           </div>
-          <div>
-            <label style="font-size: 12px; color: #666;">Column:</label>
-            <select name="col_field" style="padding: 4px 8px; border: 1px solid #ddd; border-radius: 4px;">
+          <div style="display: flex; align-items: center; gap: 6px;">
+            <label style="font-size: 13px; color: #666; font-weight: 500; white-space: nowrap;">
+              Column:
+            </label>
+            <select
+              name="col_field"
+              style="padding: 6px 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; min-width: 100px; background: white;"
+            >
               <option value="status" selected={@pivot_col_field == "status"}>상태</option>
               <option value="department" selected={@pivot_col_field == "department"}>부서</option>
               <option value="position" selected={@pivot_col_field == "position"}>직급</option>
             </select>
           </div>
-          <div>
-            <label style="font-size: 12px; color: #666;">Value:</label>
-            <select name="value_field" style="padding: 4px 8px; border: 1px solid #ddd; border-radius: 4px;">
+          <div style="display: flex; align-items: center; gap: 6px;">
+            <label style="font-size: 13px; color: #666; font-weight: 500; white-space: nowrap;">
+              Value:
+            </label>
+            <select
+              name="value_field"
+              style="padding: 6px 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; min-width: 100px; background: white;"
+            >
               <option value="salary" selected={@pivot_value_field == "salary"}>급여</option>
               <option value="age" selected={@pivot_value_field == "age"}>나이</option>
             </select>
           </div>
-          <div>
-            <label style="font-size: 12px; color: #666;">Aggregate:</label>
-            <select name="aggregate" style="padding: 4px 8px; border: 1px solid #ddd; border-radius: 4px;">
+          <div style="display: flex; align-items: center; gap: 6px;">
+            <label style="font-size: 13px; color: #666; font-weight: 500; white-space: nowrap;">
+              Aggregate:
+            </label>
+            <select
+              name="aggregate"
+              style="padding: 6px 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; min-width: 100px; background: white;"
+            >
               <option value="sum" selected={@pivot_aggregate == "sum"}>합계</option>
               <option value="avg" selected={@pivot_aggregate == "avg"}>평균</option>
               <option value="count" selected={@pivot_aggregate == "count"}>건수</option>
@@ -265,7 +323,10 @@ defmodule LiveviewGridWeb.AdvancedDemoLive do
         <div class="lv-grid" style="max-width: 100%;">
           <div class="lv-grid__header">
             <%= for col <- @pivot_columns do %>
-              <div class="lv-grid__header-cell" style={"width: #{col.width}px; flex: 0 0 #{col.width}px; #{if Map.get(col, :align) == :right, do: "justify-content: flex-end;", else: ""}"}>
+              <div
+                class="lv-grid__header-cell"
+                style={"width: #{col.width}px; flex: 0 0 #{col.width}px; #{if Map.get(col, :align) == :right, do: "justify-content: flex-end;", else: ""}"}
+              >
                 <%= col.label %>
               </div>
             <% end %>
@@ -274,7 +335,10 @@ defmodule LiveviewGridWeb.AdvancedDemoLive do
             <%= for row <- @pivot_rows do %>
               <div class="lv-grid__row">
                 <%= for col <- @pivot_columns do %>
-                  <div class={"lv-grid__cell #{if col.field == :_total, do: "lv-grid__pivot-total"}"} style={"width: #{col.width}px; flex: 0 0 #{col.width}px; #{if Map.get(col, :align) == :right, do: "justify-content: flex-end;", else: ""}"}>
+                  <div
+                    class={"lv-grid__cell #{if col.field == :_total, do: "lv-grid__pivot-total"}"}
+                    style={"width: #{col.width}px; flex: 0 0 #{col.width}px; #{if Map.get(col, :align) == :right, do: "justify-content: flex-end;", else: ""}"}
+                  >
                     <%= format_pivot_value(Map.get(row, col.field), col) %>
                   </div>
                 <% end %>
@@ -292,12 +356,11 @@ defmodule LiveviewGridWeb.AdvancedDemoLive do
   end
 
   defp format_pivot_value(nil, _col), do: "-"
-  defp format_pivot_value(value, _col) when is_float(value) do
-    :erlang.float_to_binary(value, decimals: 0)
+
+  defp format_pivot_value(value, _col) when is_number(value) do
+    Formatter.format(value, :number)
   end
-  defp format_pivot_value(value, _col) when is_integer(value) do
-    Integer.to_string(value)
-  end
+
   defp format_pivot_value(value, _col), do: to_string(value)
 
   # ── 컬럼 정의 ──
@@ -309,7 +372,16 @@ defmodule LiveviewGridWeb.AdvancedDemoLive do
       %{field: :department, label: "부서", width: 100, sortable: true, filterable: true},
       %{field: :position, label: "직급", width: 100, sortable: true, filterable: true},
       %{field: :status, label: "상태", width: 80, sortable: true, filterable: true},
-      %{field: :salary, label: "급여", width: 120, sortable: true, filterable: true, filter_type: :number, align: :right},
+      %{
+        field: :salary,
+        label: "급여",
+        width: 120,
+        sortable: true,
+        filterable: true,
+        filter_type: :number,
+        align: :right,
+        formatter: :currency
+      },
       %{field: :age, label: "나이", width: 80, sortable: true, filterable: true, filter_type: :number}
     ]
   end
@@ -329,7 +401,20 @@ defmodule LiveviewGridWeb.AdvancedDemoLive do
     departments = ["개발", "마케팅", "영업", "인사", "재무"]
     positions = ["사원", "대리", "과장", "차장", "부장"]
     statuses = ["재직", "휴직", "퇴직"]
-    first_names = ["김철수", "이영희", "박지민", "최수진", "정민호", "강서연", "조현우", "윤하나", "장태양", "임지수"]
+
+    first_names = [
+      "김철수",
+      "이영희",
+      "박지민",
+      "최수진",
+      "정민호",
+      "강서연",
+      "조현우",
+      "윤하나",
+      "장태양",
+      "임지수"
+    ]
+
     last_names = ["A", "B", "C", "D", "E"]
 
     for i <- 1..30 do
@@ -341,6 +426,146 @@ defmodule LiveviewGridWeb.AdvancedDemoLive do
         status: Enum.at(statuses, rem(i, 10) |> min(2)),
         salary: Enum.random(30..80) * 1_000_000,
         age: Enum.random(25..55)
+      }
+    end
+  end
+
+  defp render_formatter_demo(assigns) do
+    ~H"""
+    <div>
+      <div style="margin-bottom: 16px; padding: 16px; background: #f3e5f5; border-radius: 6px; border-left: 4px solid #9c27b0;">
+        <strong>Formatter 데모</strong> - 컬럼별 셀 값 포맷팅 (숫자, 통화, 날짜, 퍼센트, 불리언, 파일크기, 마스킹, 커스텀)
+      </div>
+
+      <.live_component
+        module={LiveviewGridWeb.GridComponent}
+        id="formatter-grid"
+        data={@formatter_data}
+        columns={formatter_columns()}
+        options={%{
+          page_size: 50,
+          show_footer: true,
+          debug: false
+        }}
+      />
+    </div>
+    """
+  end
+
+  defp formatter_columns do
+    [
+      %{field: :id, label: "ID", width: 50, sortable: true},
+      %{field: :name, label: "이름", width: 100, sortable: true, filterable: true},
+      %{
+        field: :salary,
+        label: "급여 (원)",
+        width: 140,
+        sortable: true,
+        filterable: true,
+        filter_type: :number,
+        align: :right,
+        formatter: :currency
+      },
+      %{
+        field: :bonus,
+        label: "보너스 ($)",
+        width: 120,
+        sortable: true,
+        align: :right,
+        formatter: :dollar
+      },
+      %{
+        field: :rate,
+        label: "달성율",
+        width: 100,
+        sortable: true,
+        align: :right,
+        formatter: :percent
+      },
+      %{
+        field: :joined_at,
+        label: "입사일",
+        width: 120,
+        sortable: true,
+        formatter: :date
+      },
+      %{
+        field: :last_login,
+        label: "최근 로그인",
+        width: 130,
+        sortable: true,
+        formatter: :relative_time
+      },
+      %{
+        field: :active,
+        label: "활성",
+        width: 70,
+        sortable: true,
+        formatter: :boolean
+      },
+      %{
+        field: :file_size,
+        label: "첨부 크기",
+        width: 110,
+        sortable: true,
+        align: :right,
+        formatter: :filesize
+      },
+      %{
+        field: :phone,
+        label: "연락처",
+        width: 130,
+        formatter: {:mask, :phone}
+      },
+      %{
+        field: :email,
+        label: "이메일",
+        width: 180,
+        formatter: {:mask, :email}
+      },
+      %{
+        field: :score,
+        label: "점수",
+        width: 100,
+        sortable: true,
+        align: :right,
+        formatter: {:number, precision: 2}
+      }
+    ]
+  end
+
+  defp generate_formatter_data do
+    names = ["김철수", "이영희", "박지민", "최수진", "정민호", "강서연", "조현우", "윤하나", "장태양", "임지수",
+             "한미래", "송다은", "오세진", "노현정", "배준혁"]
+    phones = ["01012345678", "01098765432", "01055551234", "01011112222", "01033334444",
+              "01066667777", "01088889999", "01022223333", "01044445555", "01077778888",
+              "01099990000", "01011119999", "01022228888", "01033337777", "01044446666"]
+    domains = ["gmail.com", "naver.com", "daum.net", "kakao.com", "company.co.kr"]
+    now = NaiveDateTime.utc_now()
+
+    for i <- 1..15 do
+      name = Enum.at(names, rem(i - 1, length(names)))
+      days_ago = Enum.random(0..1800)
+      login_hours_ago = Enum.random(1..720)
+
+      %{
+        id: i,
+        name: name,
+        salary: Enum.random(35..95) * 1_000_000,
+        bonus: Enum.random(500..5000) * 1.0 + Enum.random(0..99) / 100,
+        rate: Enum.random(65..120) / 100,
+        joined_at: Date.add(Date.utc_today(), -days_ago),
+        last_login: NaiveDateTime.add(now, -login_hours_ago * 3600),
+        active: rem(i, 3) != 0,
+        file_size: Enum.random([
+          Enum.random(100..999),
+          Enum.random(1024..102_400),
+          Enum.random(102_401..10_485_760),
+          Enum.random(10_485_761..1_073_741_824)
+        ]),
+        phone: Enum.at(phones, rem(i - 1, length(phones))),
+        email: "#{String.downcase(name)}#{i}@#{Enum.random(domains)}",
+        score: Enum.random(600..1000) / 10
       }
     end
   end

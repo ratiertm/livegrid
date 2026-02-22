@@ -1,15 +1,77 @@
 defmodule LiveViewGrid.Grid do
   @moduledoc """
-  Grid 인스턴스 생성 및 관리
+  Grid 인스턴스 생성 및 관리.
 
-  v0.3: DataSource behaviour 기반 플러거블 백엔드 지원
-  - InMemory (기본): 기존 Enum 기반 파이프라인
-  - Ecto: DB 쿼리 기반 정렬/필터/페이지네이션
+  `LiveViewGrid.Grid`는 그리드의 데이터, 컬럼, 상태(state), 옵션을 하나의 맵으로 관리합니다.
+  Phoenix LiveView의 `assign`에 저장하고, 이벤트 핸들러에서 상태를 업데이트하는 방식으로 동작합니다.
 
-  v0.7: Advanced Data Processing
-  - Grouping: 다중 필드 그룹핑 + 집계
-  - Tree Grid: 계층 데이터 + expand/collapse
-  - Pivot Table: 행/열 차원 + 동적 컬럼
+  ## 기능 요약
+
+  - **정렬/필터/페이지네이션** - InMemory 파이프라인 또는 DataSource 위임
+  - **CRUD** - `add_row/3`, `update_cell/4`, `delete_rows/2` + 행 상태 추적
+  - **셀 검증** - `validate_cell/3` + validators 체인
+  - **Virtual Scroll** - 대용량 데이터 대응 (viewport 기반 부분 렌더링)
+  - **컬럼 리사이즈/리오더** - `resize_column/3`, `reorder_columns/2`
+  - **Grouping** - 다중 필드 그룹핑 + 집계 (sum, avg, count, min, max)
+  - **Tree Grid** - 계층 데이터 + expand/collapse
+  - **Pivot Table** - 행/열 차원 + 동적 컬럼 생성
+
+  ## 기본 사용법
+
+      grid = Grid.new(
+        data: users,
+        columns: [
+          %{field: :name, label: "이름", sortable: true, editable: true,
+            validators: [{:required, "필수 입력"}]},
+          %{field: :salary, label: "급여", formatter: :currency, align: :right}
+        ],
+        options: %{page_size: 20, theme: "default"}
+      )
+
+  ## DataSource 연동
+
+      # Ecto (DB)
+      grid = Grid.new(
+        columns: columns,
+        data_source: {LiveViewGrid.DataSource.Ecto,
+          %{repo: MyApp.Repo, query: from(u in User)}}
+      )
+
+      # REST API
+      grid = Grid.new(
+        columns: columns,
+        data_source: {LiveViewGrid.DataSource.Rest,
+          %{base_url: "https://api.example.com/users"}}
+      )
+
+  ## CRUD 워크플로우
+
+      grid
+      |> Grid.add_row(%{name: "", email: ""})           # :new 상태
+      |> Grid.update_cell(row_id, :name, "Alice")       # :updated 상태
+      |> Grid.validate_cell(row_id, :name)              # 검증 실행
+      |> Grid.delete_rows([row_id])                     # :deleted 마킹
+
+      Grid.changed_rows(grid)  # => [%{row: %{...}, status: :updated}, ...]
+
+  ## Grouping
+
+      grid
+      |> Grid.set_group_by([:department, :team])
+      |> Grid.set_group_aggregates(%{salary: :sum, age: :avg})
+
+  ## Tree Grid
+
+      Grid.set_tree_mode(grid, true, :parent_id)
+
+  ## Pivot Table
+
+      Grid.pivot_transform(grid, %{
+        row_fields: [:department],
+        col_field: :quarter,
+        value_field: :revenue,
+        aggregate: :sum
+      })
   """
 
   alias LiveViewGrid.{Grouping, Tree, Pivot}
@@ -525,6 +587,7 @@ defmodule LiveViewGrid.Grid do
         editor_options: [],
         validators: [],
         renderer: nil,
+        formatter: nil,
         align: :left
       }, col)
     end)

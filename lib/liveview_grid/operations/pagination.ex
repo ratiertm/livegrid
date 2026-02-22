@@ -1,8 +1,12 @@
 defmodule LiveViewGrid.Pagination do
   @moduledoc """
-  Grid 페이지네이션
-  
-  프로토타입 v0.1-alpha: 기본 페이징만 구현
+  Grid 페이지네이션.
+
+  데이터를 페이지 단위로 슬라이싱하고, 총 페이지 수를 계산합니다.
+  `Grid.visible_data/1`에서 내부적으로 호출됩니다.
+
+  Virtual Scroll이 활성화된 경우 이 모듈 대신 viewport 기반
+  부분 렌더링이 적용됩니다 (`options.virtual_scroll: true`).
   """
 
   @doc """
