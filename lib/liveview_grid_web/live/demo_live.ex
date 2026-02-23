@@ -577,7 +577,8 @@ defmodule LiveviewGridWeb.DemoLive do
                 {"서울", "서울"}, {"부산", "부산"}, {"대구", "대구"},
                 {"인천", "인천"}, {"광주", "광주"}, {"대전", "대전"},
                 {"울산", "울산"}, {"수원", "수원"}, {"창원", "창원"}, {"고양", "고양"}
-              ]}
+              ]},
+            %{field: :created_at, label: "가입일", width: 160, sortable: true, filterable: true, filter_type: :date, editable: true, editor_type: :date, formatter: :date}
           ]}
           options={%{
             page_size: if(@virtual_scroll, do: 20, else: 99999),
@@ -670,7 +671,8 @@ defmodule LiveviewGridWeb.DemoLive do
         name: "#{first} #{last}",
         email: "#{String.downcase(first)}.#{String.downcase(last)}@example.com",
         age: Enum.random(20..60),
-        city: Enum.random(cities)
+        city: Enum.random(cities),
+        created_at: Date.new!(2025, Enum.random(1..12), Enum.random(1..28))
       }
     end
   end

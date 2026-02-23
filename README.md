@@ -69,6 +69,7 @@ open doc/index.html
 ### v0.2 - Validation & Themes
 - [x] Cell validation - required fields, number ranges, format checks
 - [x] Validation error UI (cell highlight, tooltip messages)
+- [x] Advanced multi-condition filter (AND/OR combinator, text/number operators)
 - [x] Theme system (dark mode, custom themes, CSS variable customizer)
 
 ### v0.3 - DBMS Integration
@@ -90,6 +91,8 @@ open doc/index.html
 - [x] Authentication header support (Bearer token, custom headers)
 - [x] Error handling & retry logic (exponential backoff)
 - [x] Mock REST API server (MockApiController)
+- [x] Excel (.xlsx) / CSV Export (Elixlsx-based)
+- [x] Custom cell renderers (badge, link, progress built-in presets)
 - [x] API Key management (generate/revoke/delete, SQLite storage)
 - [x] API Documentation page
 - [x] Dashboard layout with sidebar navigation
@@ -105,25 +108,32 @@ open doc/index.html
 - [x] Formatter (16 types: number, currency, percent, date, datetime, time, boolean, mask, phone, email, url, uppercase, lowercase, capitalize, truncate, custom)
 - [x] API documentation (ex_doc with bilingual guides in Korean/English)
 
+## 📊 Implementation Status
+
+| Item | Count |
+|------|-------|
+| Total Features | 42 |
+| Completed | 31 (74%) |
+| Remaining | 11 (26%) |
+| Versions Shipped | v0.1 ~ v0.7 |
+
 ## 🗺️ Roadmap
 
-### v0.6 - DBMS & API Enhancements (Phase B~D)
+### v0.8 - Collaboration & Real-time
+- [ ] Real-time sync (Phoenix PubSub-based multi-user concurrent editing)
+- [ ] Change history (Undo/Redo)
+- [ ] Cell locking (concurrent edit conflict prevention)
+
+### v1.0 - Enterprise
 - [ ] Multi-DB drivers - PostgreSQL (`postgrex`), MySQL/MariaDB (`myxql`)
 - [ ] Multi-DB drivers - MSSQL (`tds_ecto`), Oracle (`ecto_oracle`)
 - [ ] Large dataset streaming (`Repo.stream` for memory-efficient processing)
 - [ ] GraphQL data source support
 - [ ] Cursor-based pagination (in addition to offset)
-
-### v0.8 - Collaboration & Real-time
-- [ ] Real-time sync (multi-user concurrent editing)
-- [ ] Change history (Undo/Redo)
-- [ ] Cell locking
-
-### v1.0 - Enterprise
-- [ ] Excel Export/Import
-- [ ] Context menu
-- [ ] Keyboard navigation
-- [x] API documentation (ex_doc, bilingual guides)
+- [ ] Excel Import (.xlsx upload + column mapping)
+- [ ] Context menu (right-click)
+- [ ] Keyboard navigation (arrow keys/Tab/Enter cell movement)
+- [ ] Date filter (Date Picker, range selection)
 
 ## 📁 Project Structure
 
@@ -135,32 +145,45 @@ lib/
 │   ├── data_source/
 │   │   ├── in_memory.ex        # InMemory adapter (v0.1)
 │   │   ├── ecto.ex             # Ecto/DB adapter (v0.3)
+│   │   ├── ecto/
+│   │   │   └── query_builder.ex # SQL query builder
 │   │   └── rest.ex             # REST API adapter (v0.5)
 │   ├── operations/
+│   │   ├── sorting.ex          # Sorting engine (v0.1)
+│   │   ├── filter.ex           # Filter engine - basic+advanced (v0.1/v0.2)
+│   │   ├── pagination.ex       # Pagination (v0.1)
 │   │   ├── grouping.ex         # Multi-level grouping (v0.7)
 │   │   ├── tree.ex             # Tree grid hierarchy (v0.7)
 │   │   └── pivot.ex            # Pivot table transform (v0.7)
+│   ├── renderers.ex            # Custom cell renderer presets (v0.5)
 │   ├── formatter.ex            # 16 data formatters (v0.7)
+│   ├── export.ex               # Excel/CSV Export (v0.5)
 │   ├── api_key.ex              # API Key schema
 │   ├── api_keys.ex             # API Key context (CRUD)
+│   ├── demo_user.ex            # Demo User schema
+│   ├── repo.ex                 # Ecto Repo
 │   └── application.ex
 └── liveview_grid_web/          # Web layer
     ├── live/
-    │   ├── demo_live.ex        # InMemory demo
-    │   ├── dbms_demo_live.ex   # DBMS demo (SQLite)
-    │   ├── api_demo_live.ex    # REST API demo
+    │   ├── grid_live.ex         # Grid LiveView
+    │   ├── grid_live.html.heex  # Grid template
+    │   ├── demo_live.ex         # InMemory demo
+    │   ├── dbms_demo_live.ex    # DBMS demo (SQLite)
+    │   ├── api_demo_live.ex     # REST API demo
     │   ├── renderer_demo_live.ex # Renderer demo
     │   ├── advanced_demo_live.ex # Advanced features demo (v0.7)
-    │   ├── api_key_live.ex     # API Key management
-    │   └── api_doc_live.ex     # API documentation
+    │   ├── api_key_live.ex      # API Key management
+    │   └── api_doc_live.ex      # API documentation
     ├── components/
-    │   ├── grid_component.ex   # Grid LiveComponent
+    │   ├── grid_component.ex    # Grid LiveComponent (core)
+    │   ├── core_components.ex   # Phoenix core components
     │   └── layouts/
     │       └── dashboard.html.heex  # Sidebar dashboard layout
     ├── plugs/
     │   └── require_api_key.ex       # API Key authentication plug (v0.6)
     ├── controllers/
-    │   └── mock_api_controller.ex   # Mock REST API
+    │   ├── mock_api_controller.ex   # Mock REST API
+    │   └── csv_controller.ex        # CSV download
     └── router.ex
 
 assets/
@@ -182,10 +205,14 @@ projects/skills/                   # Development workflow skills
 
 - **Elixir** 1.16+ / **Phoenix** 1.7+
 - **LiveView** 1.0+ - Real-time UI (LiveComponent)
+- **Ecto** + **SQLite** (`ecto_sqlite3`) - Database integration
+- **Elixlsx** - Excel Export
 - **Custom CSS** - BEM methodology (`lv-grid__*`)
 - **JavaScript Hooks** - Virtual scroll, cell editing, column resize
 
 ## 📝 Usage Example
+
+### Basic Grid
 
 ```elixir
 # Use GridComponent in LiveView
@@ -196,9 +223,10 @@ projects/skills/                   # Development workflow skills
   columns={[
     %{field: :id, label: "ID", width: 80, sortable: true},
     %{field: :name, label: "Name", width: 150, sortable: true,
-      filterable: true, filter_type: :text, editable: true},
-    %{field: :age, label: "Age", width: 80, sortable: true,
-      editable: true, editor_type: :number},
+      filterable: true, filter_type: :text, editable: true,
+      validators: [{:required, "Required"}]},
+    %{field: :salary, label: "Salary", width: 120, sortable: true,
+      formatter: :currency, align: :right},
     %{field: :city, label: "City", width: 120, sortable: true,
       editable: true, editor_type: :select,
       editor_options: [{"Seoul", "Seoul"}, {"Busan", "Busan"}, {"Daegu", "Daegu"}]}
@@ -211,6 +239,37 @@ projects/skills/                   # Development workflow skills
   }}
 />
 ```
+
+### DataSource Integration
+
+```elixir
+# Ecto (DB) integration
+grid = Grid.new(
+  columns: columns,
+  data_source: {LiveViewGrid.DataSource.Ecto,
+    %{repo: MyApp.Repo, query: from(u in User)}}
+)
+
+# REST API integration
+grid = Grid.new(
+  columns: columns,
+  data_source: {LiveViewGrid.DataSource.Rest,
+    %{base_url: "https://api.example.com/users"}}
+)
+```
+
+## 📖 API Documentation
+
+- **API Specification**: [English](docs/API_SPEC.md) | [한국어](docs/API_SPEC.ko.md)
+- **Live API Docs**: http://localhost:5001/api-docs (when server is running)
+
+The API provides 26 endpoints across 6 categories:
+1. **Grid Setup** - Configuration, columns, options
+2. **Data CRUD** - Single/batch create, read, update, delete
+3. **Theme** - Built-in themes, custom theme creation
+4. **Sort & Pagination** - Sorting, paging, virtual scroll settings
+5. **DBMS Connection** - Database adapter configuration
+6. **Renderers** - Built-in and custom cell renderers
 
 ## 🎯 Target Market
 
@@ -229,19 +288,6 @@ projects/skills/                   # Development workflow skills
 - **Community Edition**: MIT (free, core features)
 - **Professional**: Commercial license ($999/yr, advanced features)
 - **Enterprise**: Custom ($negotiable, collaboration/customization)
-
-## 📖 API Documentation
-
-- **API Specification**: [English](docs/API_SPEC.md) | [한국어](docs/API_SPEC.ko.md)
-- **Live API Docs**: http://localhost:5001/api-docs (when server is running)
-
-The API provides 26 endpoints across 6 categories:
-1. **Grid Setup** - Configuration, columns, options
-2. **Data CRUD** - Single/batch create, read, update, delete
-3. **Theme** - Built-in themes, custom theme creation
-4. **Sort & Pagination** - Sorting, paging, virtual scroll settings
-5. **DBMS Connection** - Database adapter configuration
-6. **Renderers** - Built-in and custom cell renderers
 
 ## 📚 References
 

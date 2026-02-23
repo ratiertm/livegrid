@@ -284,6 +284,47 @@ defmodule LiveviewGridWeb.GridComponent do
   end
 
   @impl true
+  def handle_event("grid_filter_date", %{"field" => field, "part" => part, "value" => value}, socket) do
+    grid = socket.assigns.grid
+    field_atom = String.to_atom(field)
+
+    # 기존 필터값에서 from/to 파싱
+    current = Map.get(grid.state.filters, field_atom, "~")
+    [current_from, current_to] = case String.split(current, "~", parts: 2) do
+      [f, t] -> [f, t]
+      _ -> ["", ""]
+    end
+
+    # 해당 part만 업데이트
+    {new_from, new_to} = case part do
+      "from" -> {value, current_to}
+      "to" -> {current_from, value}
+      _ -> {current_from, current_to}
+    end
+
+    # 날짜 범위 문자열 재조합
+    combined = "#{new_from}~#{new_to}"
+
+    # 둘 다 비어있으면 필터 제거
+    updated_filters = if new_from == "" and new_to == "" do
+      Map.delete(grid.state.filters, field_atom)
+    else
+      Map.put(grid.state.filters, field_atom, combined)
+    end
+
+    updated_grid = grid
+      |> put_in([:state, :filters], updated_filters)
+      |> put_in([:state, :pagination, :current_page], 1)
+      |> put_in([:state, :scroll_offset], 0)
+
+    {:noreply,
+      socket
+      |> assign(grid: updated_grid)
+      |> push_event("reset_virtual_scroll", %{})
+    }
+  end
+
+  @impl true
   def handle_event("grid_clear_filters", _params, socket) do
     grid = socket.assigns.grid
 
@@ -354,16 +395,19 @@ defmodule LiveviewGridWeb.GridComponent do
     row_id_int = String.to_integer(row_id)
     field_atom = String.to_atom(field)
 
-    # 숫자 타입이면 변환 시도
+    # 타입별 값 변환
     column = Enum.find(grid.columns, fn c -> c.field == field_atom end)
-    parsed_value = if column && column.editor_type == :number do
-      case Float.parse(value) do
-        {num, ""} -> if num == trunc(num), do: trunc(num), else: num
-        {num, _} -> if num == trunc(num), do: trunc(num), else: num
-        :error -> value
-      end
-    else
-      value
+    parsed_value = cond do
+      column && column.editor_type == :number ->
+        case Float.parse(value) do
+          {num, ""} -> if num == trunc(num), do: trunc(num), else: num
+          {num, _} -> if num == trunc(num), do: trunc(num), else: num
+          :error -> value
+        end
+      column && (column.editor_type == :date || column.filter_type == :date) ->
+        parse_date_value(value)
+      true ->
+        value
     end
 
     # 원래 값과 비교 → 변경 없으면 편집 모드만 종료
@@ -413,6 +457,12 @@ defmodule LiveviewGridWeb.GridComponent do
   end
 
   @impl true
+  def handle_event("cell_edit_date", %{"field" => field, "row-id" => row_id, "value" => value}, socket) do
+    # date picker에서 값이 변경되면 바로 저장
+    handle_event("cell_edit_save", %{"row-id" => row_id, "field" => field, "value" => value}, socket)
+  end
+
+  @impl true
   def handle_event("cell_edit_cancel", _params, socket) do
     grid = socket.assigns.grid
     updated_grid = put_in(grid.state.editing, nil)
@@ -442,9 +492,11 @@ defmodule LiveviewGridWeb.GridComponent do
     defaults = Enum.reduce(grid.columns, %{}, fn col, acc ->
       default_val = case col.editor_type do
         :number -> 0
+        :date -> Date.utc_today()
         :select ->
           if col.editor_options != [], do: elem(hd(col.editor_options), 1), else: ""
-        _ -> ""
+        _ ->
+          if col.filter_type == :date, do: Date.utc_today(), else: ""
       end
       Map.put(acc, col.field, default_val)
     end)
@@ -598,6 +650,7 @@ defmodule LiveviewGridWeb.GridComponent do
       field_str = params["field"] || ""
       operator_str = params["operator"] || ""
       value_str = params["value"] || ""
+      value_to_str = params["value_to"]
 
       new_field = if field_str != "", do: String.to_existing_atom(field_str), else: condition.field
 
@@ -605,14 +658,25 @@ defmodule LiveviewGridWeb.GridComponent do
       new_operator = cond do
         field_str != "" && new_field != condition.field ->
           col = Enum.find(grid.columns, fn c -> c.field == new_field end)
-          if col && Map.get(col, :filter_type) == :number, do: :eq, else: :contains
+          case Map.get(col, :filter_type) do
+            :number -> :eq
+            :date -> :eq
+            _ -> :contains
+          end
         operator_str != "" ->
           String.to_existing_atom(operator_str)
         true ->
           condition.operator
       end
 
-      %{condition | field: new_field, operator: new_operator, value: value_str}
+      # between 연산자: value_to가 있으면 "from~to" 형식으로 결합
+      final_value = if new_operator == :between && value_to_str do
+        "#{value_str}~#{value_to_str}"
+      else
+        value_str
+      end
+
+      %{condition | field: new_field, operator: new_operator, value: final_value}
     end)
 
     updated_adv = %{adv | conditions: conditions}
@@ -923,16 +987,42 @@ defmodule LiveviewGridWeb.GridComponent do
           <%= for {column, col_idx} <- Enum.with_index(Grid.display_columns(@grid)) do %>
             <div class={"lv-grid__filter-cell #{frozen_class(col_idx, @grid)}"} style={"#{column_width_style(column, @grid)}; #{frozen_style(col_idx, @grid)}"} data-col-index={col_idx}>
               <%= if column.filterable do %>
-                <input
-                  type="text"
-                  class="lv-grid__filter-input"
-                  placeholder={filter_placeholder(column)}
-                  value={Map.get(@grid.state.filters, column.field, "")}
-                  phx-keyup="grid_filter"
-                  phx-value-field={column.field}
-                  phx-debounce="300"
-                  phx-target={@myself}
-                />
+                <%= if column.filter_type == :date do %>
+                  <div class="lv-grid__date-filter">
+                    <form phx-change="grid_filter_date" phx-target={@myself} style="display: contents;">
+                      <input type="hidden" name="field" value={column.field} />
+                      <input type="hidden" name="part" value="from" />
+                      <input
+                        type="date"
+                        name="value"
+                        class="lv-grid__filter-input lv-grid__filter-input--date"
+                        value={parse_date_part(Map.get(@grid.state.filters, column.field, ""), :from)}
+                      />
+                    </form>
+                    <span class="lv-grid__date-filter-sep">~</span>
+                    <form phx-change="grid_filter_date" phx-target={@myself} style="display: contents;">
+                      <input type="hidden" name="field" value={column.field} />
+                      <input type="hidden" name="part" value="to" />
+                      <input
+                        type="date"
+                        name="value"
+                        class="lv-grid__filter-input lv-grid__filter-input--date"
+                        value={parse_date_part(Map.get(@grid.state.filters, column.field, ""), :to)}
+                      />
+                    </form>
+                  </div>
+                <% else %>
+                  <input
+                    type="text"
+                    class="lv-grid__filter-input"
+                    placeholder={filter_placeholder(column)}
+                    value={Map.get(@grid.state.filters, column.field, "")}
+                    phx-keyup="grid_filter"
+                    phx-value-field={column.field}
+                    phx-debounce="300"
+                    phx-target={@myself}
+                  />
+                <% end %>
               <% end %>
             </div>
           <% end %>
@@ -1003,12 +1093,21 @@ defmodule LiveviewGridWeb.GridComponent do
                     <option value="gte" selected={condition.operator == :gte}>≥ 크거나같음</option>
                     <option value="lte" selected={condition.operator == :lte}>≤ 작거나같음</option>
                   <% else %>
-                    <option value="contains" selected={condition.operator == :contains}>포함</option>
-                    <option value="equals" selected={condition.operator == :equals}>같음</option>
-                    <option value="starts_with" selected={condition.operator == :starts_with}>시작</option>
-                    <option value="ends_with" selected={condition.operator == :ends_with}>끝남</option>
-                    <option value="is_empty" selected={condition.operator == :is_empty}>비어있음</option>
-                    <option value="is_not_empty" selected={condition.operator == :is_not_empty}>비어있지않음</option>
+                    <%= if filter_type == :date do %>
+                      <option value="eq" selected={condition.operator == :eq}>= 같은 날</option>
+                      <option value="before" selected={condition.operator == :before}>이전</option>
+                      <option value="after" selected={condition.operator == :after}>이후</option>
+                      <option value="between" selected={condition.operator == :between}>사이</option>
+                      <option value="is_empty" selected={condition.operator == :is_empty}>비어있음</option>
+                      <option value="is_not_empty" selected={condition.operator == :is_not_empty}>비어있지않음</option>
+                    <% else %>
+                      <option value="contains" selected={condition.operator == :contains}>포함</option>
+                      <option value="equals" selected={condition.operator == :equals}>같음</option>
+                      <option value="starts_with" selected={condition.operator == :starts_with}>시작</option>
+                      <option value="ends_with" selected={condition.operator == :ends_with}>끝남</option>
+                      <option value="is_empty" selected={condition.operator == :is_empty}>비어있음</option>
+                      <option value="is_not_empty" selected={condition.operator == :is_not_empty}>비어있지않음</option>
+                    <% end %>
                   <% end %>
                 <% else %>
                   <option value="">연산자</option>
@@ -1016,14 +1115,35 @@ defmodule LiveviewGridWeb.GridComponent do
               </select>
 
               <%= if condition.operator not in [:is_empty, :is_not_empty] do %>
-                <input
-                  type="text"
-                  class="lv-grid__filter-condition-value"
-                  placeholder="값 입력..."
-                  value={condition.value}
-                  name="value"
-                  phx-debounce="300"
-                />
+                <% adv_filter_type = if condition.field, do: get_column_filter_type(@grid.columns, condition.field), else: :text %>
+                <%= if adv_filter_type == :date and condition.operator == :between do %>
+                  <div class="lv-grid__date-filter" style="flex: 1;">
+                    <input
+                      type="date"
+                      class="lv-grid__filter-condition-value lv-grid__filter-input--date"
+                      value={parse_date_part(condition.value || "", :from)}
+                      name="value"
+                      phx-debounce="300"
+                    />
+                    <span class="lv-grid__date-filter-sep">~</span>
+                    <input
+                      type="date"
+                      class="lv-grid__filter-condition-value lv-grid__filter-input--date"
+                      value={parse_date_part(condition.value || "", :to)}
+                      name="value_to"
+                      phx-debounce="300"
+                    />
+                  </div>
+                <% else %>
+                  <input
+                    type={if adv_filter_type == :date, do: "date", else: "text"}
+                    class="lv-grid__filter-condition-value"
+                    placeholder={if adv_filter_type == :date, do: "날짜 선택", else: "값 입력..."}
+                    value={condition.value}
+                    name="value"
+                    phx-debounce="300"
+                  />
+                <% end %>
               <% end %>
               </form>
 
@@ -1388,7 +1508,19 @@ defmodule LiveviewGridWeb.GridComponent do
   end
 
   defp filter_placeholder(%{filter_type: :number}), do: "예: >30, <=25"
+  defp filter_placeholder(%{filter_type: :date}), do: "날짜 선택"
   defp filter_placeholder(_column), do: "검색..."
+
+  # 날짜 범위 필터값에서 from/to 파트 추출
+  defp parse_date_part(nil, _part), do: ""
+  defp parse_date_part("", _part), do: ""
+  defp parse_date_part(value, part) when is_binary(value) do
+    case String.split(value, "~", parts: 2) do
+      [from, to] -> if part == :from, do: from, else: to
+      _ -> ""
+    end
+  end
+  defp parse_date_part(_, _), do: ""
 
   defp get_column_filter_type(columns, field) do
     case Enum.find(columns, fn c -> c.field == field end) do
@@ -1412,7 +1544,28 @@ defmodule LiveviewGridWeb.GridComponent do
   defp editing?(%{row_id: rid, field: f}, row_id, field), do: rid == row_id and f == field
 
   defp editor_input_type(%{editor_type: :number}), do: "number"
+  defp editor_input_type(%{editor_type: :date}), do: "date"
+  defp editor_input_type(%{filter_type: :date}), do: "date"
   defp editor_input_type(_column), do: "text"
+
+  # Date 값을 <input type="date">의 value 형식(YYYY-MM-DD)으로 변환
+  defp format_date_for_input(%Date{} = d), do: Date.to_iso8601(d)
+  defp format_date_for_input(%DateTime{} = dt), do: dt |> DateTime.to_date() |> Date.to_iso8601()
+  defp format_date_for_input(%NaiveDateTime{} = dt), do: dt |> NaiveDateTime.to_date() |> Date.to_iso8601()
+  defp format_date_for_input(val) when is_binary(val), do: val
+  defp format_date_for_input(nil), do: ""
+  defp format_date_for_input(_), do: ""
+
+  # 날짜 문자열을 Date 타입으로 파싱
+  defp parse_date_value(""), do: nil
+  defp parse_date_value(nil), do: nil
+  defp parse_date_value(value) when is_binary(value) do
+    case Date.from_iso8601(value) do
+      {:ok, date} -> date
+      _ -> value
+    end
+  end
+  defp parse_date_value(value), do: value
 
   defp render_status_badge(:normal), do: ""
   defp render_status_badge(:new) do
@@ -1447,22 +1600,49 @@ defmodule LiveviewGridWeb.GridComponent do
         </select>
         """
       else
-        # INPUT 편집 모드 (text/number)
-        assigns = assign(assigns, row: row, column: column)
-        ~H"""
-        <input
-          type={editor_input_type(@column)}
-          value={Map.get(@row, @column.field)}
-          phx-blur="cell_edit_save"
-          phx-keyup="cell_keydown"
-          phx-value-row-id={@row.id}
-          phx-value-field={@column.field}
-          phx-target={@myself}
-          class="lv-grid__cell-editor"
-          id={"editor-#{@row.id}-#{@column.field}"}
-          phx-hook="CellEditor"
-        />
-        """
+        input_type = editor_input_type(column)
+
+        if input_type == "date" do
+          # DATE 편집 모드 - date picker
+          cell_val = Map.get(row, column.field)
+          date_str = format_date_for_input(cell_val)
+          assigns = assign(assigns, row: row, column: column, date_value: date_str)
+          ~H"""
+          <form phx-change="cell_edit_date" phx-target={@myself} style="display: contents;">
+            <input type="hidden" name="row-id" value={@row.id} />
+            <input type="hidden" name="field" value={@column.field} />
+            <input
+              type="date"
+              name="value"
+              value={@date_value}
+              phx-blur="cell_edit_save"
+              phx-value-row-id={@row.id}
+              phx-value-field={@column.field}
+              phx-target={@myself}
+              class="lv-grid__cell-editor"
+              id={"editor-#{@row.id}-#{@column.field}"}
+              phx-hook="CellEditor"
+            />
+          </form>
+          """
+        else
+          # INPUT 편집 모드 (text/number)
+          assigns = assign(assigns, row: row, column: column)
+          ~H"""
+          <input
+            type={editor_input_type(@column)}
+            value={Map.get(@row, @column.field)}
+            phx-blur="cell_edit_save"
+            phx-keyup="cell_keydown"
+            phx-value-row-id={@row.id}
+            phx-value-field={@column.field}
+            phx-target={@myself}
+            class="lv-grid__cell-editor"
+            id={"editor-#{@row.id}-#{@column.field}"}
+            phx-hook="CellEditor"
+          />
+          """
+        end
       end
     else
       # 보기 모드

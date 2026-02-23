@@ -410,6 +410,27 @@
   font-size: 11px;
 }
 
+/* Date Filter (F-062) */
+.lv-grid__date-filter {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+}
+
+.lv-grid__filter-input--date {
+  flex: 1;
+  min-width: 0;
+  padding: 4px 6px;
+  font-size: 11px;
+}
+
+.lv-grid__date-filter-sep {
+  color: var(--lv-grid-text-secondary);
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
 .lv-grid__filter-clear {
   position: absolute;
   right: 4px;

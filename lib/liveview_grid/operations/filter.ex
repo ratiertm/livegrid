@@ -6,10 +6,16 @@ defmodule LiveViewGrid.Filter do
   - 텍스트: 대소문자 무관 부분 일치
   - 숫자: 연산자 지원 (>, <, >=, <=, =)
 
+  ## 날짜 필터 (v0.8 - F-062)
+  - 기본: 범위 필터 ("from~to" 형식)
+  - 고급: eq, before, after, between, is_empty, is_not_empty
+  - 지원 타입: Date, DateTime, NaiveDateTime, ISO8601 문자열
+
   ## 고급 필터 (v0.6 - F-310)
   - 다중 조건: AND/OR 논리 연산자 조합
   - 텍스트 연산자: contains, equals, starts_with, ends_with, is_empty, is_not_empty
   - 숫자 연산자: eq, neq, gt, lt, gte, lte
+  - 날짜 연산자: eq, before, after, between, is_empty, is_not_empty
   """
 
   @doc """
@@ -106,8 +112,11 @@ defmodule LiveViewGrid.Filter do
   def apply_advanced(data, %{logic: logic, conditions: conditions}, columns)
       when is_list(data) and is_list(conditions) do
     # 유효한 조건만 필터 (field가 nil이거나 value가 비어있으면 무시)
+    # 단, is_empty/is_not_empty 연산자는 value 없이도 유효
     active = Enum.filter(conditions, fn c ->
-      c[:field] != nil and c[:value] != nil and c[:value] != ""
+      c[:field] != nil and
+        (c[:operator] in [:is_empty, :is_not_empty] or
+         (c[:value] != nil and c[:value] != ""))
     end)
 
     if Enum.empty?(active) do
@@ -142,6 +151,7 @@ defmodule LiveViewGrid.Filter do
 
     case filter_type do
       :number -> match_number_op?(cell_value, operator, value)
+      :date -> match_date_op?(cell_value, operator, value)
       _ -> match_text_op?(cell_value, operator, value)
     end
   end
@@ -233,6 +243,17 @@ defmodule LiveViewGrid.Filter do
     end
   end
 
+  defp match_filter?(row, field, value, :date) do
+    cell_value = Map.get(row, field)
+    cell_date = to_date(cell_value)
+
+    if is_nil(cell_date) do
+      false
+    else
+      match_date_range?(cell_date, to_string(value))
+    end
+  end
+
   defp match_filter?(row, field, value, _unknown_type) do
     match_filter?(row, field, value, :text)
   end
@@ -276,6 +297,88 @@ defmodule LiveViewGrid.Filter do
       :error -> false
     end
   end
+
+  # ── Date operator matching (F-062) ──
+
+  defp match_date_op?(nil, :is_empty, _), do: true
+  defp match_date_op?(_, :is_empty, _), do: false
+
+  defp match_date_op?(nil, :is_not_empty, _), do: false
+  defp match_date_op?(_, :is_not_empty, _), do: true
+
+  defp match_date_op?(nil, _, _), do: false
+
+  defp match_date_op?(cell, :eq, value) do
+    cell_date = to_date(cell)
+    val_date = to_date(value)
+    if cell_date && val_date, do: Date.compare(cell_date, val_date) == :eq, else: false
+  end
+
+  defp match_date_op?(cell, :before, value) do
+    cell_date = to_date(cell)
+    val_date = to_date(value)
+    if cell_date && val_date, do: Date.compare(cell_date, val_date) == :lt, else: false
+  end
+
+  defp match_date_op?(cell, :after, value) do
+    cell_date = to_date(cell)
+    val_date = to_date(value)
+    if cell_date && val_date, do: Date.compare(cell_date, val_date) == :gt, else: false
+  end
+
+  defp match_date_op?(cell, :between, value) do
+    cell_date = to_date(cell)
+    if is_nil(cell_date), do: false, else: match_date_range?(cell_date, to_string(value))
+  end
+
+  # 알 수 없는 날짜 연산자는 eq로 fallback
+  defp match_date_op?(cell, _unknown, value), do: match_date_op?(cell, :eq, value)
+
+  # ── Date range matching ──
+
+  # "from~to" 형식의 범위 필터
+  defp match_date_range?(cell_date, range_str) when is_binary(range_str) do
+    case String.split(range_str, "~", parts: 2) do
+      [from_str, to_str] ->
+        from_date = if String.trim(from_str) != "", do: to_date(String.trim(from_str))
+        to_date_val = if String.trim(to_str) != "", do: to_date(String.trim(to_str))
+
+        from_ok = if from_date, do: Date.compare(cell_date, from_date) in [:gt, :eq], else: true
+        to_ok = if to_date_val, do: Date.compare(cell_date, to_date_val) in [:lt, :eq], else: true
+
+        from_ok and to_ok
+
+      [single] ->
+        # "~" 없이 단일 날짜 → 정확히 일치
+        val_date = to_date(String.trim(single))
+        if val_date, do: Date.compare(cell_date, val_date) == :eq, else: false
+
+      _ -> false
+    end
+  end
+  defp match_date_range?(_cell_date, _), do: false
+
+  # ── Date conversion helper ──
+
+  defp to_date(%Date{} = d), do: d
+  defp to_date(%DateTime{} = dt), do: DateTime.to_date(dt)
+  defp to_date(%NaiveDateTime{} = dt), do: NaiveDateTime.to_date(dt)
+  defp to_date(value) when is_binary(value) do
+    trimmed = String.trim(value)
+    if trimmed == "" do
+      nil
+    else
+      case Date.from_iso8601(trimmed) do
+        {:ok, date} -> date
+        _ ->
+          case NaiveDateTime.from_iso8601(trimmed) do
+            {:ok, dt} -> NaiveDateTime.to_date(dt)
+            _ -> nil
+          end
+      end
+    end
+  end
+  defp to_date(_), do: nil
 
   defp to_number(value) when is_integer(value), do: value * 1.0
   defp to_number(value) when is_float(value), do: value

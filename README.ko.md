@@ -69,6 +69,7 @@ open doc/index.html
 ### v0.2 - 검증 & 테마
 - [x] 셀 검증 - 필수값, 숫자 범위, 형식 체크
 - [x] 검증 오류 UI (셀 하이라이트, 툴팁 메시지)
+- [x] 다중 조건 고급 필터 (AND/OR 조합, 텍스트/숫자 연산자)
 - [x] 테마 시스템 (다크 모드, 커스텀 테마, CSS 변수 커스터마이저)
 
 ### v0.3 - DBMS 연동
@@ -90,6 +91,8 @@ open doc/index.html
 - [x] 인증 헤더 지원 (Bearer 토큰, 커스텀 헤더)
 - [x] 에러 처리 & 재시도 로직 (지수 백오프)
 - [x] Mock REST API 서버 (MockApiController)
+- [x] Excel (.xlsx) / CSV Export (Elixlsx 기반)
+- [x] 커스텀 셀 렌더러 (badge, link, progress 내장 프리셋)
 - [x] API Key 관리 (생성/폐기/삭제, SQLite 저장)
 - [x] API 문서 페이지
 - [x] 사이드바 네비게이션 대시보드 레이아웃
@@ -105,25 +108,32 @@ open doc/index.html
 - [x] 포맷터 (16종: number, currency, percent, date, datetime, time, boolean, mask, phone, email, url, uppercase, lowercase, capitalize, truncate, custom)
 - [x] API 문서화 (ex_doc, 한국어/영어 가이드)
 
+## 📊 구현 현황
+
+| 항목 | 수치 |
+|------|------|
+| 전체 기능 | 42개 |
+| 구현 완료 | 31개 (74%) |
+| 미구현 | 11개 (26%) |
+| 구현 버전 | v0.1 ~ v0.7 |
+
 ## 🗺️ 로드맵
 
-### v0.6 - DBMS & API 강화 (Phase B~D)
+### v0.8 - 협업 & 실시간
+- [ ] 실시간 동기화 (Phoenix PubSub 기반 멀티 유저 동시 편집)
+- [ ] 변경 이력 (Undo/Redo)
+- [ ] 셀 잠금 (동시 편집 충돌 방지)
+
+### v1.0 - 엔터프라이즈
 - [ ] 멀티 DB 드라이버 - PostgreSQL (`postgrex`), MySQL/MariaDB (`myxql`)
 - [ ] 멀티 DB 드라이버 - MSSQL (`tds_ecto`), Oracle (`ecto_oracle`)
 - [ ] 대용량 데이터 스트리밍 (`Repo.stream` 메모리 효율 처리)
 - [ ] GraphQL 데이터 소스 지원
 - [ ] 커서 기반 페이지네이션 (오프셋 외 추가)
-
-### v0.8 - 협업 & 실시간
-- [ ] 실시간 동기화 (멀티 유저 동시 편집)
-- [ ] 변경 이력 (Undo/Redo)
-- [ ] 셀 잠금
-
-### v1.0 - 엔터프라이즈
-- [ ] Excel Export/Import
-- [ ] 컨텍스트 메뉴
-- [ ] 키보드 내비게이션
-- [x] API 문서화 (ex_doc, 한/영 가이드)
+- [ ] Excel Import (.xlsx 업로드 + 컬럼 매핑)
+- [ ] 컨텍스트 메뉴 (우클릭)
+- [ ] 키보드 내비게이션 (화살표키/Tab/Enter 셀 이동)
+- [ ] 날짜 필터 (Date Picker, 범위 선택)
 
 ## 📁 프로젝트 구조
 
@@ -135,32 +145,45 @@ lib/
 │   ├── data_source/
 │   │   ├── in_memory.ex        # InMemory 어댑터 (v0.1)
 │   │   ├── ecto.ex             # Ecto/DB 어댑터 (v0.3)
+│   │   ├── ecto/
+│   │   │   └── query_builder.ex # SQL 쿼리 빌더
 │   │   └── rest.ex             # REST API 어댑터 (v0.5)
 │   ├── operations/
+│   │   ├── sorting.ex          # 정렬 엔진 (v0.1)
+│   │   ├── filter.ex           # 필터 엔진 - 기본+고급 (v0.1/v0.2)
+│   │   ├── pagination.ex       # 페이지네이션 (v0.1)
 │   │   ├── grouping.ex         # 다중 필드 그룹핑 (v0.7)
 │   │   ├── tree.ex             # 트리 그리드 계층 (v0.7)
 │   │   └── pivot.ex            # 피벗 테이블 변환 (v0.7)
+│   ├── renderers.ex            # 커스텀 셀 렌더러 프리셋 (v0.5)
 │   ├── formatter.ex            # 16종 데이터 포맷터 (v0.7)
+│   ├── export.ex               # Excel/CSV Export (v0.5)
 │   ├── api_key.ex              # API Key 스키마
 │   ├── api_keys.ex             # API Key 컨텍스트 (CRUD)
+│   ├── demo_user.ex            # 데모용 User 스키마
+│   ├── repo.ex                 # Ecto Repo
 │   └── application.ex
 └── liveview_grid_web/          # 웹 레이어
     ├── live/
-    │   ├── demo_live.ex        # InMemory 데모
-    │   ├── dbms_demo_live.ex   # DBMS 데모 (SQLite)
-    │   ├── api_demo_live.ex    # REST API 데모
+    │   ├── grid_live.ex         # Grid LiveView
+    │   ├── grid_live.html.heex  # Grid 템플릿
+    │   ├── demo_live.ex         # InMemory 데모
+    │   ├── dbms_demo_live.ex    # DBMS 데모 (SQLite)
+    │   ├── api_demo_live.ex     # REST API 데모
     │   ├── renderer_demo_live.ex # 렌더러 데모
     │   ├── advanced_demo_live.ex # 고급 기능 데모 (v0.7)
-    │   ├── api_key_live.ex     # API Key 관리
-    │   └── api_doc_live.ex     # API 문서
+    │   ├── api_key_live.ex      # API Key 관리
+    │   └── api_doc_live.ex      # API 문서
     ├── components/
-    │   ├── grid_component.ex   # Grid LiveComponent
+    │   ├── grid_component.ex    # Grid LiveComponent (핵심)
+    │   ├── core_components.ex   # Phoenix 기본 컴포넌트
     │   └── layouts/
     │       └── dashboard.html.heex  # 사이드바 대시보드 레이아웃
     ├── plugs/
     │   └── require_api_key.ex       # API Key 인증 plug (v0.6)
     ├── controllers/
-    │   └── mock_api_controller.ex   # Mock REST API
+    │   ├── mock_api_controller.ex   # Mock REST API
+    │   └── csv_controller.ex        # CSV 다운로드
     └── router.ex
 
 assets/
@@ -182,10 +205,14 @@ projects/skills/                   # 개발 워크플로우 스킬
 
 - **Elixir** 1.16+ / **Phoenix** 1.7+
 - **LiveView** 1.0+ - 실시간 UI (LiveComponent)
+- **Ecto** + **SQLite** (`ecto_sqlite3`) - 데이터베이스 연동
+- **Elixlsx** - Excel Export
 - **커스텀 CSS** - BEM 방식 (`lv-grid__*`)
 - **JavaScript Hooks** - 가상 스크롤, 셀 편집, 컬럼 리사이즈
 
 ## 📝 사용 예시
+
+### 기본 그리드
 
 ```elixir
 # LiveView에서 GridComponent 사용
@@ -196,9 +223,10 @@ projects/skills/                   # 개발 워크플로우 스킬
   columns={[
     %{field: :id, label: "ID", width: 80, sortable: true},
     %{field: :name, label: "이름", width: 150, sortable: true,
-      filterable: true, filter_type: :text, editable: true},
-    %{field: :age, label: "나이", width: 80, sortable: true,
-      editable: true, editor_type: :number},
+      filterable: true, filter_type: :text, editable: true,
+      validators: [{:required, "필수 입력"}]},
+    %{field: :salary, label: "급여", width: 120, sortable: true,
+      formatter: :currency, align: :right},
     %{field: :city, label: "도시", width: 120, sortable: true,
       editable: true, editor_type: :select,
       editor_options: [{"서울", "서울"}, {"부산", "부산"}, {"대구", "대구"}]}
@@ -210,6 +238,24 @@ projects/skills/                   # 개발 워크플로우 스킬
     frozen_columns: 1
   }}
 />
+```
+
+### DataSource 연동
+
+```elixir
+# Ecto (DB) 연동
+grid = Grid.new(
+  columns: columns,
+  data_source: {LiveViewGrid.DataSource.Ecto,
+    %{repo: MyApp.Repo, query: from(u in User)}}
+)
+
+# REST API 연동
+grid = Grid.new(
+  columns: columns,
+  data_source: {LiveViewGrid.DataSource.Rest,
+    %{base_url: "https://api.example.com/users"}}
+)
 ```
 
 ## 📖 API 문서

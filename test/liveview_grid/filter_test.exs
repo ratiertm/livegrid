@@ -194,6 +194,149 @@ defmodule LiveViewGrid.FilterTest do
     end
   end
 
+  # ── 날짜 필터 (F-062) ──
+
+  @date_columns [
+    %{field: :name, filter_type: :text},
+    %{field: :created_at, filter_type: :date}
+  ]
+
+  @date_data [
+    %{id: 1, name: "Alice", created_at: ~D[2026-01-15]},
+    %{id: 2, name: "Bob", created_at: ~D[2026-02-10]},
+    %{id: 3, name: "Charlie", created_at: ~D[2026-03-20]},
+    %{id: 4, name: "David", created_at: ~D[2026-04-05]},
+    %{id: 5, name: "Eve", created_at: nil}
+  ]
+
+  describe "날짜 필터 (기본)" do
+    test "범위 필터: from~to" do
+      result = Filter.apply(@date_data, %{created_at: "2026-01-01~2026-02-28"}, @date_columns)
+      assert length(result) == 2
+      names = Enum.map(result, & &1.name) |> Enum.sort()
+      assert names == ["Alice", "Bob"]
+    end
+
+    test "범위 필터: from만" do
+      result = Filter.apply(@date_data, %{created_at: "2026-03-01~"}, @date_columns)
+      assert length(result) == 2
+      names = Enum.map(result, & &1.name) |> Enum.sort()
+      assert names == ["Charlie", "David"]
+    end
+
+    test "범위 필터: to만" do
+      result = Filter.apply(@date_data, %{created_at: "~2026-02-28"}, @date_columns)
+      assert length(result) == 2
+      names = Enum.map(result, & &1.name) |> Enum.sort()
+      assert names == ["Alice", "Bob"]
+    end
+
+    test "단일 날짜 (정확히 일치)" do
+      result = Filter.apply(@date_data, %{created_at: "2026-02-10"}, @date_columns)
+      assert length(result) == 1
+      assert hd(result).name == "Bob"
+    end
+
+    test "빈 필터 → 전체 데이터" do
+      result = Filter.apply(@date_data, %{created_at: ""}, @date_columns)
+      assert length(result) == 5
+    end
+
+    test "nil 날짜는 필터에서 제외" do
+      result = Filter.apply(@date_data, %{created_at: "2026-01-01~2026-12-31"}, @date_columns)
+      assert length(result) == 4
+      refute Enum.any?(result, fn row -> row.name == "Eve" end)
+    end
+
+    test "DateTime 값도 Date로 비교" do
+      data = [
+        %{id: 1, name: "Alice", created_at: ~N[2026-02-10 14:30:00]},
+        %{id: 2, name: "Bob", created_at: ~N[2026-03-15 09:00:00]}
+      ]
+      result = Filter.apply(data, %{created_at: "2026-02-01~2026-02-28"}, @date_columns)
+      assert length(result) == 1
+      assert hd(result).name == "Alice"
+    end
+
+    test "ISO8601 문자열 값도 처리" do
+      data = [
+        %{id: 1, name: "Alice", created_at: "2026-01-15"},
+        %{id: 2, name: "Bob", created_at: "2026-03-20"}
+      ]
+      result = Filter.apply(data, %{created_at: "2026-01-01~2026-02-28"}, @date_columns)
+      assert length(result) == 1
+      assert hd(result).name == "Alice"
+    end
+  end
+
+  describe "날짜 필터 (고급)" do
+    test "eq: 같은 날" do
+      conditions = [%{field: :created_at, operator: :eq, value: "2026-02-10"}]
+      result = Filter.apply_advanced(@date_data, %{logic: :and, conditions: conditions}, @date_columns)
+      assert length(result) == 1
+      assert hd(result).name == "Bob"
+    end
+
+    test "before: 이전" do
+      conditions = [%{field: :created_at, operator: :before, value: "2026-03-01"}]
+      result = Filter.apply_advanced(@date_data, %{logic: :and, conditions: conditions}, @date_columns)
+      assert length(result) == 2
+      names = Enum.map(result, & &1.name) |> Enum.sort()
+      assert names == ["Alice", "Bob"]
+    end
+
+    test "after: 이후" do
+      conditions = [%{field: :created_at, operator: :after, value: "2026-03-01"}]
+      result = Filter.apply_advanced(@date_data, %{logic: :and, conditions: conditions}, @date_columns)
+      assert length(result) == 2
+      names = Enum.map(result, & &1.name) |> Enum.sort()
+      assert names == ["Charlie", "David"]
+    end
+
+    test "between: 사이" do
+      conditions = [%{field: :created_at, operator: :between, value: "2026-02-01~2026-03-31"}]
+      result = Filter.apply_advanced(@date_data, %{logic: :and, conditions: conditions}, @date_columns)
+      assert length(result) == 2
+      names = Enum.map(result, & &1.name) |> Enum.sort()
+      assert names == ["Bob", "Charlie"]
+    end
+
+    test "is_empty: 비어있음" do
+      conditions = [%{field: :created_at, operator: :is_empty, value: ""}]
+      result = Filter.apply_advanced(@date_data, %{logic: :and, conditions: conditions}, @date_columns)
+      assert length(result) == 1
+      assert hd(result).name == "Eve"
+    end
+
+    test "is_not_empty: 비어있지않음" do
+      conditions = [%{field: :created_at, operator: :is_not_empty, value: ""}]
+      result = Filter.apply_advanced(@date_data, %{logic: :and, conditions: conditions}, @date_columns)
+      assert length(result) == 4
+      refute Enum.any?(result, fn row -> row.name == "Eve" end)
+    end
+
+    test "날짜 + 텍스트 다중 조건 (AND)" do
+      conditions = [
+        %{field: :created_at, operator: :after, value: "2026-02-01"},
+        %{field: :name, operator: :contains, value: "Charlie"}
+      ]
+      result = Filter.apply_advanced(@date_data, %{logic: :and, conditions: conditions}, @date_columns)
+      assert length(result) == 1
+      assert hd(result).name == "Charlie"
+    end
+
+    test "날짜 다중 조건 (OR)" do
+      conditions = [
+        %{field: :created_at, operator: :eq, value: "2026-01-15"},
+        %{field: :created_at, operator: :eq, value: "2026-04-05"}
+      ]
+      result = Filter.apply_advanced(@date_data, %{logic: :or, conditions: conditions}, @date_columns)
+      assert length(result) == 2
+      names = Enum.map(result, & &1.name) |> Enum.sort()
+      assert names == ["Alice", "David"]
+    end
+  end
+
   describe "nil 값 포함 데이터" do
     test "nil 필드값은 텍스트 필터에서 제외" do
       data_with_nil = [
