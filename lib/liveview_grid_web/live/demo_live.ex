@@ -269,6 +269,69 @@ defmodule LiveviewGridWeb.DemoLive do
     )}
   end
 
+  # F-920: 행 단위 편집 완료 시 원본 데이터 업데이트
+  @impl true
+  def handle_info({:grid_row_updated, row_id, changed_values}, socket) do
+    update_row = fn users ->
+      Enum.map(users, fn user ->
+        if user.id == row_id do
+          Enum.reduce(changed_values, user, fn {field, value}, acc ->
+            Map.put(acc, field, value)
+          end)
+        else
+          user
+        end
+      end)
+    end
+
+    {:noreply, assign(socket,
+      all_users: update_row.(socket.assigns.all_users),
+      filtered_users: update_row.(socket.assigns.filtered_users),
+      visible_users: update_row.(socket.assigns.visible_users)
+    )}
+  end
+
+  # F-700: Undo/Redo 알림 처리 — 부모 데이터 동기화
+  @impl true
+  def handle_info({:grid_undo, %{type: :cell, row_id: row_id, field: field, value: value}}, socket) do
+    update_fn = fn users ->
+      Enum.map(users, fn user ->
+        if user.id == row_id, do: Map.put(user, field, value), else: user
+      end)
+    end
+
+    {:noreply, assign(socket,
+      all_users: update_fn.(socket.assigns.all_users),
+      filtered_users: update_fn.(socket.assigns.filtered_users),
+      visible_users: update_fn.(socket.assigns.visible_users)
+    )}
+  end
+
+  @impl true
+  def handle_info({:grid_undo, %{type: :row, row_id: row_id, values: values}}, socket) do
+    update_fn = fn users ->
+      Enum.map(users, fn user ->
+        if user.id == row_id do
+          Enum.reduce(values, user, fn {field, value}, acc -> Map.put(acc, field, value) end)
+        else
+          user
+        end
+      end)
+    end
+
+    {:noreply, assign(socket,
+      all_users: update_fn.(socket.assigns.all_users),
+      filtered_users: update_fn.(socket.assigns.filtered_users),
+      visible_users: update_fn.(socket.assigns.visible_users)
+    )}
+  end
+
+  @impl true
+  def handle_info({:grid_redo, summary}, socket) do
+    # Redo는 Undo와 동일한 구조 (값만 다름)
+    handle_info({:grid_undo, summary}, socket)
+  end
+
   @impl true
   def handle_info({:grid_save_blocked, error_count}, socket) do
     {:noreply, put_flash(socket, :error, "검증 오류 #{error_count}건이 있어 저장할 수 없습니다. 오류를 수정해주세요.")}
@@ -350,6 +413,12 @@ defmodule LiveviewGridWeb.DemoLive do
       <h1>LiveView Grid 프로토타입 v0.1-alpha</h1>
       <p>기본 기능: 정렬 + 페이징 + Virtual Scrolling</p>
       
+      <!-- 데모 컨트롤 (접기/펼치기) -->
+      <details style="margin: 10px 0;">
+        <summary style="cursor: pointer; padding: 8px 12px; background: #f5f5f5; border-radius: 4px; font-weight: 600; font-size: 13px; color: #666; user-select: none;">
+          ⚙️ 데모 설정 (검색, 테마, 데이터 개수, Virtual Scroll)
+        </summary>
+
       <!-- 데이터 상태 표시 -->
       <div style="margin: 10px 0; padding: 10px; background: #e1f5fe; border-left: 4px solid #03a9f4; border-radius: 4px;">
         <strong>📊 현재 데이터:</strong> 
@@ -552,7 +621,8 @@ defmodule LiveviewGridWeb.DemoLive do
         </button>
         <span style="margin-left: 15px; color: #666;">현재: <%= @data_count %>개</span>
       </div>
-      
+      </details>
+
       <div style="position: relative;">
         <.live_component
           module={LiveviewGridWeb.GridComponent}
@@ -561,14 +631,29 @@ defmodule LiveviewGridWeb.DemoLive do
           columns={[
             %{field: :id, label: "ID", width: 80, sortable: true},
             %{field: :name, label: "이름", width: 150, sortable: true, filterable: true, filter_type: :text, editable: true,
+              header_group: "인적 정보",
+              # input_pattern 제거: 국제 문자(한글, 중국어, 일본어, 이모지 등) 모두 허용
               validators: [{:required, "이름은 필수입니다"}]},
             %{field: :email, label: "이메일", width: 250, sortable: true, filterable: true, filter_type: :text, editable: true,
+              header_group: "인적 정보",
               validators: [{:required, "이메일은 필수입니다"}, {:pattern, ~r/@/, "이메일 형식이 올바르지 않습니다"}],
               renderer: LiveViewGrid.Renderers.link(prefix: "mailto:")},
             %{field: :age, label: "나이", width: 100, sortable: true, filterable: true, filter_type: :number, editable: true, editor_type: :number,
+              header_group: "인적 정보",
               validators: [{:required, "나이는 필수입니다"}, {:min, 1, "1 이상이어야 합니다"}, {:max, 150, "150 이하이어야 합니다"}],
-              renderer: LiveViewGrid.Renderers.progress(max: 60, color: "green")},
+              renderer: LiveViewGrid.Renderers.progress(max: 60, color: "green"),
+              style_expr: fn row ->
+                age = Map.get(row, :age)
+                cond do
+                  is_nil(age) -> nil
+                  age >= 50 -> %{bg: "#ffebee", color: "#c62828"}
+                  age < 30 -> %{bg: "#e3f2fd", color: "#1565c0"}
+                  true -> nil
+                end
+              end},
+            %{field: :active, label: "활성", width: 70, editable: true, editor_type: :checkbox, header_group: "부가 정보"},
             %{field: :city, label: "도시", width: 120, sortable: true, filterable: true, filter_type: :text, editable: true, editor_type: :select,
+              header_group: "부가 정보",
               renderer: LiveViewGrid.Renderers.badge(
                 colors: %{"서울" => "blue", "부산" => "green", "대구" => "red",
                           "인천" => "purple", "광주" => "yellow", "대전" => "gray",
@@ -578,7 +663,7 @@ defmodule LiveviewGridWeb.DemoLive do
                 {"인천", "인천"}, {"광주", "광주"}, {"대전", "대전"},
                 {"울산", "울산"}, {"수원", "수원"}, {"창원", "창원"}, {"고양", "고양"}
               ]},
-            %{field: :created_at, label: "가입일", width: 160, sortable: true, filterable: true, filter_type: :date, editable: true, editor_type: :date, formatter: :date}
+            %{field: :created_at, label: "가입일", width: 160, sortable: true, filterable: true, filter_type: :date, editable: true, editor_type: :date, formatter: :date, header_group: "부가 정보"}
           ]}
           options={%{
             page_size: if(@virtual_scroll, do: 20, else: 99999),
@@ -586,6 +671,7 @@ defmodule LiveviewGridWeb.DemoLive do
             row_height: 40,
             show_footer: !@virtual_scroll,
             frozen_columns: 1,
+            show_row_number: true,
             debug: true,
             theme: @theme,
             custom_css_vars: @custom_css_vars
@@ -671,6 +757,7 @@ defmodule LiveviewGridWeb.DemoLive do
         name: "#{first} #{last}",
         email: "#{String.downcase(first)}.#{String.downcase(last)}@example.com",
         age: Enum.random(20..60),
+        active: Enum.random([true, false]),
         city: Enum.random(cities),
         created_at: Date.new!(2025, Enum.random(1..12), Enum.random(1..28))
       }

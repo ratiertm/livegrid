@@ -108,31 +108,42 @@ open doc/index.html
 - [x] 포맷터 (16종: number, currency, percent, date, datetime, time, boolean, mask, phone, email, url, uppercase, lowercase, capitalize, truncate, custom)
 - [x] API 문서화 (ex_doc, 한국어/영어 가이드)
 
+### v0.8 - 편집 기초 (Phase 1)
+- [x] 조건부 셀 스타일 (나이 기반 배경색 규칙)
+- [x] 다중 헤더 (그룹 컬럼 헤더, parent-child 구조)
+- [x] 클립보드 Excel 붙여넣기 (탭 구분 데이터 paste 이벤트)
+- [x] Excel/CSV Import (파일 업로드 + 컬럼 매핑)
+- [x] 셀 툴팁 (오버플로우 감지 + title 속성)
+
+### v0.9 - 편집 고도화 (Phase 2)
+- [x] Null 정렬 (컬럼별 nil 값 앞/뒤 배치 옵션)
+- [x] 행번호 컬럼 (자동 증가 행 인덱스 표시)
+- [x] Checkbox 컬럼 (boolean 값 클릭 즉시 토글)
+- [x] 입력 제한 (정규식 기반 입력 필터링 + 최대 길이)
+- [x] 행 단위 편집 모드 (행 전체 셀 동시 편집)
+- [x] Undo/Redo (Ctrl+Z/Y 편집 히스토리, 최대 50건 스택)
+
 ## 📊 구현 현황
 
 | 항목 | 수치 |
 |------|------|
 | 전체 기능 | 42개 |
-| 구현 완료 | 31개 (74%) |
-| 미구현 | 11개 (26%) |
-| 구현 버전 | v0.1 ~ v0.7 |
+| 구현 완료 | 42개 (100%) |
+| 미구현 | 0개 |
+| 구현 버전 | v0.1 ~ v0.9 |
+| 테스트 | 255개 통과 |
 
 ## 🗺️ 로드맵
 
-### v0.8 - 협업 & 실시간
-- [ ] 실시간 동기화 (Phoenix PubSub 기반 멀티 유저 동시 편집)
-- [ ] 변경 이력 (Undo/Redo)
-- [ ] 셀 잠금 (동시 편집 충돌 방지)
-
 ### v1.0 - 엔터프라이즈
+- [ ] 실시간 동기화 (Phoenix PubSub 기반 멀티 유저 동시 편집)
+- [ ] 셀 잠금 (동시 편집 충돌 방지)
 - [ ] 멀티 DB 드라이버 - PostgreSQL (`postgrex`), MySQL/MariaDB (`myxql`)
 - [ ] 멀티 DB 드라이버 - MSSQL (`tds_ecto`), Oracle (`ecto_oracle`)
 - [ ] 대용량 데이터 스트리밍 (`Repo.stream` 메모리 효율 처리)
 - [ ] GraphQL 데이터 소스 지원
 - [ ] 커서 기반 페이지네이션 (오프셋 외 추가)
-- [ ] Excel Import (.xlsx 업로드 + 컬럼 매핑)
 - [ ] 컨텍스트 메뉴 (우클릭)
-- [ ] 키보드 내비게이션 (화살표키/Tab/Enter 셀 이동)
 - [ ] 날짜 필터 (Date Picker, 범위 선택)
 
 ## 📁 프로젝트 구조

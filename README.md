@@ -108,31 +108,42 @@ open doc/index.html
 - [x] Formatter (16 types: number, currency, percent, date, datetime, time, boolean, mask, phone, email, url, uppercase, lowercase, capitalize, truncate, custom)
 - [x] API documentation (ex_doc with bilingual guides in Korean/English)
 
+### v0.8 - Editing Basics (Phase 1)
+- [x] Conditional cell styling (age-based background color rules)
+- [x] Multi-level headers (grouped column headers with parent-child)
+- [x] Clipboard Excel paste (paste event handler for tabular data)
+- [x] Excel/CSV Import (file upload with column mapping)
+- [x] Cell tooltip (overflow detection with title attribute)
+
+### v0.9 - Editing Enhancement (Phase 2)
+- [x] Null sorting (nil values first/last option per column)
+- [x] Row number column (auto-increment row index display)
+- [x] Checkbox column (boolean toggle with instant click edit)
+- [x] Input restriction (regex-based input filtering + max length)
+- [x] Row edit mode (edit all cells in a row simultaneously)
+- [x] Undo/Redo (Ctrl+Z/Y edit history with 50-action stack)
+
 ## 📊 Implementation Status
 
 | Item | Count |
 |------|-------|
 | Total Features | 42 |
-| Completed | 31 (74%) |
-| Remaining | 11 (26%) |
-| Versions Shipped | v0.1 ~ v0.7 |
+| Completed | 42 (100%) |
+| Remaining | 0 |
+| Versions Shipped | v0.1 ~ v0.9 |
+| Tests | 255 passing |
 
 ## 🗺️ Roadmap
 
-### v0.8 - Collaboration & Real-time
-- [ ] Real-time sync (Phoenix PubSub-based multi-user concurrent editing)
-- [ ] Change history (Undo/Redo)
-- [ ] Cell locking (concurrent edit conflict prevention)
-
 ### v1.0 - Enterprise
+- [ ] Real-time sync (Phoenix PubSub-based multi-user concurrent editing)
+- [ ] Cell locking (concurrent edit conflict prevention)
 - [ ] Multi-DB drivers - PostgreSQL (`postgrex`), MySQL/MariaDB (`myxql`)
 - [ ] Multi-DB drivers - MSSQL (`tds_ecto`), Oracle (`ecto_oracle`)
 - [ ] Large dataset streaming (`Repo.stream` for memory-efficient processing)
 - [ ] GraphQL data source support
 - [ ] Cursor-based pagination (in addition to offset)
-- [ ] Excel Import (.xlsx upload + column mapping)
 - [ ] Context menu (right-click)
-- [ ] Keyboard navigation (arrow keys/Tab/Enter cell movement)
 - [ ] Date filter (Date Picker, range selection)
 
 ## 📁 Project Structure

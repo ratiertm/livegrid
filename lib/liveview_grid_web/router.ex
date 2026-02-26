@@ -34,6 +34,7 @@ defmodule LiveviewGridWeb.Router do
       live "/dbms-demo", DbmsDemoLive
       live "/api-demo", ApiDemoLive
       live "/advanced-demo", AdvancedDemoLive
+      live "/grid-config-demo", GridConfigDemoLive
       live "/api-keys", ApiKeyLive
       live "/api-docs", ApiDocLive
     end
