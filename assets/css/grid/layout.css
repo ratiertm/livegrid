@@ -1,0 +1,208 @@
+/* ========================================
+   LiveView Grid - Layout (Container, Reset, Footer, Info)
+   ======================================== */
+
+/* 2. Reset */
+.lv-grid,
+.lv-grid * {
+  box-sizing: border-box;
+}
+
+/* 3. Container */
+.lv-grid {
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+
+  background: var(--lv-grid-bg);
+  border: 1px solid var(--lv-grid-border);
+  border-radius: 4px;
+  overflow: hidden;
+
+  font-family: var(--lv-grid-font-family);
+  font-size: var(--lv-grid-font-size-md);
+  color: var(--lv-grid-text);
+}
+
+/* 6. Footer */
+.lv-grid__footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+
+  padding: var(--lv-grid-space-3) var(--lv-grid-space-4);
+  height: 56px;
+
+  background: var(--lv-grid-bg-secondary);
+  border-top: 1px solid var(--lv-grid-border);
+
+  font-size: var(--lv-grid-font-size-sm);
+}
+
+.lv-grid__pagination {
+  display: flex;
+  gap: 4px;
+}
+
+.lv-grid__page-btn {
+  min-width: 36px;
+  height: 36px;
+  padding: 0 12px;
+
+  border: 1px solid var(--lv-grid-border);
+  border-radius: 4px;
+  background: var(--lv-grid-bg);
+
+  font-size: var(--lv-grid-font-size-sm);
+  color: var(--lv-grid-text);
+
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.lv-grid__page-btn:hover:not(:disabled) {
+  background: var(--lv-grid-hover);
+  border-color: var(--lv-grid-primary);
+}
+
+.lv-grid__page-btn--current {
+  background: var(--lv-grid-primary);
+  color: var(--lv-grid-bg);
+  border-color: var(--lv-grid-primary);
+}
+
+.lv-grid__page-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.lv-grid__info {
+  color: var(--lv-grid-text-secondary);
+}
+
+/* 7. Custom Renderers */
+
+/* 7.1 Badge Renderer */
+.lv-grid__badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+.lv-grid__badge--blue { background: var(--lv-grid-primary-light); color: #1565c0; }
+.lv-grid__badge--green { background: var(--lv-grid-success-light); color: #2e7d32; }
+.lv-grid__badge--red { background: var(--lv-grid-danger-light); color: #c62828; }
+.lv-grid__badge--yellow { background: #fff8e1; color: var(--lv-grid-warning-text); }
+.lv-grid__badge--gray { background: var(--lv-grid-disabled-bg); color: var(--lv-grid-text-placeholder); }
+.lv-grid__badge--purple { background: #f3e5f5; color: #6a1b9a; }
+
+/* 7.2 Link Renderer */
+.lv-grid__link {
+  color: var(--lv-grid-primary-dark);
+  text-decoration: none;
+}
+.lv-grid__link:hover {
+  text-decoration: underline;
+}
+
+/* 7.3 Progress Renderer */
+.lv-grid__progress {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+}
+.lv-grid__progress-track {
+  flex: 1;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--lv-grid-border);
+  overflow: hidden;
+}
+.lv-grid__progress-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+.lv-grid__progress-fill--blue { background: var(--lv-grid-primary-dark); }
+.lv-grid__progress-fill--green { background: #2e7d32; }
+.lv-grid__progress-fill--red { background: #c62828; }
+.lv-grid__progress-fill--yellow { background: #f57f17; }
+.lv-grid__progress-text {
+  font-size: 12px;
+  color: var(--lv-grid-text-placeholder);
+  min-width: 30px;
+  text-align: right;
+}
+
+/* 8. Export Buttons */
+.lv-grid__export {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+.lv-grid__export-btn {
+  padding: 4px 12px;
+  border: 1px solid var(--lv-grid-border);
+  border-radius: 4px;
+  background: var(--lv-grid-bg);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+.lv-grid__export-btn:hover {
+  background: var(--lv-grid-disabled-bg);
+  border-color: var(--lv-grid-text-muted);
+}
+.lv-grid__export-btn--excel {
+  color: #217346;
+  border-color: #217346;
+}
+.lv-grid__export-btn--excel:hover {
+  background: var(--lv-grid-success-light);
+}
+.lv-grid__export-btn--csv {
+  color: #1565c0;
+  border-color: #1565c0;
+}
+.lv-grid__export-btn--csv:hover {
+  background: var(--lv-grid-primary-light);
+}
+.lv-grid__export-btn--import {
+  color: #e65100;
+  border-color: #e65100;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.lv-grid__export-btn--import:hover {
+  background: var(--lv-grid-warning-light);
+}
+.lv-grid__export-dropdown {
+  position: absolute;
+  bottom: 100%;
+  right: 0;
+  margin-bottom: 4px;
+  background: var(--lv-grid-bg);
+  border: 1px solid var(--lv-grid-border-input);
+  border-radius: 4px;
+  box-shadow: 0 -2px 8px rgba(0,0,0,0.12);
+  min-width: 180px;
+  z-index: 100;
+  overflow: hidden;
+}
+.lv-grid__export-dropdown-item {
+  padding: 8px 16px;
+  cursor: pointer;
+  font-size: 13px;
+  white-space: nowrap;
+  transition: background 0.15s;
+}
+.lv-grid__export-dropdown-item:hover {
+  background: var(--lv-grid-disabled-bg);
+}

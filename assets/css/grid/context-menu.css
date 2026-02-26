@@ -1,0 +1,56 @@
+/* ========================================
+   LiveView Grid - Context Menu (F-800)
+   ======================================== */
+
+.lv-grid__context-menu {
+  background: var(--lv-grid-bg);
+  border: 1px solid var(--lv-grid-border-input);
+  border-radius: 6px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  min-width: 180px;
+  overflow: hidden;
+  animation: lv-grid-menu-in 0.12s ease-out;
+  padding: 4px 0;
+}
+
+@keyframes lv-grid-menu-in {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.lv-grid__context-menu-item {
+  padding: 7px 16px;
+  cursor: pointer;
+  font-size: 13px;
+  white-space: nowrap;
+  transition: background 0.1s;
+  user-select: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--lv-grid-text);
+}
+
+.lv-grid__context-menu-item:hover {
+  background: var(--lv-grid-hover);
+}
+
+.lv-grid__context-menu-item--danger {
+  color: var(--lv-grid-danger);
+}
+
+.lv-grid__context-menu-item--danger:hover {
+  background: var(--lv-grid-danger-light);
+}
+
+.lv-grid__context-menu-divider {
+  height: 1px;
+  background: var(--lv-grid-border-light);
+  margin: 4px 0;
+}

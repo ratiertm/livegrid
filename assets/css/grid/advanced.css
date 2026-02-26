@@ -1,0 +1,259 @@
+/* ========================================
+   LiveView Grid - Advanced Features (Advanced Filter, Grouping, Tree, Pivot)
+   ======================================== */
+
+/* ── Section 9: Advanced Filter (F-310) ── */
+
+.lv-grid__advanced-filter {
+  background: var(--lv-grid-bg-tertiary);
+  border: 1px solid var(--lv-grid-border);
+  border-radius: 8px;
+  padding: 16px;
+  margin: 4px 0 8px 0;
+}
+
+.lv-grid__advanced-filter-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--lv-grid-text);
+}
+
+.lv-grid__advanced-filter-logic {
+  display: inline-flex;
+  gap: 4px;
+}
+
+.lv-grid__advanced-filter-logic-btn {
+  padding: 2px 10px;
+  border: 1px solid var(--lv-grid-border);
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  background: var(--lv-grid-bg);
+  transition: all 0.15s;
+}
+.lv-grid__advanced-filter-logic-btn:hover {
+  border-color: var(--lv-grid-text-muted);
+}
+.lv-grid__advanced-filter-logic-btn--active {
+  background: var(--lv-grid-primary-dark);
+  color: var(--lv-grid-bg);
+  border-color: var(--lv-grid-primary-dark);
+}
+
+.lv-grid__filter-condition {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.lv-grid__filter-condition form {
+  display: contents;
+}
+
+.lv-grid__filter-condition select {
+  padding: 6px 8px;
+  border: 1px solid var(--lv-grid-border-input);
+  border-radius: 4px;
+  font-size: 13px;
+  color: var(--lv-grid-text);
+  background: var(--lv-grid-bg-input);
+  flex: 0 0 140px;
+  cursor: pointer;
+}
+.lv-grid__filter-condition select:focus {
+  border-color: var(--lv-grid-primary-dark);
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(25, 118, 210, 0.15);
+}
+
+.lv-grid__filter-condition-value {
+  padding: 6px 8px;
+  border: 1px solid var(--lv-grid-border-input);
+  border-radius: 4px;
+  font-size: 13px;
+  color: var(--lv-grid-text);
+  background: var(--lv-grid-bg-input);
+  flex: 1;
+  min-width: 0;
+}
+.lv-grid__filter-condition-value:focus {
+  border-color: var(--lv-grid-primary-dark);
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(25, 118, 210, 0.15);
+}
+
+.lv-grid__filter-condition-remove {
+  background: none;
+  border: none;
+  color: var(--lv-grid-text-muted);
+  cursor: pointer;
+  font-size: 16px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+.lv-grid__filter-condition-remove:hover {
+  color: var(--lv-grid-danger-hover);
+  background: var(--lv-grid-danger-light);
+}
+
+.lv-grid__advanced-filter-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--lv-grid-border);
+}
+
+.lv-grid__filter-add-btn {
+  background: none;
+  border: 1px dashed var(--lv-grid-text-muted);
+  border-radius: 4px;
+  padding: 6px 16px;
+  font-size: 13px;
+  cursor: pointer;
+  color: var(--lv-grid-text-placeholder);
+  transition: all 0.15s;
+}
+.lv-grid__filter-add-btn:hover {
+  border-color: var(--lv-grid-primary-dark);
+  color: var(--lv-grid-primary-dark);
+  background: var(--lv-grid-primary-light);
+}
+
+.lv-grid__filter-reset-btn {
+  background: var(--lv-grid-bg);
+  border: 1px solid var(--lv-grid-border);
+  border-radius: 4px;
+  padding: 6px 16px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.lv-grid__filter-reset-btn:hover {
+  background: var(--lv-grid-disabled-bg);
+  border-color: var(--lv-grid-text-muted);
+}
+
+.lv-grid__filter-badge {
+  background: var(--lv-grid-danger-hover);
+  color: var(--lv-grid-bg);
+  border-radius: 50%;
+  font-size: 10px;
+  min-width: 16px;
+  height: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: 2px;
+  font-weight: 700;
+}
+
+/* ── Section 10: Grouping (v0.7) ── */
+
+.lv-grid__row--group-header {
+  background: var(--lv-grid-bg-tertiary);
+  border-bottom: 1px solid var(--lv-grid-border);
+  font-weight: 600;
+  font-size: var(--lv-grid-font-size-sm);
+  cursor: pointer;
+}
+
+.lv-grid__row--group-header:hover {
+  background: var(--lv-grid-hover);
+}
+
+.lv-grid__row--group-depth-0 {
+  background: var(--lv-grid-bg-secondary);
+}
+
+.lv-grid__row--group-depth-1 {
+  background: var(--lv-grid-bg-tertiary);
+}
+
+.lv-grid__group-header-cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 40px;
+  padding: 8px 16px;
+}
+
+.lv-grid__group-label {
+  font-weight: 600;
+  color: var(--lv-grid-text);
+}
+
+.lv-grid__group-count {
+  color: var(--lv-grid-text-muted);
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.lv-grid__group-aggregates {
+  display: flex;
+  gap: 12px;
+  margin-left: auto;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--lv-grid-text-secondary);
+}
+
+.lv-grid__group-agg-item {
+  padding: 2px 6px;
+  background: var(--lv-grid-primary-light);
+  border-radius: 4px;
+  font-size: 11px;
+}
+
+/* ── Section 11: Tree Grid (v0.7) ── */
+
+.lv-grid__tree-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border: none;
+  background: transparent;
+  color: var(--lv-grid-text-muted);
+  font-size: 10px;
+  cursor: pointer;
+  padding: 0;
+  border-radius: 3px;
+  flex-shrink: 0;
+  transition: all 0.15s ease;
+}
+
+.lv-grid__tree-toggle:hover {
+  background: var(--lv-grid-border);
+  color: var(--lv-grid-primary);
+}
+
+.lv-grid__tree-spacer {
+  display: inline-block;
+  width: 20px;
+  flex-shrink: 0;
+}
+
+/* ── Section 12: Pivot Table (v0.7) ── */
+
+.lv-grid__pivot-value {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.lv-grid__pivot-total {
+  font-weight: 600;
+  color: var(--lv-grid-primary-dark);
+}

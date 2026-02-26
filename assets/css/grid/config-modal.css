@@ -1,0 +1,237 @@
+/* ========================================
+   Grid Config Modal - Phase 2 Styles
+   Grid Settings Tab (Tab 4)
+   ======================================== */
+
+/* ── Grid Settings Tab Container ── */
+.grid-settings-tab {
+  padding: 1.5rem;
+  max-height: 600px;
+  overflow-y: auto;
+}
+
+/* ── Form Sections ── */
+.form-section {
+  margin-bottom: 2rem;
+  padding-bottom: 2rem;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.form-section:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+
+.form-section h3 {
+  font-size: 1rem;
+  font-weight: 600;
+  margin-bottom: 1rem;
+  color: #333;
+}
+
+/* ── Form Groups ── */
+.form-group {
+  margin-bottom: 1.5rem;
+}
+
+.form-group:last-child {
+  margin-bottom: 0;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-weight: 500;
+  font-size: 0.875rem;
+  color: #555;
+}
+
+.form-group select,
+.form-group input[type="number"] {
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 1rem;
+  transition: border-color 0.2s;
+}
+
+.form-group select:focus,
+.form-group input[type="number"]:focus {
+  outline: none;
+  border-color: #2196f3;
+  box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.2);
+}
+
+/* ── Checkbox Groups ── */
+.form-checkbox-group {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+  padding: 0.75rem;
+  background: #f9f9f9;
+  border-radius: 4px;
+  border: 1px solid #e8e8e8;
+}
+
+.form-checkbox-group label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0;
+  cursor: pointer;
+  font-weight: 500;
+  font-size: 0.875rem;
+  color: #444;
+}
+
+.form-checkbox-group input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+  accent-color: #2196f3;
+}
+
+/* ── Slider Styling ── */
+.form-slider {
+  width: 100%;
+  height: 6px;
+  border-radius: 3px;
+  background: #e0e0e0;
+  outline: none;
+  -webkit-appearance: none;
+  accent-color: #2196f3;
+}
+
+.form-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #2196f3;
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.form-slider::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #2196f3;
+  cursor: pointer;
+  border: none;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.slider-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.8rem;
+  color: #666;
+  margin-top: 0.5rem;
+}
+
+/* ── Value Display Badge ── */
+.value-display {
+  font-family: monospace;
+  background: #f0f0f0;
+  padding: 0.2rem 0.5rem;
+  border-radius: 3px;
+  font-size: 0.875rem;
+  margin-left: 0.5rem;
+}
+
+/* ── Help Text ── */
+.help-text {
+  font-size: 0.8rem;
+  color: #777;
+  margin-top: 0.4rem;
+  line-height: 1.4;
+}
+
+/* ── Theme Preview ── */
+.theme-preview {
+  margin-top: 1rem;
+}
+
+.preview-box {
+  width: 100%;
+  padding: 1.5rem;
+  border-radius: 4px;
+  text-align: center;
+  font-weight: 500;
+  font-size: 0.9rem;
+  transition: all 0.3s ease;
+}
+
+.preview-box--light {
+  background: #ffffff;
+  border: 1px solid #ddd;
+  color: #333;
+}
+
+.preview-box--dark {
+  background: #333333;
+  border: 1px solid #555;
+  color: #fff;
+}
+
+.preview-box--custom {
+  background: #f5f5f5;
+  border: 1px solid #999;
+  color: #333;
+}
+
+/* ── Frozen Columns Preview ── */
+.frozen-columns-preview {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 1rem;
+  padding: 0.75rem;
+  background: #f9f9f9;
+  border-radius: 4px;
+  flex-wrap: wrap;
+  font-size: 0.8rem;
+}
+
+.col-indicator {
+  padding: 0.4rem 0.6rem;
+  background: #e0e0e0;
+  border-radius: 3px;
+  transition: all 0.3s ease;
+  color: #555;
+}
+
+.col-indicator.frozen {
+  background: #4caf50;
+  color: white;
+  font-weight: 600;
+}
+
+/* ── Responsive ── */
+@media (max-width: 640px) {
+  .grid-settings-tab {
+    max-height: none;
+    padding: 1rem;
+  }
+
+  .form-checkbox-group {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .slider-labels {
+    font-size: 0.75rem;
+  }
+
+  .frozen-columns-preview {
+    flex-wrap: wrap;
+  }
+
+  .form-group select,
+  .form-group input[type="number"] {
+    font-size: 0.9rem;
+  }
+}

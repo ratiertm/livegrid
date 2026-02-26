@@ -1,0 +1,311 @@
+/* ========================================
+   LiveView Grid - Body (Rows, Cells, Selection, Editing)
+   ======================================== */
+
+/* 5. Body */
+.lv-grid__body {
+  max-height: 600px;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+/* Virtual Scroll Body - 고정 높이로 스크롤바 보장 */
+.lv-grid__body--virtual {
+  height: 600px;
+  overflow-y: scroll;
+  overflow-x: hidden;
+}
+
+.lv-grid__row {
+  display: flex;
+  border-bottom: 1px solid var(--lv-grid-border-light);
+  transition: background 0.2s ease;
+}
+
+.lv-grid__row:hover {
+  background: var(--lv-grid-hover);
+}
+
+.lv-grid__row--selected {
+  background: var(--lv-grid-selected);
+  border-left: 3px solid var(--lv-grid-primary);
+}
+
+.lv-grid__row--selected:hover {
+  background: var(--lv-grid-primary-light);
+}
+
+.lv-grid__cell {
+  padding: var(--lv-grid-space-2) var(--lv-grid-space-4);
+  min-height: var(--lv-grid-cell-min-h);
+
+  display: flex;
+  align-items: center;
+
+  font-size: var(--lv-grid-font-size-md);
+  color: var(--lv-grid-text-secondary);
+
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 5.5 Cell Editing */
+.lv-grid__cell-value {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  width: 100%;
+}
+
+.lv-grid__cell-value--editable {
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 2px;
+  transition: background 0.15s ease;
+  min-height: var(--lv-grid-cell-content-h);
+  display: inline-block;
+}
+
+.lv-grid__cell-value--editable:hover {
+  background: var(--lv-grid-warning-light);
+}
+
+.lv-grid__cell-editor {
+  width: 100%;
+  /* span과 동일 변수 참조 → 행 높이 변화 없음 (box-sizing: border-box 포함) */
+  height: var(--lv-grid-cell-content-h);
+  padding: 2px 4px;
+  border: 1px solid var(--lv-grid-primary);
+  border-radius: 2px;
+  font-size: var(--lv-grid-font-size-md);
+  font-family: var(--lv-grid-font-family);
+  color: var(--lv-grid-text);
+  background: var(--lv-grid-bg-input);
+  outline: none;
+  box-shadow: 0 0 0 1px rgba(33, 150, 243, 0.2);
+}
+
+.lv-grid__cell-editor:focus {
+  border-color: var(--lv-grid-primary-dark);
+  box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.3);
+}
+
+/* 5.5b Keyboard Navigation Focus */
+.lv-grid__cell--focused {
+  outline: 2px solid var(--lv-grid-primary);
+  outline-offset: -2px;
+  z-index: 1;
+  position: relative;
+}
+
+.lv-grid:focus {
+  outline: none;
+}
+
+/* 5.5c Cell Range Selection (F-940) */
+.lv-grid__cell--in-range {
+  background: var(--lv-grid-selected) !important;
+}
+
+.lv-grid__cell--range-top {
+  border-top: 2px solid var(--lv-grid-primary);
+}
+
+.lv-grid__cell--range-bottom {
+  border-bottom: 2px solid var(--lv-grid-primary);
+}
+
+.lv-grid__cell--range-left {
+  border-left: 2px solid var(--lv-grid-primary);
+}
+
+.lv-grid__cell--range-right {
+  border-right: 2px solid var(--lv-grid-primary);
+}
+
+.lv-grid__cell--focused.lv-grid__cell--in-range {
+  outline: 2px solid var(--lv-grid-primary-dark);
+  outline-offset: -2px;
+  z-index: 2;
+}
+
+.lv-grid--selecting {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+select.lv-grid__cell-editor {
+  appearance: auto;
+  cursor: pointer;
+  padding-right: 24px;
+}
+
+/* 5.6 Status Column */
+.lv-grid__cell--status {
+  justify-content: center;
+}
+
+.lv-grid__status-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--lv-grid-bg);
+  line-height: 1;
+}
+
+.lv-grid__status-badge--new {
+  background: var(--lv-grid-success);
+}
+
+.lv-grid__status-badge--updated {
+  background: var(--lv-grid-warning);
+}
+
+.lv-grid__status-badge--deleted {
+  background: var(--lv-grid-danger);
+}
+
+.lv-grid__status-toggle {
+  width: 20px;
+  height: 20px;
+  border: none;
+  background: transparent;
+  color: var(--lv-grid-text-muted);
+  font-size: 10px;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 3px;
+  transition: all 0.2s ease;
+}
+
+.lv-grid__status-toggle:hover {
+  background: var(--lv-grid-border);
+  color: var(--lv-grid-primary);
+}
+
+.lv-grid__status-toggle--active {
+  color: var(--lv-grid-success);
+  background: var(--lv-grid-success-light);
+}
+
+/* 5.7 Row Number Column (F-902) */
+.lv-grid__cell--row-number {
+  color: var(--lv-grid-text-muted);
+  font-size: var(--lv-grid-font-size-sm);
+  font-variant-numeric: tabular-nums;
+  user-select: none;
+}
+
+/* 5.7b Checkbox Column (F-905) */
+.lv-grid__cell-checkbox {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+}
+
+.lv-grid__cell-checkbox input[type="checkbox"] {
+  accent-color: var(--lv-grid-primary);
+}
+
+.lv-grid__cell-checkbox input[type="checkbox"]:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* 5.8 F-920 행 단위 편집 모드 */
+.lv-grid__row--editing {
+  background: var(--lv-grid-primary-light, #e3f2fd) !important;
+  box-shadow: inset 0 0 0 2px var(--lv-grid-primary, #1976d2);
+}
+
+.lv-grid__row-edit-btn {
+  background: none;
+  border: 1px solid var(--lv-grid-border, #e0e0e0);
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1;
+  padding: 2px 4px;
+  color: var(--lv-grid-text-secondary, #666);
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.lv-grid__row:hover .lv-grid__row-edit-btn {
+  opacity: 1;
+}
+
+.lv-grid__row-edit-btn:hover {
+  background: var(--lv-grid-primary-light, #e3f2fd);
+  color: var(--lv-grid-primary, #1976d2);
+  border-color: var(--lv-grid-primary, #1976d2);
+}
+
+.lv-grid__cell--row-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+
+.lv-grid__row-edit-save,
+.lv-grid__row-edit-cancel {
+  border: none;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  padding: 2px 8px;
+  line-height: 1.4;
+}
+
+.lv-grid__row-edit-save {
+  background: var(--lv-grid-primary, #1976d2);
+  color: white;
+}
+
+.lv-grid__row-edit-save:hover {
+  filter: brightness(1.1);
+}
+
+.lv-grid__row-edit-cancel {
+  background: var(--lv-grid-border, #e0e0e0);
+  color: var(--lv-grid-text, #333);
+}
+
+.lv-grid__row-edit-cancel:hover {
+  background: #ff5252;
+  color: white;
+}
+
+/* 5.9 Frozen Columns */
+.lv-grid__cell--frozen {
+  background: var(--lv-grid-bg);
+  box-shadow: 2px 0 4px rgba(0, 0, 0, 0.08);
+}
+
+.lv-grid__row:hover .lv-grid__cell--frozen {
+  background: var(--lv-grid-hover);
+}
+
+.lv-grid__row--selected .lv-grid__cell--frozen {
+  background: var(--lv-grid-selected);
+}
+
+/* 5.8 Deleted Row Style */
+.lv-grid__row--deleted {
+  opacity: 0.5;
+  text-decoration: line-through;
+  background: var(--lv-grid-danger-light);
+}

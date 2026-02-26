@@ -1,0 +1,104 @@
+/* ========================================
+   LiveView Grid - CSS Variables & Theme
+   ======================================== */
+
+/* 1. Variables - Light Theme (default) */
+:root,
+.lv-grid[data-theme="light"] {
+  /* ── 기본 색상 ── */
+  --lv-grid-primary: #2196f3;
+  --lv-grid-primary-dark: #1976d2;
+  --lv-grid-primary-light: #e3f2fd;
+  --lv-grid-bg: #ffffff;
+  --lv-grid-text: #333333;
+  --lv-grid-text-secondary: #555555;
+  --lv-grid-border: #e0e0e0;
+  --lv-grid-hover: #f5f5f5;
+  --lv-grid-selected: #e3f2fd;
+
+  /* ── 배경 계층 ── */
+  --lv-grid-bg-secondary: #fafafa;
+  --lv-grid-bg-tertiary: #f8f9fa;
+  --lv-grid-bg-input: #ffffff;
+
+  /* ── 텍스트 계층 ── */
+  --lv-grid-text-muted: #999999;
+  --lv-grid-text-disabled: #aaaaaa;
+  --lv-grid-text-placeholder: #666666;
+
+  /* ── 보더 계층 ── */
+  --lv-grid-border-light: #f0f0f0;
+  --lv-grid-border-input: #dddddd;
+
+  /* ── 시맨틱 색상 ── */
+  --lv-grid-danger: #f44336;
+  --lv-grid-danger-dark: #d32f2f;
+  --lv-grid-danger-light: #ffebee;
+  --lv-grid-danger-hover: #e53935;
+  --lv-grid-success: #4caf50;
+  --lv-grid-success-dark: #43a047;
+  --lv-grid-success-light: #e8f5e9;
+  --lv-grid-warning: #ff9800;
+  --lv-grid-warning-light: #fff3e0;
+  --lv-grid-warning-text: #f57f17;
+
+  /* ── 기타 ── */
+  --lv-grid-shadow: rgba(0, 0, 0, 0.08);
+  --lv-grid-overlay: rgba(0, 0, 0, 0.05);
+  --lv-grid-scrollbar-thumb: #bdbdbd;
+  --lv-grid-disabled-bg: #f5f5f5;
+
+  /* ── 스페이싱 ── */
+  --lv-grid-space-2: 8px;
+  --lv-grid-space-3: 12px;
+  --lv-grid-space-4: 16px;
+
+  /* ── 셀 ── */
+  --lv-grid-cell-content-h: 24px;            /* editable span & editor 공유 */
+  --lv-grid-cell-min-h: calc(var(--lv-grid-cell-content-h) + var(--lv-grid-space-2) * 2);
+
+  /* ── 폰트 ── */
+  --lv-grid-font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --lv-grid-font-size-sm: 13px;
+  --lv-grid-font-size-md: 14px;
+}
+
+/* 1.1 Dark Theme */
+.lv-grid[data-theme="dark"] {
+  --lv-grid-primary: #64b5f6;
+  --lv-grid-primary-dark: #42a5f5;
+  --lv-grid-primary-light: #1a2332;
+  --lv-grid-bg: #1e1e1e;
+  --lv-grid-text: #e0e0e0;
+  --lv-grid-text-secondary: #b0b0b0;
+  --lv-grid-border: #444444;
+  --lv-grid-hover: #2a2a2a;
+  --lv-grid-selected: #1a2332;
+
+  --lv-grid-bg-secondary: #252525;
+  --lv-grid-bg-tertiary: #2c2c2c;
+  --lv-grid-bg-input: #2a2a2a;
+
+  --lv-grid-text-muted: #888888;
+  --lv-grid-text-disabled: #666666;
+  --lv-grid-text-placeholder: #888888;
+
+  --lv-grid-border-light: #383838;
+  --lv-grid-border-input: #555555;
+
+  --lv-grid-danger: #ef5350;
+  --lv-grid-danger-dark: #e53935;
+  --lv-grid-danger-light: #3d1f1f;
+  --lv-grid-danger-hover: #f44336;
+  --lv-grid-success: #66bb6a;
+  --lv-grid-success-dark: #4caf50;
+  --lv-grid-success-light: #1b3a1b;
+  --lv-grid-warning: #ffa726;
+  --lv-grid-warning-light: #3d2e1a;
+  --lv-grid-warning-text: #ffa726;
+
+  --lv-grid-shadow: rgba(0, 0, 0, 0.3);
+  --lv-grid-overlay: rgba(255, 255, 255, 0.05);
+  --lv-grid-scrollbar-thumb: #555555;
+  --lv-grid-disabled-bg: #333333;
+}
