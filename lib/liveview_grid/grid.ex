@@ -76,6 +76,8 @@ defmodule LiveViewGrid.Grid do
 
   alias LiveViewGrid.{Grouping, Tree, Pivot}
 
+  @max_edit_history 50
+
   @type t :: %{
     id: String.t(),
     data: list(map()),
@@ -221,7 +223,8 @@ defmodule LiveViewGrid.Grid do
     searched = apply_global_search(data, state.global_search, columns)
     filtered = apply_filters(searched, state.filters, columns)
     advanced = apply_advanced_filters(filtered, state.advanced_filters, columns)
-    sorted = apply_sort(advanced, state.sort)
+    with_new = ensure_new_rows_included(advanced, data, state.row_statuses)
+    sorted = apply_sort(with_new, state.sort, columns)
 
     # v0.7: Grouping / Tree 적용 (pagination 전에)
     structured = apply_data_structuring(sorted, state)
@@ -243,7 +246,8 @@ defmodule LiveViewGrid.Grid do
     |> apply_global_search(state.global_search, columns)
     |> apply_filters(state.filters, columns)
     |> apply_advanced_filters(state.advanced_filters, columns)
-    |> apply_sort(state.sort)
+    |> ensure_new_rows_included(data, state.row_statuses)
+    |> apply_sort(state.sort, columns)
   end
 
   @doc """
@@ -266,6 +270,7 @@ defmodule LiveViewGrid.Grid do
       |> apply_global_search(state.global_search, columns)
       |> apply_filters(state.filters, columns)
       |> apply_advanced_filters(Map.get(state, :advanced_filters, %{logic: :and, conditions: []}), columns)
+      |> ensure_new_rows_included(data, state.row_statuses)
       |> length()
     else
       length(data)
@@ -562,12 +567,415 @@ defmodule LiveViewGrid.Grid do
     end)
   end
 
-  # 다음 임시 ID를 생성합니다. (음수로 자동 감소)
-  defp next_temp_id(grid) do
+  # ── F-700: Undo/Redo API ──
+
+  @doc """
+  편집 기록을 히스토리에 추가합니다. redo_stack은 초기화됩니다.
+  최대 #{@max_edit_history}건까지 보관합니다.
+
+  ## 액션 타입
+      {:update_cell, row_id, field, old_value, new_value}
+      {:update_row, row_id, %{field => old_value, ...}, %{field => new_value, ...}}
+  """
+  @spec push_edit_history(grid :: t(), action :: tuple()) :: t()
+  def push_edit_history(grid, action) do
+    history = [action | grid.state.edit_history]
+      |> Enum.take(@max_edit_history)
+
+    grid
+    |> put_in([:state, :edit_history], history)
+    |> put_in([:state, :redo_stack], [])
+  end
+
+  @doc "마지막 편집을 되돌립니다. 히스토리가 비어있으면 그대로 반환합니다."
+  @spec undo(grid :: t()) :: t()
+  def undo(grid) do
+    case grid.state.edit_history do
+      [] -> grid
+      [action | rest] ->
+        grid
+        |> apply_undo_action(action)
+        |> put_in([:state, :edit_history], rest)
+        |> put_in([:state, :redo_stack], [action | grid.state.redo_stack])
+    end
+  end
+
+  @doc "되돌린 편집을 다시 적용합니다. redo_stack이 비어있으면 그대로 반환합니다."
+  @spec redo(grid :: t()) :: t()
+  def redo(grid) do
+    case grid.state.redo_stack do
+      [] -> grid
+      [action | rest] ->
+        grid
+        |> apply_redo_action(action)
+        |> put_in([:state, :redo_stack], rest)
+        |> put_in([:state, :edit_history], [action | grid.state.edit_history])
+    end
+  end
+
+  @doc "되돌리기 가능 여부를 확인합니다."
+  @spec can_undo?(grid :: t()) :: boolean()
+  def can_undo?(grid), do: grid.state.edit_history != []
+
+  @doc "다시하기 가능 여부를 확인합니다."
+  @spec can_redo?(grid :: t()) :: boolean()
+  def can_redo?(grid), do: grid.state.redo_stack != []
+
+  @doc """
+  Grid-level settings (options)를 Grid 구조체에 적용합니다.
+
+  ConfigModal의 Tab 4 (Grid Settings)에서 전달받은 옵션 변경 사항을 검증하고
+  Grid.options에 병합합니다.
+
+  - page_size: 1 ~ 1000 (정수)
+  - theme: "light" | "dark" | "custom"
+  - virtual_scroll: boolean
+  - row_height: 32 ~ 80 (픽셀)
+  - frozen_columns: 0 ~ 컬럼 수
+  - show_row_number: boolean
+  - show_header: boolean
+  - show_footer: boolean
+  - debug_mode: boolean
+
+  ## Examples
+
+      iex> Grid.apply_grid_settings(grid, %{"page_size" => 50, "theme" => "dark"})
+      {:ok, %Grid{options: %{page_size: 50, theme: "dark", ...}}}
+
+      iex> Grid.apply_grid_settings(grid, %{"page_size" => 9999})
+      {:error, "Invalid page_size: must be between 1 and 1000"}
+
+  """
+  @spec apply_grid_settings(grid :: t(), options_changes :: map()) ::
+          {:ok, t()} | {:error, String.t()}
+  def apply_grid_settings(grid, options_changes) when is_map(options_changes) do
+    normalized = normalize_option_keys(options_changes)
+
+    case validate_grid_options(normalized, grid) do
+      :ok ->
+        new_options = Map.merge(grid.options, normalized)
+        {:ok, %{grid | options: new_options}}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
+  def apply_grid_settings(_grid, nil), do: {:error, "options_changes must be a map"}
+
+  # option key 문자열을 atom으로 정규화
+  defp normalize_option_keys(options) when is_map(options) do
+    Map.new(options, fn {k, v} ->
+      key = if is_binary(k), do: String.to_atom(k), else: k
+      {key, v}
+    end)
+  end
+
+  # 각 옵션 값을 검증 (유효하지 않으면 {:error, reason} 반환)
+  defp validate_grid_options(options, grid) do
+    try do
+      Enum.each(options, fn {key, value} ->
+        case key do
+          :page_size ->
+            unless is_integer(value) and value > 0 and value <= 1000 do
+              raise "Invalid page_size: must be between 1 and 1000"
+            end
+
+          :theme ->
+            unless is_binary(value) and value in ["light", "dark", "custom"] do
+              raise "Invalid theme: must be 'light', 'dark', or 'custom'"
+            end
+
+          :virtual_scroll ->
+            unless is_boolean(value) do
+              raise "Invalid virtual_scroll: must be boolean"
+            end
+
+          :row_height ->
+            unless is_integer(value) and value >= 32 and value <= 80 do
+              raise "Invalid row_height: must be between 32 and 80 pixels"
+            end
+
+          :frozen_columns ->
+            max_cols = length(grid.columns)
+
+            unless is_integer(value) and value >= 0 and value <= max_cols do
+              raise "Invalid frozen_columns: must be between 0 and #{max_cols}"
+            end
+
+          :show_row_number ->
+            unless is_boolean(value) do
+              raise "Invalid show_row_number: must be boolean"
+            end
+
+          :show_header ->
+            unless is_boolean(value) do
+              raise "Invalid show_header: must be boolean"
+            end
+
+          :show_footer ->
+            unless is_boolean(value) do
+              raise "Invalid show_footer: must be boolean"
+            end
+
+          :debug_mode ->
+            unless is_boolean(value) do
+              raise "Invalid debug_mode: must be boolean"
+            end
+
+          _ ->
+            # 알 수 없는 키는 무시 (하위 호환성)
+            :ok
+        end
+      end)
+
+      :ok
+    rescue
+      e in RuntimeError -> {:error, e.message}
+    end
+  end
+
+  @doc """
+  사용자가 설정한 컬럼 설정 변경 사항을 Grid에 적용합니다.
+
+  Config Modal에서 전달받은 설정 변경 사항을 검증하고 Grid에 적용합니다.
+  - 컬럼 속성 변경 (label, width, align, sortable, filterable, editable)
+  - 포매터 및 검증자 설정
+  - 컬럼 표시/숨김 및 순서 변경
+
+  ## Examples
+
+      iex> config_changes = %{
+      ...>   "columns" => [
+      ...>     %{"field" => "name", "label" => "이름", "width" => 200}
+      ...>   ],
+      ...>   "column_order" => [:name, :email]
+      ...> }
+      iex> Grid.apply_config_changes(grid, config_changes)
+      %{...}
+  """
+  @spec apply_config_changes(grid :: t(), config_changes :: map()) :: t()
+  def apply_config_changes(grid, config_changes) do
+    config_changes = normalize_config_changes(config_changes)
+    validate_columns!(config_changes, grid)
+
+    new_columns = update_columns(grid.columns, config_changes)
+    new_columns = apply_column_visibility_and_order(new_columns, config_changes)
+
+    %{grid | columns: new_columns}
+  end
+
+  # Config 변경 사항 정규화 (문자열 키를 기존 형식으로 변환)
+  defp normalize_config_changes(config_changes) when is_map(config_changes) do
+    config_changes
+    |> Enum.reduce(%{}, fn
+      {"columns", columns}, acc when is_list(columns) ->
+        normalized_columns =
+          columns
+          |> Enum.map(&normalize_column_config/1)
+        Map.put(acc, :columns, normalized_columns)
+
+      {"column_order", order}, acc when is_list(order) ->
+        # 문자열을 atom으로 변환
+        normalized_order = Enum.map(order, fn
+          field when is_atom(field) -> field
+          field when is_binary(field) -> String.to_atom(field)
+        end)
+        Map.put(acc, :column_order, normalized_order)
+
+      {"hidden_columns", hidden}, acc when is_list(hidden) ->
+        normalized_hidden = Enum.map(hidden, fn
+          field when is_atom(field) -> field
+          field when is_binary(field) -> String.to_atom(field)
+        end)
+        Map.put(acc, :hidden_columns, normalized_hidden)
+
+      {key, value}, acc ->
+        # 알려지지 않은 키는 그대로 유지
+        Map.put(acc, String.to_atom(key), value)
+    end)
+  end
+
+  # 개별 컬럼 설정 정규화
+  defp normalize_column_config(column) when is_map(column) do
+    Enum.reduce(column, %{}, fn
+      {"field", field}, acc ->
+        field = if is_atom(field), do: field, else: String.to_atom(field)
+        Map.put(acc, :field, field)
+
+      {"label", label}, acc ->
+        Map.put(acc, :label, label)
+
+      {"width", width}, acc when is_integer(width) ->
+        Map.put(acc, :width, width)
+
+      {"align", align}, acc ->
+        align = if is_atom(align), do: align, else: String.to_atom(align)
+        Map.put(acc, :align, align)
+
+      {"sortable", sortable}, acc when is_boolean(sortable) ->
+        Map.put(acc, :sortable, sortable)
+
+      {"filterable", filterable}, acc when is_boolean(filterable) ->
+        Map.put(acc, :filterable, filterable)
+
+      {"editable", editable}, acc when is_boolean(editable) ->
+        Map.put(acc, :editable, editable)
+
+      {"formatter", formatter}, acc ->
+        formatter = if is_atom(formatter), do: formatter, else: String.to_atom(formatter)
+        Map.put(acc, :formatter, formatter)
+
+      {"formatter_options", options}, acc when is_map(options) ->
+        Map.put(acc, :formatter_options, options)
+
+      {"validators", validators}, acc when is_list(validators) ->
+        Map.put(acc, :validators, validators)
+
+      {_key, _value}, acc ->
+        acc
+    end)
+  end
+
+  # 컬럼 존재 여부 및 유효성 검증
+  defp validate_columns!(config_changes, grid) do
+    case Map.get(config_changes, :columns) do
+      nil ->
+        :ok
+
+      columns when is_list(columns) ->
+        grid_fields = Enum.map(grid.columns, & &1.field)
+
+        Enum.each(columns, fn column ->
+          field = Map.get(column, :field)
+
+          unless field && Enum.member?(grid_fields, field) do
+            raise "컬럼 필드가 존재하지 않습니다: #{inspect(field)}"
+          end
+        end)
+    end
+  end
+
+  # Grid의 컬럼 속성 업데이트
+  defp update_columns(columns, config_changes) do
+    case Map.get(config_changes, :columns) do
+      nil ->
+        columns
+
+      config_columns when is_list(config_columns) ->
+        # 각 컬럼의 설정을 맵으로 변환 (field -> config)
+        config_map = Map.new(config_columns, &{&1.field, &1})
+
+        Enum.map(columns, fn column ->
+          case Map.get(config_map, column.field) do
+            nil ->
+              column
+
+            config ->
+              # 설정에서 주어진 속성만 업데이트
+              column
+              |> update_if_present(config, :label)
+              |> update_if_present(config, :width)
+              |> update_if_present(config, :align)
+              |> update_if_present(config, :sortable)
+              |> update_if_present(config, :filterable)
+              |> update_if_present(config, :editable)
+              |> update_if_present(config, :formatter)
+              |> update_if_present(config, :formatter_options)
+              |> update_if_present(config, :validators)
+          end
+        end)
+    end
+  end
+
+  # 컬럼 속성이 설정에 존재하면 업데이트 (없으면 유지)
+  defp update_if_present(column, config, key) do
+    case Map.get(config, key) do
+      nil -> column
+      value -> Map.put(column, key, value)
+    end
+  end
+
+  # 컬럼 표시/숨김 및 순서 적용
+  defp apply_column_visibility_and_order(columns, config_changes) do
+    # column_order가 있으면 그 순서대로 컬럼을 정렬
+    case Map.get(config_changes, :column_order) do
+      nil ->
+        columns
+
+      order when is_list(order) ->
+        # order에 포함된 필드만 표시, 포함되지 않은 필드는 숨김
+        field_to_column = Map.new(columns, &{&1.field, &1})
+
+        Enum.map(order, fn field ->
+          Map.get(field_to_column, field)
+        end)
+        |> Enum.reject(&is_nil/1)
+    end
+  end
+
+  # Undo: 이전 값으로 복원 (히스토리 추가 없이 데이터만 변경)
+  defp apply_undo_action(grid, {:update_cell, row_id, field, old_value, _new_value}) do
+    update_cell_data_only(grid, row_id, field, old_value)
+  end
+  defp apply_undo_action(grid, {:update_row, row_id, old_values, _new_values}) do
+    Enum.reduce(old_values, grid, fn {field, value}, acc ->
+      update_cell_data_only(acc, row_id, field, value)
+    end)
+  end
+  defp apply_undo_action(grid, {:insert_row, row_id, _row_data}) do
+    updated_data = Enum.reject(grid.data, fn row -> row.id == row_id end)
+    %{grid | data: updated_data}
+    |> put_in([:state, :row_statuses], Map.delete(grid.state.row_statuses, row_id))
+    |> put_in([:state, :pagination, :total_rows], length(updated_data))
+  end
+
+  # Redo: 새 값으로 재적용 (히스토리 추가 없이 데이터만 변경)
+  defp apply_redo_action(grid, {:update_cell, row_id, field, _old_value, new_value}) do
+    update_cell_data_only(grid, row_id, field, new_value)
+  end
+  defp apply_redo_action(grid, {:update_row, row_id, _old_values, new_values}) do
+    Enum.reduce(new_values, grid, fn {field, value}, acc ->
+      update_cell_data_only(acc, row_id, field, value)
+    end)
+  end
+  defp apply_redo_action(grid, {:insert_row, row_id, row_data}) do
+    updated_data = grid.data ++ [row_data]
+    %{grid | data: updated_data}
+    |> put_in([:state, :row_statuses], Map.put(grid.state.row_statuses, row_id, :new))
+    |> put_in([:state, :pagination, :total_rows], length(updated_data))
+  end
+
+  # 데이터만 업데이트 (row_statuses, edit_history 변경 없이)
+  defp update_cell_data_only(grid, row_id, field, value) do
+    updated_data = Enum.map(grid.data, fn row ->
+      if row.id == row_id, do: Map.put(row, field, value), else: row
+    end)
+    %{grid | data: updated_data}
+  end
+
+  @doc """
+  다음 임시 ID를 생성합니다. (음수로 자동 감소)
+  """
+  def next_temp_id(grid) do
     existing_ids = Enum.map(grid.data, & &1.id)
     min_id = Enum.min(existing_ids, fn -> 0 end)
     if min_id > 0, do: -1, else: min_id - 1
   end
+
+  # ── F-940: Cell Range Selection ──
+
+  @doc """
+  셀 범위 선택을 설정합니다.
+  range는 %{anchor_row_id, anchor_col_idx, extent_row_id, extent_col_idx} 맵입니다.
+  """
+  @spec set_cell_range(t(), map() | nil) :: t()
+  def set_cell_range(grid, nil), do: put_in(grid.state.cell_range, nil)
+  def set_cell_range(grid, range) when is_map(range), do: put_in(grid.state.cell_range, range)
+
+  @doc "셀 범위 선택을 해제합니다."
+  @spec clear_cell_range(t()) :: t()
+  def clear_cell_range(grid), do: put_in(grid.state.cell_range, nil)
 
   # Private functions
 
@@ -586,9 +994,13 @@ defmodule LiveViewGrid.Grid do
         editor_type: :text,
         editor_options: [],
         validators: [],
+        input_pattern: nil,
         renderer: nil,
         formatter: nil,
-        align: :left
+        align: :left,
+        style_expr: nil,
+        header_group: nil,
+        nulls: :last
       }, col)
     end)
   end
@@ -611,6 +1023,7 @@ defmodule LiveViewGrid.Grid do
       },
       scroll_offset: 0,
       editing: nil,
+      editing_row: nil,
       row_statuses: %{},
       cell_errors: %{},
       show_status_column: true,
@@ -625,7 +1038,12 @@ defmodule LiveViewGrid.Grid do
       tree_parent_field: :parent_id,
       tree_expanded: %{},
       # v0.7: Pivot Table
-      pivot_config: nil
+      pivot_config: nil,
+      # F-700: Undo/Redo
+      edit_history: [],
+      redo_stack: [],
+      # F-940: Cell Range Selection
+      cell_range: nil
     }
   end
 
@@ -639,8 +1057,29 @@ defmodule LiveViewGrid.Grid do
       row_height: 40,
       frozen_columns: 0,
       debug: false,
-      theme: "light"
+      theme: "light",
+      show_row_number: false
     }, options)
+  end
+
+  # F-800-INSERT(B): :new 행이 필터에 걸려 사라지지 않도록 보장
+  defp ensure_new_rows_included(filtered_data, original_data, row_statuses) do
+    new_ids = for {id, :new} <- row_statuses, into: MapSet.new(), do: id
+
+    if MapSet.size(new_ids) == 0 do
+      filtered_data
+    else
+      filtered_ids = MapSet.new(Enum.map(filtered_data, & &1.id))
+      missing_new_ids = MapSet.difference(new_ids, filtered_ids)
+
+      if MapSet.size(missing_new_ids) == 0 do
+        filtered_data
+      else
+        Enum.filter(original_data, fn r ->
+          MapSet.member?(filtered_ids, r.id) or MapSet.member?(missing_new_ids, r.id)
+        end)
+      end
+    end
   end
 
   defp apply_global_search(data, "", _columns), do: data
@@ -660,9 +1099,13 @@ defmodule LiveViewGrid.Grid do
   end
   defp apply_advanced_filters(data, _, _columns), do: data
 
-  defp apply_sort(data, nil), do: data
-  defp apply_sort(data, %{field: field, direction: direction}) do
-    LiveViewGrid.Sorting.sort(data, field, direction)
+  defp apply_sort(data, nil, _columns), do: data
+  defp apply_sort(data, %{field: field, direction: direction}, columns) do
+    nulls_position = case Enum.find(columns, fn c -> c.field == field end) do
+      %{nulls: pos} -> pos
+      _ -> :last
+    end
+    LiveViewGrid.Sorting.sort(data, field, direction, nulls_position)
   end
 
   defp apply_pagination(data, pagination, page_size) do
