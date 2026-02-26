@@ -1036,4 +1036,296 @@ defmodule LiveViewGrid.GridTest do
       assert grid.state.column_order == nil
     end
   end
+
+  # ── Grid Configuration (apply_config_changes/2) ──
+
+  describe "apply_config_changes/2" do
+    setup do
+      data = [
+        %{id: 1, name: "Alice", salary: 5000, department: "Engineering"},
+        %{id: 2, name: "Bob", salary: 4500, department: "Sales"}
+      ]
+
+      columns = [
+        %{field: :name, label: "Name", width: 120, align: :left, sortable: true, editable: true},
+        %{field: :salary, label: "Salary", width: 100, align: :right, sortable: true},
+        %{field: :department, label: "Department", width: 120, align: :left}
+      ]
+
+      grid = Grid.new(data: data, columns: columns)
+      %{grid: grid}
+    end
+
+    test "changes column label", %{grid: grid} do
+      config = %{
+        "columns" => [%{"field" => "name", "label" => "Full Name"}]
+      }
+
+      updated = Grid.apply_config_changes(grid, config)
+      name_col = Enum.find(updated.columns, &(&1.field == :name))
+      assert name_col.label == "Full Name"
+    end
+
+    test "changes column width", %{grid: grid} do
+      config = %{
+        "columns" => [%{"field" => "salary", "width" => 200}]
+      }
+
+      updated = Grid.apply_config_changes(grid, config)
+      salary_col = Enum.find(updated.columns, &(&1.field == :salary))
+      assert salary_col.width == 200
+    end
+
+    test "changes column alignment", %{grid: grid} do
+      config = %{
+        "columns" => [%{"field" => "name", "align" => "center"}]
+      }
+
+      updated = Grid.apply_config_changes(grid, config)
+      name_col = Enum.find(updated.columns, &(&1.field == :name))
+      assert name_col.align == :center
+    end
+
+    test "changes sortable flag", %{grid: grid} do
+      config = %{
+        "columns" => [%{"field" => "salary", "sortable" => false}]
+      }
+
+      updated = Grid.apply_config_changes(grid, config)
+      salary_col = Enum.find(updated.columns, &(&1.field == :salary))
+      assert salary_col.sortable == false
+    end
+
+    test "changes editable flag", %{grid: grid} do
+      config = %{
+        "columns" => [%{"field" => "department", "editable" => true}]
+      }
+
+      updated = Grid.apply_config_changes(grid, config)
+      dept_col = Enum.find(updated.columns, &(&1.field == :department))
+      assert dept_col.editable == true
+    end
+
+    test "reorders columns via column_order", %{grid: grid} do
+      config = %{
+        "column_order" => ["department", "salary", "name"]
+      }
+
+      updated = Grid.apply_config_changes(grid, config)
+      fields = Enum.map(updated.columns, & &1.field)
+      assert fields == [:department, :salary, :name]
+    end
+
+    test "applies multiple column changes at once", %{grid: grid} do
+      config = %{
+        "columns" => [
+          %{"field" => "name", "label" => "Employee", "width" => 200},
+          %{"field" => "salary", "align" => "center", "sortable" => false}
+        ]
+      }
+
+      updated = Grid.apply_config_changes(grid, config)
+      name_col = Enum.find(updated.columns, &(&1.field == :name))
+      salary_col = Enum.find(updated.columns, &(&1.field == :salary))
+
+      assert name_col.label == "Employee"
+      assert name_col.width == 200
+      assert salary_col.align == :center
+      assert salary_col.sortable == false
+    end
+
+    test "unchanged columns retain their original values", %{grid: grid} do
+      config = %{
+        "columns" => [%{"field" => "name", "label" => "Changed"}]
+      }
+
+      updated = Grid.apply_config_changes(grid, config)
+      dept_col = Enum.find(updated.columns, &(&1.field == :department))
+      assert dept_col.label == "Department"
+      assert dept_col.width == 120
+    end
+
+    test "returns grid unchanged when no columns key", %{grid: grid} do
+      config = %{}
+      updated = Grid.apply_config_changes(grid, config)
+      assert updated.columns == grid.columns
+    end
+
+    test "raises on invalid column field", %{grid: grid} do
+      config = %{
+        "columns" => [%{"field" => "nonexistent", "label" => "Ghost"}]
+      }
+
+      assert_raise RuntimeError, fn ->
+        Grid.apply_config_changes(grid, config)
+      end
+    end
+
+    test "changes formatter for a column", %{grid: grid} do
+      config = %{
+        "columns" => [%{"field" => "salary", "formatter" => "currency"}]
+      }
+
+      updated = Grid.apply_config_changes(grid, config)
+      salary_col = Enum.find(updated.columns, &(&1.field == :salary))
+      assert salary_col.formatter == :currency
+    end
+
+    test "changes filterable flag", %{grid: grid} do
+      config = %{
+        "columns" => [%{"field" => "name", "filterable" => true}]
+      }
+
+      updated = Grid.apply_config_changes(grid, config)
+      name_col = Enum.find(updated.columns, &(&1.field == :name))
+      assert name_col.filterable == true
+    end
+
+    test "data remains unchanged after config apply", %{grid: grid} do
+      config = %{
+        "columns" => [%{"field" => "name", "label" => "New Label"}]
+      }
+
+      updated = Grid.apply_config_changes(grid, config)
+      assert updated.data == grid.data
+    end
+  end
+
+  # ── Grid Settings (apply_grid_settings/2) ──
+
+  describe "apply_grid_settings/2" do
+    setup do
+      data = [
+        %{id: 1, name: "Alice", salary: 5000},
+        %{id: 2, name: "Bob", salary: 4500}
+      ]
+
+      columns = [
+        %{field: :name, label: "Name", width: 120, align: :left, sortable: true},
+        %{field: :salary, label: "Salary", width: 100, align: :right, sortable: true}
+      ]
+
+      grid = Grid.new(data: data, columns: columns)
+      %{grid: grid}
+    end
+
+    test "applies valid page_size", %{grid: grid} do
+      {:ok, new_grid} = Grid.apply_grid_settings(grid, %{"page_size" => 50})
+      assert new_grid.options.page_size == 50
+    end
+
+    test "applies valid theme dark", %{grid: grid} do
+      {:ok, new_grid} = Grid.apply_grid_settings(grid, %{"theme" => "dark"})
+      assert new_grid.options.theme == "dark"
+    end
+
+    test "applies valid theme light", %{grid: grid} do
+      {:ok, new_grid} = Grid.apply_grid_settings(grid, %{"theme" => "light"})
+      assert new_grid.options.theme == "light"
+    end
+
+    test "applies valid theme custom", %{grid: grid} do
+      {:ok, new_grid} = Grid.apply_grid_settings(grid, %{"theme" => "custom"})
+      assert new_grid.options.theme == "custom"
+    end
+
+    test "applies virtual_scroll toggle", %{grid: grid} do
+      {:ok, new_grid} = Grid.apply_grid_settings(grid, %{"virtual_scroll" => true})
+      assert new_grid.options.virtual_scroll == true
+    end
+
+    test "applies valid row_height", %{grid: grid} do
+      {:ok, new_grid} = Grid.apply_grid_settings(grid, %{"row_height" => 55})
+      assert new_grid.options.row_height == 55
+    end
+
+    test "applies valid frozen_columns", %{grid: grid} do
+      {:ok, new_grid} = Grid.apply_grid_settings(grid, %{"frozen_columns" => 1})
+      assert new_grid.options.frozen_columns == 1
+    end
+
+    test "applies show_row_number boolean", %{grid: grid} do
+      {:ok, new_grid} = Grid.apply_grid_settings(grid, %{"show_row_number" => false})
+      assert new_grid.options.show_row_number == false
+    end
+
+    test "applies show_header boolean", %{grid: grid} do
+      {:ok, new_grid} = Grid.apply_grid_settings(grid, %{"show_header" => false})
+      assert new_grid.options.show_header == false
+    end
+
+    test "applies show_footer boolean", %{grid: grid} do
+      {:ok, new_grid} = Grid.apply_grid_settings(grid, %{"show_footer" => true})
+      assert new_grid.options.show_footer == true
+    end
+
+    test "applies multiple options at once", %{grid: grid} do
+      changes = %{
+        "page_size" => 25,
+        "theme" => "dark",
+        "row_height" => 50,
+        "virtual_scroll" => true
+      }
+
+      {:ok, new_grid} = Grid.apply_grid_settings(grid, changes)
+      assert new_grid.options.page_size == 25
+      assert new_grid.options.theme == "dark"
+      assert new_grid.options.row_height == 50
+      assert new_grid.options.virtual_scroll == true
+    end
+
+    test "accepts atom keys as well as string keys", %{grid: grid} do
+      {:ok, new_grid} = Grid.apply_grid_settings(grid, %{page_size: 100})
+      assert new_grid.options.page_size == 100
+    end
+
+    test "validates page_size upper bound", %{grid: grid} do
+      {:error, reason} = Grid.apply_grid_settings(grid, %{"page_size" => 2000})
+      assert String.contains?(reason, "page_size")
+    end
+
+    test "validates page_size lower bound (zero)", %{grid: grid} do
+      {:error, reason} = Grid.apply_grid_settings(grid, %{"page_size" => 0})
+      assert String.contains?(reason, "page_size")
+    end
+
+    test "validates row_height upper bound", %{grid: grid} do
+      {:error, reason} = Grid.apply_grid_settings(grid, %{"row_height" => 100})
+      assert String.contains?(reason, "row_height")
+    end
+
+    test "validates row_height lower bound", %{grid: grid} do
+      {:error, reason} = Grid.apply_grid_settings(grid, %{"row_height" => 10})
+      assert String.contains?(reason, "row_height")
+    end
+
+    test "validates invalid theme value", %{grid: grid} do
+      {:error, reason} = Grid.apply_grid_settings(grid, %{"theme" => "purple"})
+      assert String.contains?(reason, "theme")
+    end
+
+    test "validates frozen_columns upper bound (exceeds column count)", %{grid: grid} do
+      {:error, reason} = Grid.apply_grid_settings(grid, %{"frozen_columns" => 99})
+      assert String.contains?(reason, "frozen_columns")
+    end
+
+    test "validates frozen_columns lower bound (negative)", %{grid: grid} do
+      {:error, reason} = Grid.apply_grid_settings(grid, %{"frozen_columns" => -1})
+      assert String.contains?(reason, "frozen_columns")
+    end
+
+    test "ignores unknown option keys without error", %{grid: grid} do
+      {:ok, _new_grid} = Grid.apply_grid_settings(grid, %{"unknown_option" => "value"})
+    end
+
+    test "returns error for nil options_changes", %{grid: grid} do
+      {:error, _reason} = Grid.apply_grid_settings(grid, nil)
+    end
+
+    test "preserves existing options not in changes", %{grid: grid} do
+      original_show_header = grid.options.show_header
+      {:ok, new_grid} = Grid.apply_grid_settings(grid, %{"page_size" => 50})
+      assert new_grid.options.show_header == original_show_header
+    end
+  end
 end
