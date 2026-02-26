@@ -18,43 +18,22 @@ defmodule LiveviewGridWeb.GridComponent do
   - `id` - 컴포넌트 고유 ID (보통 `@grid.id`)
   - `grid` - `LiveViewGrid.Grid.new/1`로 생성한 Grid 맵 (또는 `data` + `columns` 개별 전달)
 
-  ## 개별 Assigns (grid 대신 사용 가능)
+  ## 모듈 구조
 
-  - `data` - 행 데이터 리스트 `[%{id: 1, name: "Alice"}, ...]`
-  - `columns` - 컬럼 정의 리스트
-  - `options` - Grid 옵션 맵
-  - `data_source` - DataSource 튜플 (선택)
-
-  ## 지원 이벤트
-
-  GridComponent는 다음 이벤트를 내부적으로 처리합니다:
-
-  - `sort` - 컬럼 헤더 클릭 정렬
-  - `filter` - 컬럼 필터 입력
-  - `global_search` - 전체 검색
-  - `change_page` / `change_page_size` - 페이지네이션
-  - `select_row` / `toggle_select_all` - 행 선택
-  - `start_edit` / `save_edit` / `cancel_edit` - 인라인 셀 편집
-  - `add_row` / `delete_selected` / `save_changes` / `cancel_changes` - CRUD
-  - `export` - Excel/CSV 내보내기
-  - `scroll` - Virtual Scroll
-  - `resize_column` / `reorder_column` - 컬럼 리사이즈/리오더
-  - `toggle_group` - 그룹 expand/collapse
-  - `toggle_tree_node` - 트리 노드 expand/collapse
-
-  ## 부모 LiveView로의 이벤트 전파
-
-  CRUD 작업 시 `send(self(), {:grid_save, changes})` 등으로
-  부모에게 알림을 보냅니다. 부모 LiveView에서 `handle_info/2`로 수신합니다.
+  - `GridComponent` (이 파일) — mount, update, render, handle_event 디스패치
+  - `GridComponent.EventHandlers` — 이벤트 핸들러 비즈니스 로직
+  - `GridComponent.RenderHelpers` — 렌더링 헬퍼 함수
   """
-  
+
   use Phoenix.LiveComponent
-  
-  alias LiveViewGrid.{Grid, Export, Formatter, Pagination}
+
+  alias LiveViewGrid.{Grid, Pagination}
+  alias LiveviewGridWeb.GridComponent.EventHandlers
+  import LiveviewGridWeb.GridComponent.RenderHelpers
 
   @impl true
   def mount(socket) do
-    {:ok, socket}
+    {:ok, assign(socket, :show_config_modal, false)}
   end
 
   @impl true
@@ -67,7 +46,6 @@ defmodule LiveviewGridWeb.GridComponent do
       old_virtual = old_grid.options.virtual_scroll
       new_virtual = Map.get(new_options, :virtual_scroll, old_virtual)
 
-      # 이후 업데이트: 기존 state(scroll_offset, sort, selection) 보존
       updated = Grid.update_data(
         old_grid,
         assigns.data,
@@ -75,7 +53,6 @@ defmodule LiveviewGridWeb.GridComponent do
         new_options
       )
 
-      # data_source 모드: 보존 + refresh로 total_rows 재설정
       updated = if data_source do
         updated
         |> Map.put(:data_source, data_source)
@@ -84,14 +61,12 @@ defmodule LiveviewGridWeb.GridComponent do
         updated
       end
 
-      # virtual_scroll 옵션이 변경되었으면 scroll_offset 리셋
       if old_virtual != new_virtual do
         {put_in(updated.state.scroll_offset, 0), true}
       else
         {updated, false}
       end
     else
-      # 첫 마운트: 새 Grid 생성
       grid_opts = [
         data: assigns.data,
         columns: assigns.columns,
@@ -101,7 +76,6 @@ defmodule LiveviewGridWeb.GridComponent do
 
       grid = Grid.new(grid_opts)
 
-      # InMemory일 때는 data 기반 total_rows, DataSource일 때는 fetch가 이미 설정
       grid = if data_source do
         grid
       else
@@ -111,12 +85,10 @@ defmodule LiveviewGridWeb.GridComponent do
       {grid, false}
     end
 
-    # v0.7: options에서 group_by, tree_mode 등을 state에 반영
-    grid = apply_v07_options(grid, new_options)
+    grid = EventHandlers.apply_v07_options(grid, new_options)
 
     socket = assign(socket, grid: grid)
 
-    # export_menu_open 초기화 (첫 마운트 시)
     socket =
       if Map.has_key?(socket.assigns, :export_menu_open) do
         socket
@@ -124,7 +96,13 @@ defmodule LiveviewGridWeb.GridComponent do
         assign(socket, export_menu_open: nil)
       end
 
-    # virtual scroll 전환 시 JS 스크롤 리셋
+    socket =
+      if Map.has_key?(socket.assigns, :context_menu) do
+        socket
+      else
+        assign(socket, context_menu: nil)
+      end
+
     socket = if virtual_changed? do
       push_event(socket, "reset_virtual_scroll", %{})
     else
@@ -134,691 +112,303 @@ defmodule LiveviewGridWeb.GridComponent do
     {:ok, socket}
   end
 
+  # ── Event Handler Dispatch ──
+  # 모든 비즈니스 로직은 EventHandlers 모듈에 위임
+
   @impl true
-  def handle_event("grid_sort", %{"field" => field, "direction" => direction}, socket) do
-    grid = socket.assigns.grid
-    field_atom = String.to_atom(field)
-    direction_atom = String.to_atom(direction)
+  def handle_event("grid_sort", params, socket),
+    do: EventHandlers.handle_sort(params, socket)
 
-    # 정렬 상태 업데이트 + 스크롤 위치 리셋
-    updated_grid = grid
-      |> put_in([:state, :sort], %{field: field_atom, direction: direction_atom})
-      |> put_in([:state, :scroll_offset], 0)
+  @impl true
+  def handle_event("grid_page_change", params, socket),
+    do: EventHandlers.handle_page_change(params, socket)
 
-    {:noreply,
-      socket
-      |> assign(grid: updated_grid)
-      |> push_event("reset_virtual_scroll", %{})
-    }
+  @impl true
+  def handle_event("grid_page_size_change", params, socket),
+    do: EventHandlers.handle_page_size_change(params, socket)
+
+  @impl true
+  def handle_event("grid_column_resize", params, socket),
+    do: EventHandlers.handle_column_resize(params, socket)
+
+  @impl true
+  def handle_event("grid_column_reorder", params, socket),
+    do: EventHandlers.handle_column_reorder(params, socket)
+
+  @impl true
+  def handle_event("grid_row_select", params, socket),
+    do: EventHandlers.handle_row_select(params, socket)
+
+  @impl true
+  def handle_event("grid_select_all", params, socket),
+    do: EventHandlers.handle_select_all(params, socket)
+
+  @impl true
+  def handle_event("grid_toggle_filter", params, socket),
+    do: EventHandlers.handle_toggle_filter(params, socket)
+
+  @impl true
+  def handle_event("grid_toggle_status_column", params, socket),
+    do: EventHandlers.handle_toggle_status_column(params, socket)
+
+  @impl true
+  def handle_event("grid_filter", params, socket),
+    do: EventHandlers.handle_filter(params, socket)
+
+  @impl true
+  def handle_event("grid_filter_date", params, socket),
+    do: EventHandlers.handle_filter_date(params, socket)
+
+  @impl true
+  def handle_event("grid_clear_filters", params, socket),
+    do: EventHandlers.handle_clear_filters(params, socket)
+
+  @impl true
+  def handle_event("grid_global_search", params, socket),
+    do: EventHandlers.handle_global_search(params, socket)
+
+  @impl true
+  def handle_event("grid_scroll", params, socket),
+    do: EventHandlers.handle_scroll(params, socket)
+
+  @impl true
+  def handle_event("cell_edit_start", params, socket),
+    do: EventHandlers.handle_cell_edit_start(params, socket)
+
+  @impl true
+  def handle_event("row_edit_start", params, socket),
+    do: EventHandlers.handle_row_edit_start(params, socket)
+
+  @impl true
+  def handle_event("row_edit_save", params, socket),
+    do: EventHandlers.handle_row_edit_save(params, socket)
+
+  @impl true
+  def handle_event("row_edit_cancel", params, socket),
+    do: EventHandlers.handle_row_edit_cancel(params, socket)
+
+  @impl true
+  def handle_event("grid_undo", params, socket),
+    do: EventHandlers.handle_undo(params, socket)
+
+  @impl true
+  def handle_event("grid_redo", params, socket),
+    do: EventHandlers.handle_redo(params, socket)
+
+  @impl true
+  def handle_event("cell_edit_save", _params, %{assigns: %{grid: %{state: %{editing: nil}}}} = socket),
+    do: EventHandlers.handle_cell_edit_save_nil_editing(socket)
+
+  @impl true
+  def handle_event("cell_edit_save", params, socket),
+    do: EventHandlers.handle_cell_edit_save(params, socket)
+
+  @impl true
+  def handle_event("cell_checkbox_toggle", params, socket),
+    do: EventHandlers.handle_checkbox_toggle(params, socket)
+
+  @impl true
+  def handle_event("import_file", params, socket),
+    do: EventHandlers.handle_import_file(params, socket)
+
+  @impl true
+  def handle_event("paste_cells", params, socket),
+    do: EventHandlers.handle_paste_cells(params, socket)
+
+  @impl true
+  def handle_event("cell_select_change", params, socket),
+    do: EventHandlers.handle_cell_select_change(params, socket)
+
+  @impl true
+  def handle_event("cell_edit_date", params, socket),
+    do: EventHandlers.handle_cell_edit_date(params, socket)
+
+  @impl true
+  def handle_event("cell_edit_cancel", params, socket),
+    do: EventHandlers.handle_cell_edit_cancel(params, socket)
+
+  @impl true
+  def handle_event("cell_keydown", %{"key" => "Enter"} = params, socket),
+    do: EventHandlers.handle_cell_keydown_enter(params, socket)
+
+  @impl true
+  def handle_event("cell_keydown", %{"key" => "Escape"}, socket),
+    do: EventHandlers.handle_cell_keydown_escape(socket)
+
+  @impl true
+  def handle_event("cell_keydown", _params, socket),
+    do: EventHandlers.handle_cell_keydown_other(socket)
+
+  @impl true
+  def handle_event("cell_edit_save_and_move", params, socket),
+    do: EventHandlers.handle_cell_edit_save_and_move(params, socket)
+
+  @impl true
+  def handle_event("grid_add_row", params, socket),
+    do: EventHandlers.handle_add_row(params, socket)
+
+  @impl true
+  def handle_event("grid_delete_selected", params, socket),
+    do: EventHandlers.handle_delete_selected(params, socket)
+
+  @impl true
+  def handle_event("grid_save", params, socket),
+    do: EventHandlers.handle_save(params, socket)
+
+  @impl true
+  def handle_event("grid_discard", params, socket),
+    do: EventHandlers.handle_discard(params, socket)
+
+  @impl true
+  def handle_event("export_excel", params, socket),
+    do: EventHandlers.handle_export_excel(params, socket)
+
+  @impl true
+  def handle_event("export_csv", params, socket),
+    do: EventHandlers.handle_export_csv(params, socket)
+
+  @impl true
+  def handle_event("toggle_export_menu", params, socket),
+    do: EventHandlers.handle_toggle_export_menu(params, socket)
+
+  @impl true
+  def handle_event("toggle_advanced_filter", params, socket),
+    do: EventHandlers.handle_toggle_advanced_filter(params, socket)
+
+  @impl true
+  def handle_event("add_filter_condition", params, socket),
+    do: EventHandlers.handle_add_filter_condition(params, socket)
+
+  @impl true
+  def handle_event("update_filter_condition", params, socket),
+    do: EventHandlers.handle_update_filter_condition(params, socket)
+
+  @impl true
+  def handle_event("remove_filter_condition", params, socket),
+    do: EventHandlers.handle_remove_filter_condition(params, socket)
+
+  @impl true
+  def handle_event("change_filter_logic", params, socket),
+    do: EventHandlers.handle_change_filter_logic(params, socket)
+
+  @impl true
+  def handle_event("clear_advanced_filter", params, socket),
+    do: EventHandlers.handle_clear_advanced_filter(params, socket)
+
+  @impl true
+  def handle_event("noop_submit", params, socket),
+    do: EventHandlers.handle_noop_submit(params, socket)
+
+  @impl true
+  def handle_event("grid_group_by", params, socket),
+    do: EventHandlers.handle_group_by(params, socket)
+
+  @impl true
+  def handle_event("grid_group_aggregates", params, socket),
+    do: EventHandlers.handle_group_aggregates(params, socket)
+
+  @impl true
+  def handle_event("grid_toggle_group", params, socket),
+    do: EventHandlers.handle_toggle_group(params, socket)
+
+  @impl true
+  def handle_event("grid_clear_grouping", params, socket),
+    do: EventHandlers.handle_clear_grouping(params, socket)
+
+  @impl true
+  def handle_event("grid_toggle_tree", params, socket),
+    do: EventHandlers.handle_toggle_tree(params, socket)
+
+  @impl true
+  def handle_event("grid_toggle_tree_node", params, socket),
+    do: EventHandlers.handle_toggle_tree_node(params, socket)
+
+  # F-800: Context Menu
+  @impl true
+  def handle_event("show_context_menu", params, socket),
+    do: EventHandlers.handle_show_context_menu(params, socket)
+
+  @impl true
+  def handle_event("hide_context_menu", params, socket),
+    do: EventHandlers.handle_hide_context_menu(params, socket)
+
+  @impl true
+  def handle_event("context_menu_action", params, socket),
+    do: EventHandlers.handle_context_menu_action(params, socket)
+
+  # F-940: Cell Range Selection
+  @impl true
+  def handle_event("set_cell_range", params, socket),
+    do: EventHandlers.handle_set_cell_range(params, socket)
+
+  @impl true
+  def handle_event("clear_cell_range", params, socket),
+    do: EventHandlers.handle_clear_cell_range(params, socket)
+
+  @impl true
+  def handle_event("copy_cell_range", params, socket),
+    do: EventHandlers.handle_copy_cell_range(params, socket)
+
+  # ── Config Modal Events ──
+
+  @impl true
+  def handle_event("open_config_modal", _params, socket) do
+    {:noreply, assign(socket, :show_config_modal, true)}
   end
 
   @impl true
-  def handle_event("grid_page_change", %{"page" => page}, socket) do
-    grid = socket.assigns.grid
-    page_num = String.to_integer(page)
-    
-    # 페이지 상태 업데이트
-    updated_grid = put_in(grid.state.pagination.current_page, page_num)
-
-    {:noreply, assign(socket, grid: updated_grid)}
+  def handle_event("close_config_modal", _params, socket) do
+    {:noreply, assign(socket, :show_config_modal, false)}
   end
 
   @impl true
-  def handle_event("grid_page_size_change", %{"page_size" => page_size}, socket) do
-    grid = socket.assigns.grid
-    new_size = String.to_integer(page_size)
-
-    # page_size 변경 + 1페이지로 리셋
-    updated_grid = grid
-    |> put_in([:options, :page_size], new_size)
-    |> put_in([:state, :pagination, :current_page], 1)
-
-    {:noreply, assign(socket, grid: updated_grid)}
-  end
-
-  @impl true
-  def handle_event("grid_column_resize", %{"field" => field, "width" => width}, socket) do
-    grid = socket.assigns.grid
-    field_atom = String.to_existing_atom(field)
-    width_int = String.to_integer(width)
-
-    updated_grid = Grid.resize_column(grid, field_atom, max(width_int, 50))
-    {:noreply, assign(socket, grid: updated_grid)}
-  end
-
-  @impl true
-  def handle_event("grid_column_reorder", %{"order" => order}, socket) do
-    grid = socket.assigns.grid
-    field_atoms = Enum.map(order, &String.to_existing_atom/1)
-
-    updated_grid = Grid.reorder_columns(grid, field_atoms)
-    {:noreply, assign(socket, grid: updated_grid)}
-  end
-
-  @impl true
-  def handle_event("grid_row_select", %{"row-id" => row_id}, socket) do
-    grid = socket.assigns.grid
-    id = String.to_integer(row_id)
-    
-    # 선택 토글
-    selected_ids = grid.state.selection.selected_ids
-    updated_ids = if id in selected_ids do
-      List.delete(selected_ids, id)
-    else
-      [id | selected_ids]
-    end
-    
-    updated_grid = put_in(grid.state.selection.selected_ids, updated_ids)
-    
-    {:noreply, assign(socket, grid: updated_grid)}
-  end
-
-  @impl true
-  def handle_event("grid_select_all", _params, socket) do
-    grid = socket.assigns.grid
-    
-    # 전체 선택/해제 토글
-    if grid.state.selection.select_all do
-      # 전체 해제
-      updated_grid = put_in(grid.state.selection, %{selected_ids: [], select_all: false})
-      {:noreply, assign(socket, grid: updated_grid)}
-    else
-      # 전체 선택
-      all_ids = Enum.map(grid.data, & &1.id)
-      updated_grid = put_in(grid.state.selection, %{selected_ids: all_ids, select_all: true})
-      {:noreply, assign(socket, grid: updated_grid)}
-    end
-  end
-
-  @impl true
-  def handle_event("grid_toggle_filter", _params, socket) do
-    grid = socket.assigns.grid
-    show = !grid.state.show_filter_row
-
-    updated_grid = if show do
-      put_in(grid.state.show_filter_row, true)
-    else
-      # 숨길 때 필터 값도 초기화
-      grid
-      |> put_in([:state, :show_filter_row], false)
-      |> put_in([:state, :filters], %{})
-      |> put_in([:state, :pagination, :current_page], 1)
-      |> put_in([:state, :scroll_offset], 0)
-    end
-
-    socket = assign(socket, grid: updated_grid)
-    socket = if !show, do: push_event(socket, "reset_virtual_scroll", %{}), else: socket
-    {:noreply, socket}
-  end
-
-  @impl true
-  def handle_event("grid_toggle_status_column", _params, socket) do
-    grid = socket.assigns.grid
-    updated_grid = put_in(grid.state.show_status_column, !grid.state.show_status_column)
-    {:noreply, assign(socket, grid: updated_grid)}
-  end
-
-  @impl true
-  def handle_event("grid_filter", %{"field" => field, "value" => value}, socket) do
-    grid = socket.assigns.grid
-    field_atom = String.to_atom(field)
-
-    # 필터 값 업데이트 (빈 문자열이면 해당 필터 제거)
-    updated_filters = if value == "" do
-      Map.delete(grid.state.filters, field_atom)
-    else
-      Map.put(grid.state.filters, field_atom, value)
-    end
-
-    # 필터 변경 시 페이지 1로 리셋 + 스크롤 리셋
-    updated_grid = grid
-      |> put_in([:state, :filters], updated_filters)
-      |> put_in([:state, :pagination, :current_page], 1)
-      |> put_in([:state, :scroll_offset], 0)
-
-    {:noreply,
-      socket
-      |> assign(grid: updated_grid)
-      |> push_event("reset_virtual_scroll", %{})
-    }
-  end
-
-  @impl true
-  def handle_event("grid_filter_date", %{"field" => field, "part" => part, "value" => value}, socket) do
-    grid = socket.assigns.grid
-    field_atom = String.to_atom(field)
-
-    # 기존 필터값에서 from/to 파싱
-    current = Map.get(grid.state.filters, field_atom, "~")
-    [current_from, current_to] = case String.split(current, "~", parts: 2) do
-      [f, t] -> [f, t]
-      _ -> ["", ""]
-    end
-
-    # 해당 part만 업데이트
-    {new_from, new_to} = case part do
-      "from" -> {value, current_to}
-      "to" -> {current_from, value}
-      _ -> {current_from, current_to}
-    end
-
-    # 날짜 범위 문자열 재조합
-    combined = "#{new_from}~#{new_to}"
-
-    # 둘 다 비어있으면 필터 제거
-    updated_filters = if new_from == "" and new_to == "" do
-      Map.delete(grid.state.filters, field_atom)
-    else
-      Map.put(grid.state.filters, field_atom, combined)
-    end
-
-    updated_grid = grid
-      |> put_in([:state, :filters], updated_filters)
-      |> put_in([:state, :pagination, :current_page], 1)
-      |> put_in([:state, :scroll_offset], 0)
-
-    {:noreply,
-      socket
-      |> assign(grid: updated_grid)
-      |> push_event("reset_virtual_scroll", %{})
-    }
-  end
-
-  @impl true
-  def handle_event("grid_clear_filters", _params, socket) do
+  def handle_event("apply_grid_config", %{"config" => config_json}, socket) do
     grid = socket.assigns.grid
 
-    updated_grid = grid
-      |> put_in([:state, :filters], %{})
-      |> put_in([:state, :pagination, :current_page], 1)
-      |> put_in([:state, :scroll_offset], 0)
+    try do
+      # JSON 문자열 파싱
+      {:ok, config_changes} = Jason.decode(config_json)
 
-    {:noreply,
-      socket
-      |> assign(grid: updated_grid)
-      |> push_event("reset_virtual_scroll", %{})
-    }
-  end
+      # Phase 1: 컬럼 설정 변경 적용
+      updated_grid = Grid.apply_config_changes(grid, config_changes)
 
-  @impl true
-  def handle_event("grid_global_search", %{"value" => value}, socket) do
-    grid = socket.assigns.grid
+      # Phase 2: Grid-level options 변경 적용
+      updated_grid =
+        case Map.get(config_changes, "options") do
+          nil ->
+            updated_grid
 
-    updated_grid = grid
-      |> put_in([:state, :global_search], value)
-      |> put_in([:state, :pagination, :current_page], 1)
-      |> put_in([:state, :scroll_offset], 0)
+          options when is_map(options) ->
+            case Grid.apply_grid_settings(updated_grid, options) do
+              {:ok, new_grid} ->
+                new_grid
 
-    {:noreply,
-      socket
-      |> assign(grid: updated_grid)
-      |> push_event("reset_virtual_scroll", %{})
-    }
-  end
-
-  @impl true
-  def handle_event("grid_scroll", %{"scroll_top" => scroll_top}, socket) do
-    grid = socket.assigns.grid
-    row_height = grid.options.row_height
-
-    # scroll_top 안전 파싱 (JS에서 문자열로 전송)
-    scroll_top_num = case Integer.parse(to_string(scroll_top)) do
-      {num, _} -> num
-      :error -> 0
-    end
-
-    scroll_offset = max(0, div(scroll_top_num, row_height))
-    updated_grid = put_in(grid.state.scroll_offset, scroll_offset)
-
-    {:noreply, assign(socket, grid: updated_grid)}
-  end
-
-  @impl true
-  def handle_event("cell_edit_start", %{"row-id" => row_id, "field" => field}, socket) do
-    grid = socket.assigns.grid
-    row_id_int = String.to_integer(row_id)
-    field_atom = String.to_atom(field)
-
-    updated_grid = put_in(grid.state.editing, %{row_id: row_id_int, field: field_atom})
-    {:noreply, assign(socket, grid: updated_grid)}
-  end
-
-  @impl true
-  def handle_event("cell_edit_save", _params, %{assigns: %{grid: %{state: %{editing: nil}}}} = socket) do
-    # 이미 취소된 상태 (Esc 후 blur 이벤트) → 무시
-    {:noreply, socket}
-  end
-
-  @impl true
-  def handle_event("cell_edit_save", %{"row-id" => row_id, "field" => field, "value" => value}, socket) do
-    grid = socket.assigns.grid
-    row_id_int = String.to_integer(row_id)
-    field_atom = String.to_atom(field)
-
-    # 타입별 값 변환
-    column = Enum.find(grid.columns, fn c -> c.field == field_atom end)
-    parsed_value = cond do
-      column && column.editor_type == :number ->
-        case Float.parse(value) do
-          {num, ""} -> if num == trunc(num), do: trunc(num), else: num
-          {num, _} -> if num == trunc(num), do: trunc(num), else: num
-          :error -> value
+              {:error, reason} ->
+                IO.warn("Grid settings validation error: #{reason}")
+                updated_grid
+            end
         end
-      column && (column.editor_type == :date || column.filter_type == :date) ->
-        parse_date_value(value)
-      true ->
-        value
-    end
 
-    # 원래 값과 비교 → 변경 없으면 편집 모드만 종료
-    row = Enum.find(grid.data, fn r -> r.id == row_id_int end)
-    original_value = if row, do: Map.get(row, field_atom), else: nil
+      socket =
+        socket
+        |> assign(:grid, updated_grid)
+        |> assign(:show_config_modal, false)
 
-    if original_value == parsed_value do
-      # 값 변경 없음 → 편집 모드만 종료 (상태 마킹 안 함)
-      updated_grid = put_in(grid.state.editing, nil)
-      {:noreply, assign(socket, grid: updated_grid)}
-    else
-      # 값 변경됨 → update_cell + validate_cell + 부모 알림
-      updated_grid = grid
-        |> Grid.update_cell(row_id_int, field_atom, parsed_value)
-        |> Grid.validate_cell(row_id_int, field_atom)
-        |> put_in([:state, :editing], nil)
-
-      send(self(), {:grid_cell_updated, row_id_int, field_atom, parsed_value})
-      {:noreply, assign(socket, grid: updated_grid)}
-    end
-  end
-
-  @impl true
-  def handle_event("cell_select_change", %{"select_value" => value, "row-id" => row_id, "field" => field}, socket) do
-    grid = socket.assigns.grid
-    row_id_int = String.to_integer(row_id)
-    field_atom = String.to_atom(field)
-
-    # 원래 값과 비교
-    row = Enum.find(grid.data, fn r -> r.id == row_id_int end)
-    original_value = if row, do: Map.get(row, field_atom), else: nil
-
-    if to_string(original_value) == value do
-      # 값 변경 없음 → 편집 모드만 종료
-      updated_grid = put_in(grid.state.editing, nil)
-      {:noreply, assign(socket, grid: updated_grid)}
-    else
-      # 값 변경됨 → update_cell + validate_cell + 부모 알림
-      updated_grid = grid
-        |> Grid.update_cell(row_id_int, field_atom, value)
-        |> Grid.validate_cell(row_id_int, field_atom)
-        |> put_in([:state, :editing], nil)
-
-      send(self(), {:grid_cell_updated, row_id_int, field_atom, value})
-      {:noreply, assign(socket, grid: updated_grid)}
-    end
-  end
-
-  @impl true
-  def handle_event("cell_edit_date", %{"field" => field, "row-id" => row_id, "value" => value}, socket) do
-    # date picker에서 값이 변경되면 바로 저장
-    handle_event("cell_edit_save", %{"row-id" => row_id, "field" => field, "value" => value}, socket)
-  end
-
-  @impl true
-  def handle_event("cell_edit_cancel", _params, socket) do
-    grid = socket.assigns.grid
-    updated_grid = put_in(grid.state.editing, nil)
-    {:noreply, assign(socket, grid: updated_grid)}
-  end
-
-  @impl true
-  def handle_event("cell_keydown", %{"key" => "Enter", "value" => value} = params, socket) do
-    handle_event("cell_edit_save", Map.put(params, "value", value), socket)
-  end
-
-  @impl true
-  def handle_event("cell_keydown", %{"key" => "Escape"}, socket) do
-    handle_event("cell_edit_cancel", %{}, socket)
-  end
-
-  @impl true
-  def handle_event("cell_keydown", _params, socket) do
-    {:noreply, socket}
-  end
-
-  @impl true
-  def handle_event("grid_add_row", _params, socket) do
-    grid = socket.assigns.grid
-
-    # 컬럼 기본값 생성 (빈 문자열, 0, 또는 select 첫 번째 값)
-    defaults = Enum.reduce(grid.columns, %{}, fn col, acc ->
-      default_val = case col.editor_type do
-        :number -> 0
-        :date -> Date.utc_today()
-        :select ->
-          if col.editor_options != [], do: elem(hd(col.editor_options), 1), else: ""
-        _ ->
-          if col.filter_type == :date, do: Date.utc_today(), else: ""
-      end
-      Map.put(acc, col.field, default_val)
-    end)
-
-    updated_grid = Grid.add_row(grid, defaults, :top)
-
-    # 부모에게 알림
-    send(self(), {:grid_row_added, hd(updated_grid.data)})
-
-    {:noreply, assign(socket, grid: updated_grid)}
-  end
-
-  @impl true
-  def handle_event("grid_delete_selected", _params, socket) do
-    grid = socket.assigns.grid
-    selected_ids = grid.state.selection.selected_ids
-
-    if selected_ids == [] do
       {:noreply, socket}
-    else
-      updated_grid = grid
-        |> Grid.delete_rows(selected_ids)
-        |> put_in([:state, :selection, :selected_ids], [])
-        |> put_in([:state, :selection, :select_all], false)
-
-      # 부모에게 알림
-      send(self(), {:grid_rows_deleted, selected_ids})
-
-      {:noreply, assign(socket, grid: updated_grid)}
+    rescue
+      e ->
+        # 에러 발생 시 에러 메시지 표시
+        IO.puts("설정 변경 에러: #{inspect(e)}")
+        {:noreply, socket}
     end
   end
 
-  @impl true
-  def handle_event("grid_save", _params, socket) do
-    grid = socket.assigns.grid
-
-    # 검증 에러가 있으면 저장 차단
-    if Grid.has_errors?(grid) do
-      send(self(), {:grid_save_blocked, Grid.error_count(grid)})
-      {:noreply, socket}
-    else
-      changed = Grid.changed_rows(grid)
-
-      # 부모 LiveView에 저장 요청
-      send(self(), {:grid_save_requested, changed})
-
-      # 저장 후 상태 초기화
-      updated_grid = Grid.clear_row_statuses(grid)
-      {:noreply, assign(socket, grid: updated_grid)}
-    end
-  end
-
-  @impl true
-  def handle_event("grid_discard", _params, socket) do
-    grid = socket.assigns.grid
-
-    # 부모에 취소 알림 (원본 데이터로 복원 요청)
-    send(self(), :grid_discard_requested)
-
-    # 상태만 초기화 (데이터는 부모가 원본으로 다시 전달해줌)
-    updated_grid = grid
-      |> Grid.clear_row_statuses()
-      |> Grid.clear_cell_errors()
-    {:noreply, assign(socket, grid: updated_grid)}
-  end
-
-  # ── Export 이벤트 ──
-
-  @impl true
-  def handle_event("export_excel", %{"type" => type}, socket) do
-    grid = socket.assigns.grid
-    {data, columns} = export_data(grid, type)
-
-    case Export.to_xlsx(data, columns) do
-      {:ok, {_filename, binary}} ->
-        content = Base.encode64(binary)
-        timestamp = DateTime.utc_now() |> DateTime.to_unix()
-        filename = "liveview_grid_#{type}_#{timestamp}.xlsx"
-
-        # 부모 LiveView에 다운로드 요청 (LiveComponent의 push_event는 window에 도달하지 않음)
-        send(self(), {:grid_download_file, %{
-          content: content,
-          filename: filename,
-          mime_type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        }})
-
-        {:noreply, assign(socket, export_menu_open: nil)}
-
-      {:error, reason} ->
-        require Logger
-        Logger.error("Excel export failed: #{inspect(reason)}")
-        {:noreply, assign(socket, export_menu_open: nil)}
-    end
-  end
-
-  @impl true
-  def handle_event("export_csv", %{"type" => type}, socket) do
-    grid = socket.assigns.grid
-    {data, columns} = export_data(grid, type)
-
-    csv_content = Export.to_csv(data, columns)
-    content = Base.encode64(csv_content)
-    timestamp = DateTime.utc_now() |> DateTime.to_unix()
-    filename = "liveview_grid_#{type}_#{timestamp}.csv"
-
-    # 부모 LiveView에 다운로드 요청
-    send(self(), {:grid_download_file, %{
-      content: content,
-      filename: filename,
-      mime_type: "text/csv;charset=utf-8"
-    }})
-
-    {:noreply, assign(socket, export_menu_open: nil)}
-  end
-
-  @impl true
-  def handle_event("toggle_export_menu", %{"format" => format}, socket) do
-    current = socket.assigns[:export_menu_open]
-    new_value = if current == format, do: nil, else: format
-    {:noreply, assign(socket, export_menu_open: new_value)}
-  end
-
-  # ── Advanced Filter 이벤트 (F-310) ──
-
-  @impl true
-  def handle_event("toggle_advanced_filter", _params, socket) do
-    grid = socket.assigns.grid
-    show = !Map.get(grid.state, :show_advanced_filter, false)
-    updated_grid = put_in(grid.state[:show_advanced_filter], show)
-    {:noreply, assign(socket, grid: updated_grid)}
-  end
-
-  @impl true
-  def handle_event("add_filter_condition", _params, socket) do
-    grid = socket.assigns.grid
-    adv = Map.get(grid.state, :advanced_filters, %{logic: :and, conditions: []})
-    new_condition = %{field: nil, operator: :contains, value: ""}
-    updated_adv = %{adv | conditions: adv.conditions ++ [new_condition]}
-    updated_grid = put_in(grid.state[:advanced_filters], updated_adv)
-    {:noreply, assign(socket, grid: updated_grid)}
-  end
-
-  @impl true
-  def handle_event("update_filter_condition", params, socket) do
-    grid = socket.assigns.grid
-    adv = Map.get(grid.state, :advanced_filters, %{logic: :and, conditions: []})
-    index = String.to_integer(params["index"])
-
-    conditions = List.update_at(adv.conditions, index, fn condition ->
-      # Form phx-change: 모든 필드가 함께 전송됨
-      field_str = params["field"] || ""
-      operator_str = params["operator"] || ""
-      value_str = params["value"] || ""
-      value_to_str = params["value_to"]
-
-      new_field = if field_str != "", do: String.to_existing_atom(field_str), else: condition.field
-
-      # 필드가 변경되면 컬럼의 filter_type에 맞는 기본 연산자 설정
-      new_operator = cond do
-        field_str != "" && new_field != condition.field ->
-          col = Enum.find(grid.columns, fn c -> c.field == new_field end)
-          case Map.get(col, :filter_type) do
-            :number -> :eq
-            :date -> :eq
-            _ -> :contains
-          end
-        operator_str != "" ->
-          String.to_existing_atom(operator_str)
-        true ->
-          condition.operator
-      end
-
-      # between 연산자: value_to가 있으면 "from~to" 형식으로 결합
-      final_value = if new_operator == :between && value_to_str do
-        "#{value_str}~#{value_to_str}"
-      else
-        value_str
-      end
-
-      %{condition | field: new_field, operator: new_operator, value: final_value}
-    end)
-
-    updated_adv = %{adv | conditions: conditions}
-    updated_grid = put_in(grid.state[:advanced_filters], updated_adv)
-    {:noreply, assign(socket, grid: updated_grid)}
-  end
-
-  @impl true
-  def handle_event("remove_filter_condition", %{"index" => index}, socket) do
-    grid = socket.assigns.grid
-    adv = Map.get(grid.state, :advanced_filters, %{logic: :and, conditions: []})
-    idx = String.to_integer(index)
-    updated_conditions = List.delete_at(adv.conditions, idx)
-    updated_adv = %{adv | conditions: updated_conditions}
-    updated_grid = put_in(grid.state[:advanced_filters], updated_adv)
-    {:noreply, assign(socket, grid: updated_grid)}
-  end
-
-  @impl true
-  def handle_event("change_filter_logic", %{"logic" => logic}, socket) do
-    grid = socket.assigns.grid
-    adv = Map.get(grid.state, :advanced_filters, %{logic: :and, conditions: []})
-    logic_atom = String.to_existing_atom(logic)
-    updated_adv = %{adv | logic: logic_atom}
-    updated_grid = put_in(grid.state[:advanced_filters], updated_adv)
-    {:noreply, assign(socket, grid: updated_grid)}
-  end
-
-  @impl true
-  def handle_event("clear_advanced_filter", _params, socket) do
-    grid = socket.assigns.grid
-    updated_grid = put_in(grid.state[:advanced_filters], %{logic: :and, conditions: []})
-    {:noreply, assign(socket, grid: updated_grid)}
-  end
-
-  # 고급 필터 form에서 엔터 키 입력 시 submit 방지
-  @impl true
-  def handle_event("noop_submit", _params, socket) do
-    {:noreply, socket}
-  end
-
-  # ── v0.7: Grouping 이벤트 ──
-
-  @impl true
-  def handle_event("grid_group_by", %{"fields" => fields_str}, socket) do
-    grid = socket.assigns.grid
-    fields = fields_str
-      |> String.split(",", trim: true)
-      |> Enum.map(&String.to_atom(String.trim(&1)))
-
-    updated_grid = Grid.set_group_by(grid, fields)
-    {:noreply, assign(socket, grid: updated_grid)}
-  end
-
-  @impl true
-  def handle_event("grid_group_aggregates", %{"aggregates" => agg_str}, socket) do
-    grid = socket.assigns.grid
-    aggregates = agg_str
-      |> Jason.decode!()
-      |> Enum.map(fn {k, v} -> {String.to_atom(k), String.to_atom(v)} end)
-      |> Map.new()
-
-    updated_grid = Grid.set_group_aggregates(grid, aggregates)
-    {:noreply, assign(socket, grid: updated_grid)}
-  end
-
-  @impl true
-  def handle_event("grid_toggle_group", %{"group-key" => group_key}, socket) do
-    grid = socket.assigns.grid
-    updated_grid = Grid.toggle_group(grid, group_key)
-    {:noreply, assign(socket, grid: updated_grid)}
-  end
-
-  @impl true
-  def handle_event("grid_clear_grouping", _params, socket) do
-    grid = socket.assigns.grid
-    updated_grid = Grid.set_group_by(grid, [])
-    {:noreply, assign(socket, grid: updated_grid)}
-  end
-
-  # ── v0.7: Tree Grid 이벤트 ──
-
-  @impl true
-  def handle_event("grid_toggle_tree", %{"enabled" => enabled}, socket) do
-    grid = socket.assigns.grid
-    parent_field = Map.get(grid.state, :tree_parent_field, :parent_id)
-    updated_grid = Grid.set_tree_mode(grid, enabled == "true", parent_field)
-    {:noreply, assign(socket, grid: updated_grid)}
-  end
-
-  @impl true
-  def handle_event("grid_toggle_tree_node", %{"node-id" => node_id_str}, socket) do
-    grid = socket.assigns.grid
-    node_id = String.to_integer(node_id_str)
-    updated_grid = Grid.toggle_tree_node(grid, node_id)
-    {:noreply, assign(socket, grid: updated_grid)}
-  end
-
-  # v0.7: options에서 전달된 group_by, tree_mode 등을 Grid state에 반영
-  defp apply_v07_options(grid, options) do
-    grid = if Map.has_key?(options, :group_by) do
-      group_by = Map.get(options, :group_by, [])
-      aggregates = Map.get(options, :group_aggregates, %{})
-      grid
-      |> put_in([:state, :group_by], group_by)
-      |> put_in([:state, :group_aggregates], aggregates)
-    else
-      grid
-    end
-
-    grid = if Map.has_key?(options, :tree_mode) do
-      tree_mode = Map.get(options, :tree_mode, false)
-      parent_field = Map.get(options, :tree_parent_field, :parent_id)
-      grid
-      |> put_in([:state, :tree_mode], tree_mode)
-      |> put_in([:state, :tree_parent_field], parent_field)
-    else
-      grid
-    end
-
-    grid
-  end
-
-  defp export_data(grid, type) do
-    data =
-      case type do
-        "all" -> grid.data
-        "filtered" -> Grid.sorted_data(grid)
-        "selected" ->
-          selected_ids = grid.state.selection.selected_ids
-          Enum.filter(grid.data, fn row -> row.id in selected_ids end)
-        _ -> grid.data
-      end
-
-    columns = grid.columns
-    {data, columns}
-  end
+  # ── Render ──
 
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="lv-grid" data-theme={@grid.options[:theme] || "light"} style={build_custom_css_vars(@grid.options[:custom_css_vars])}>
+    <div class="lv-grid" id={"#{@grid.id}-keyboard-nav"} phx-hook="GridKeyboardNav" tabindex="0" data-theme={@grid.options[:theme] || "light"} style={build_custom_css_vars(@grid.options[:custom_css_vars])}>
       <!-- Toolbar: Search + Save -->
       <div class="lv-grid__toolbar">
         <div class="lv-grid__search-bar">
@@ -844,6 +434,25 @@ defmodule LiveviewGridWeb.GridComponent do
           <% end %>
         </div>
         <div class="lv-grid__action-area">
+          <!-- F-700: Undo/Redo 버튼 -->
+          <button
+            class={"lv-grid__undo-btn #{unless Grid.can_undo?(@grid), do: "lv-grid__undo-btn--disabled"}"}
+            phx-click="grid_undo"
+            phx-target={@myself}
+            disabled={!Grid.can_undo?(@grid)}
+            title="되돌리기 (Ctrl+Z)"
+          >
+            ↩
+          </button>
+          <button
+            class={"lv-grid__redo-btn #{unless Grid.can_redo?(@grid), do: "lv-grid__redo-btn--disabled"}"}
+            phx-click="grid_redo"
+            phx-target={@myself}
+            disabled={!Grid.can_redo?(@grid)}
+            title="다시하기 (Ctrl+Y)"
+          >
+            ↪
+          </button>
           <button
             class="lv-grid__add-btn"
             phx-click="grid_add_row"
@@ -851,6 +460,14 @@ defmodule LiveviewGridWeb.GridComponent do
             title="새 행 추가"
           >
             + 추가
+          </button>
+          <button
+            class="lv-grid__config-btn"
+            phx-click="open_config_modal"
+            phx-target={@myself}
+            title="그리드 설정"
+          >
+            ⚙ 설정
           </button>
           <%= if length(@grid.state.selection.selected_ids) > 0 do %>
             <button
@@ -891,6 +508,24 @@ defmodule LiveviewGridWeb.GridComponent do
           </div>
         <% end %>
       </div>
+
+      <!-- Header Group Row (F-910: Multi-level Header) -->
+      <%= if @grid.options.show_header && has_header_groups?(Grid.display_columns(@grid)) do %>
+        <div class="lv-grid__header lv-grid__header--group">
+          <div class="lv-grid__header-cell lv-grid__header-cell--group-spacer" style="width: 90px; flex: 0 0 90px;"></div>
+          <%= if @grid.options.show_row_number do %>
+            <div class="lv-grid__header-cell lv-grid__header-cell--group-spacer" style="width: 50px; flex: 0 0 50px;"></div>
+          <% end %>
+          <%= if @grid.state.show_status_column do %>
+            <div class="lv-grid__header-cell lv-grid__header-cell--group-spacer" style="width: 60px; flex: 0 0 60px;"></div>
+          <% end %>
+          <%= for group <- build_header_groups(Grid.display_columns(@grid), @grid) do %>
+            <div class={"lv-grid__header-cell lv-grid__header-cell--group #{if group.label, do: "", else: "lv-grid__header-cell--group-empty"}"} style={header_group_style(group)}>
+              <%= group.label %>
+            </div>
+          <% end %>
+        </div>
+      <% end %>
 
       <!-- Header -->
       <%= if @grid.options.show_header do %>
@@ -933,6 +568,13 @@ defmodule LiveviewGridWeb.GridComponent do
             </button>
           </div>
 
+          <!-- 행번호 컬럼 헤더 -->
+          <%= if @grid.options.show_row_number do %>
+            <div class="lv-grid__header-cell lv-grid__header-cell--row-number" style="width: 50px; flex: 0 0 50px; justify-content: center;">
+              #
+            </div>
+          <% end %>
+
           <!-- 상태 컬럼 헤더 -->
           <%= if @grid.state.show_status_column do %>
             <div class="lv-grid__header-cell lv-grid__header-cell--status" style="width: 60px; flex: 0 0 60px; justify-content: center;">
@@ -974,11 +616,14 @@ defmodule LiveviewGridWeb.GridComponent do
       <!-- Filter Row -->
       <%= if @grid.state.show_filter_row && has_filterable_columns?(@grid.columns) do %>
         <div class="lv-grid__filter-row">
-          <!-- 체크박스 컬럼 빈칸 -->
           <div class="lv-grid__filter-cell" style="width: 90px; flex: 0 0 90px;">
           </div>
 
-          <!-- 상태 컬럼 빈칸 -->
+          <%= if @grid.options.show_row_number do %>
+            <div class="lv-grid__filter-cell" style="width: 50px; flex: 0 0 50px;">
+            </div>
+          <% end %>
+
           <%= if @grid.state.show_status_column do %>
             <div class="lv-grid__filter-cell" style="width: 60px; flex: 0 0 60px;">
             </div>
@@ -1027,7 +672,6 @@ defmodule LiveviewGridWeb.GridComponent do
             </div>
           <% end %>
 
-          <!-- 필터 초기화 버튼 -->
           <%= if map_size(@grid.state.filters) > 0 do %>
             <button
               class="lv-grid__filter-clear"
@@ -1070,7 +714,6 @@ defmodule LiveviewGridWeb.GridComponent do
             </div>
           </div>
 
-          <!-- 조건 목록 -->
           <%= for {condition, idx} <- Enum.with_index(@grid.state.advanced_filters.conditions) do %>
             <div class="lv-grid__filter-condition">
               <form phx-change="update_filter_condition" phx-submit="noop_submit" phx-target={@myself} style="display: contents;">
@@ -1157,7 +800,6 @@ defmodule LiveviewGridWeb.GridComponent do
             </div>
           <% end %>
 
-          <!-- 하단 액션 -->
           <div class="lv-grid__advanced-filter-actions">
             <button
               class="lv-grid__filter-add-btn"
@@ -1185,29 +827,63 @@ defmodule LiveviewGridWeb.GridComponent do
           data-row-height={@grid.options.row_height}
           style="height: 600px;"
         >
-          <!-- 전체 높이 스페이서 (스크롤바 크기 결정) -->
           <div style={"height: #{length(@grid.data) * @grid.options.row_height}px; position: relative;"}>
-            <!-- 보이는 행만 올바른 위치에 렌더링 -->
             <div style={"position: absolute; top: #{Grid.virtual_offset_top(@grid)}px; width: 100%;"}>
-              <%= for row <- Grid.visible_data(@grid) do %>
-                <div class={"lv-grid__row #{if row.id in @grid.state.selection.selected_ids, do: "lv-grid__row--selected"} #{if Map.get(@grid.state.row_statuses, row.id) == :deleted, do: "lv-grid__row--deleted"}"}>
-                  <div class="lv-grid__cell" style="width: 90px; flex: 0 0 90px; justify-content: center;">
-                    <input
-                      type="checkbox"
-                      phx-click="grid_row_select"
-                      phx-value-row-id={row.id}
-                      phx-target={@myself}
-                      checked={row.id in @grid.state.selection.selected_ids}
-                      style="width: 18px; height: 18px; cursor: pointer;"
-                    />
-                  </div>
+              <% v_data = Grid.visible_data(@grid) %>
+              <% v_row_id_to_pos = v_data |> Enum.with_index() |> Enum.map(fn {r, i} -> {r.id, i} end) |> Map.new() %>
+              <%= for row <- v_data do %>
+                <div class={"lv-grid__row #{if row.id in @grid.state.selection.selected_ids, do: "lv-grid__row--selected"} #{if Map.get(@grid.state.row_statuses, row.id) == :deleted, do: "lv-grid__row--deleted"} #{if @grid.state.editing_row == row.id, do: "lv-grid__row--editing"}"} data-row-id={row.id}>
+                  <%= if @grid.state.editing_row == row.id do %>
+                    <div class="lv-grid__cell lv-grid__cell--row-actions" style="width: 90px; flex: 0 0 90px; justify-content: center; gap: 4px;">
+                      <button
+                        class="lv-grid__row-edit-save"
+                        id={"row-save-#{row.id}"}
+                        phx-hook="RowEditSave"
+                        data-row-id={row.id}
+                        phx-target={@myself}
+                        title="행 저장"
+                      >&#10003;</button>
+                      <button
+                        class="lv-grid__row-edit-cancel"
+                        phx-click="row_edit_cancel"
+                        phx-value-row-id={row.id}
+                        phx-target={@myself}
+                        title="행 취소"
+                      >&#10005;</button>
+                    </div>
+                  <% else %>
+                    <div class="lv-grid__cell" style="width: 90px; flex: 0 0 90px; justify-content: center; gap: 4px;">
+                      <input
+                        type="checkbox"
+                        phx-click="grid_row_select"
+                        phx-value-row-id={row.id}
+                        phx-target={@myself}
+                        checked={row.id in @grid.state.selection.selected_ids}
+                        style="width: 18px; height: 18px; cursor: pointer;"
+                      />
+                      <%= if has_editable_columns?(@grid.columns) do %>
+                        <button
+                          class="lv-grid__row-edit-btn"
+                          phx-click="row_edit_start"
+                          phx-value-row-id={row.id}
+                          phx-target={@myself}
+                          title="행 편집"
+                        >&#9998;</button>
+                      <% end %>
+                    </div>
+                  <% end %>
+                  <%= if @grid.options.show_row_number do %>
+                    <div class="lv-grid__cell lv-grid__cell--row-number" style="width: 50px; flex: 0 0 50px; justify-content: center;">
+                      <%= Map.get(row, :_virtual_index, 0) + 1 %>
+                    </div>
+                  <% end %>
                   <%= if @grid.state.show_status_column do %>
                     <div class="lv-grid__cell lv-grid__cell--status" style="width: 60px; flex: 0 0 60px; justify-content: center;">
                       <%= render_status_badge(Map.get(@grid.state.row_statuses, row.id, :normal)) %>
                     </div>
                   <% end %>
                   <%= for {column, col_idx} <- Enum.with_index(Grid.display_columns(@grid)) do %>
-                    <div class={"lv-grid__cell #{frozen_class(col_idx, @grid)}"} style={"#{column_width_style(column, @grid)}; #{frozen_style(col_idx, @grid)}"} data-col-index={col_idx}>
+                    <div class={"lv-grid__cell #{frozen_class(col_idx, @grid)} #{if cell_in_range?(@grid.state.cell_range, row.id, col_idx, v_row_id_to_pos), do: "lv-grid__cell--in-range"}"} style={"#{column_width_style(column, @grid)}; #{frozen_style(col_idx, @grid)}"} data-col-index={col_idx}>
                       <%= render_cell(assigns, row, column) %>
                     </div>
                   <% end %>
@@ -1219,7 +895,9 @@ defmodule LiveviewGridWeb.GridComponent do
       <% else %>
         <!-- 기본 Body (페이징 방식) -->
         <div class="lv-grid__body">
-          <%= for row <- Grid.visible_data(@grid) do %>
+          <% p_data = Grid.visible_data(@grid) %>
+          <% p_row_id_to_pos = p_data |> Enum.with_index() |> Enum.map(fn {r, i} -> {Map.get(r, :id), i} end) |> Enum.reject(fn {k, _} -> is_nil(k) end) |> Map.new() %>
+          <%= for {row, row_num} <- with_row_numbers(p_data, row_number_offset(@grid)) do %>
             <%= if Map.get(row, :_row_type) == :group_header do %>
               <!-- Group Header Row -->
               <div class={"lv-grid__row lv-grid__row--group-header lv-grid__row--group-depth-#{row._group_depth}"}>
@@ -1249,26 +927,59 @@ defmodule LiveviewGridWeb.GridComponent do
               </div>
             <% else %>
               <!-- Data Row (normal / tree) -->
-              <div class={"lv-grid__row #{if Map.get(row, :id) in @grid.state.selection.selected_ids, do: "lv-grid__row--selected"} #{if Map.get(@grid.state.row_statuses, Map.get(row, :id)) == :deleted, do: "lv-grid__row--deleted"}"}>
-                <div class="lv-grid__cell" style="width: 90px; flex: 0 0 90px; justify-content: center;">
-                  <input
-                    type="checkbox"
-                    phx-click="grid_row_select"
-                    phx-value-row-id={row.id}
-                    phx-target={@myself}
-                    checked={row.id in @grid.state.selection.selected_ids}
-                    style="width: 18px; height: 18px; cursor: pointer;"
-                  />
-                </div>
+              <div class={"lv-grid__row #{if Map.get(row, :id) in @grid.state.selection.selected_ids, do: "lv-grid__row--selected"} #{if Map.get(@grid.state.row_statuses, Map.get(row, :id)) == :deleted, do: "lv-grid__row--deleted"} #{if @grid.state.editing_row == Map.get(row, :id), do: "lv-grid__row--editing"}"} data-row-id={Map.get(row, :id)}>
+                <%= if @grid.state.editing_row == row.id do %>
+                  <div class="lv-grid__cell lv-grid__cell--row-actions" style="width: 90px; flex: 0 0 90px; justify-content: center; gap: 4px;">
+                    <button
+                      class="lv-grid__row-edit-save"
+                      id={"row-save-#{row.id}"}
+                      phx-hook="RowEditSave"
+                      data-row-id={row.id}
+                      phx-target={@myself}
+                      title="행 저장"
+                    >&#10003;</button>
+                    <button
+                      class="lv-grid__row-edit-cancel"
+                      phx-click="row_edit_cancel"
+                      phx-value-row-id={row.id}
+                      phx-target={@myself}
+                      title="행 취소"
+                    >&#10005;</button>
+                  </div>
+                <% else %>
+                  <div class="lv-grid__cell" style="width: 90px; flex: 0 0 90px; justify-content: center; gap: 4px;">
+                    <input
+                      type="checkbox"
+                      phx-click="grid_row_select"
+                      phx-value-row-id={row.id}
+                      phx-target={@myself}
+                      checked={row.id in @grid.state.selection.selected_ids}
+                      style="width: 18px; height: 18px; cursor: pointer;"
+                    />
+                    <%= if has_editable_columns?(@grid.columns) do %>
+                      <button
+                        class="lv-grid__row-edit-btn"
+                        phx-click="row_edit_start"
+                        phx-value-row-id={row.id}
+                        phx-target={@myself}
+                        title="행 편집"
+                      >&#9998;</button>
+                    <% end %>
+                  </div>
+                <% end %>
+                <%= if @grid.options.show_row_number do %>
+                  <div class="lv-grid__cell lv-grid__cell--row-number" style="width: 50px; flex: 0 0 50px; justify-content: center;">
+                    <%= row_num %>
+                  </div>
+                <% end %>
                 <%= if @grid.state.show_status_column do %>
                   <div class="lv-grid__cell lv-grid__cell--status" style="width: 60px; flex: 0 0 60px; justify-content: center;">
                     <%= render_status_badge(Map.get(@grid.state.row_statuses, row.id, :normal)) %>
                   </div>
                 <% end %>
                 <%= for {column, col_idx} <- Enum.with_index(Grid.display_columns(@grid)) do %>
-                  <div class={"lv-grid__cell #{frozen_class(col_idx, @grid)}"} style={"#{column_width_style(column, @grid)}; #{frozen_style(col_idx, @grid)}; #{tree_indent_style(row, col_idx)}"} data-col-index={col_idx}>
+                  <div class={"lv-grid__cell #{frozen_class(col_idx, @grid)} #{if cell_in_range?(@grid.state.cell_range, row.id, col_idx, p_row_id_to_pos), do: "lv-grid__cell--in-range"}"} style={"#{column_width_style(column, @grid)}; #{frozen_style(col_idx, @grid)}; #{tree_indent_style(row, col_idx)}"} data-col-index={col_idx}>
                     <%= if col_idx == 0 && Map.has_key?(row, :_tree_has_children) do %>
-                      <!-- Tree toggle for first column -->
                       <%= if row._tree_has_children do %>
                         <button
                           class="lv-grid__tree-toggle"
@@ -1291,7 +1002,7 @@ defmodule LiveviewGridWeb.GridComponent do
         </div>
       <% end %>
 
-      <!-- 디버깅: 보이는 데이터 개수 (debug 옵션으로 토글) -->
+      <!-- 디버깅 -->
       <%= if @grid.options.debug do %>
         <div style="padding: 10px; background: #fff9c4; border: 1px solid #fbc02d; margin: 10px 0; font-size: 12px;">
           전체 데이터 <%= length(@grid.data) %>개 |
@@ -1301,14 +1012,12 @@ defmodule LiveviewGridWeb.GridComponent do
           Virtual Scroll <%= if @grid.options.virtual_scroll, do: "ON (offset: #{@grid.state.scroll_offset})", else: "OFF" %>
         </div>
       <% end %>
-      
+
       <!-- Footer -->
       <%= if @grid.options.show_footer do %>
         <div class="lv-grid__footer" style="flex-direction: column; align-items: center; gap: 8px;">
           <%= if !@grid.options.virtual_scroll do %>
-            <!-- 페이지네이션 (센터) -->
             <div style="display: flex; align-items: center; gap: 12px; width: 100%; justify-content: center;">
-              <!-- 페이지 사이즈 선택 -->
               <div style="display: flex; align-items: center; gap: 4px; font-size: 12px; color: var(--lv-grid-text-secondary, #666);">
                 <select
                   phx-change="grid_page_size_change"
@@ -1323,7 +1032,6 @@ defmodule LiveviewGridWeb.GridComponent do
               </div>
 
               <div class="lv-grid__pagination">
-                <!-- 이전 버튼 -->
                 <button
                   class="lv-grid__page-btn"
                   phx-click="grid_page_change"
@@ -1334,7 +1042,6 @@ defmodule LiveviewGridWeb.GridComponent do
                   &lt;
                 </button>
 
-                <!-- 페이지 번호 -->
                 <% filtered_total = Grid.filtered_count(@grid) %>
                 <%= for page <- page_range_for(filtered_total, @grid.state.pagination.current_page, @grid.options.page_size) do %>
                   <button
@@ -1347,7 +1054,6 @@ defmodule LiveviewGridWeb.GridComponent do
                   </button>
                 <% end %>
 
-                <!-- 다음 버튼 -->
                 <button
                   class="lv-grid__page-btn"
                   phx-click="grid_page_change"
@@ -1381,6 +1087,18 @@ defmodule LiveviewGridWeb.GridComponent do
                 <%= map_size(@grid.state.row_statuses) %>개 변경됨
               </span>
             <% end %>
+          </div>
+
+          <!-- Import 버튼 (F-511) -->
+          <div class="lv-grid__export" style="margin-right: 8px;">
+            <div
+              class="lv-grid__export-btn lv-grid__export-btn--import"
+              id={"import-btn-#{@grid.id}"}
+              phx-hook="FileImport"
+              style="cursor: pointer;"
+            >
+              📥 Import
+            </div>
           </div>
 
           <!-- Export 버튼 -->
@@ -1443,300 +1161,47 @@ defmodule LiveviewGridWeb.GridComponent do
           </div>
         </div>
       <% end %>
-    </div>
-    """
-  end
-
-  # Helper functions
-
-  defp column_width_style(%{width: :auto}), do: "flex: 1"
-  defp column_width_style(%{width: width}), do: "width: #{width}px; flex: 0 0 #{width}px"
-
-  # column_widths state에서 리사이즈된 너비 우선 적용
-  defp column_width_style(column, grid) do
-    case Map.get(grid.state.column_widths, column.field) do
-      nil -> column_width_style(column)
-      w -> "width: #{w}px; flex: 0 0 #{w}px"
-    end
-  end
-
-  defp frozen_style(col_idx, grid) do
-    frozen_count = grid.options.frozen_columns
-    if frozen_count > 0 and col_idx < frozen_count do
-      # 체크박스(90px) + 상태(60px if visible) + 이전 컬럼들 너비 합산
-      base_offset = 90 + if(grid.state.show_status_column, do: 60, else: 0)
-      display_cols = Grid.display_columns(grid)
-      prev_width = display_cols
-        |> Enum.take(col_idx)
-        |> Enum.reduce(0, fn col, acc ->
-          # column_widths에서 리사이즈된 값 우선 사용
-          w = Map.get(grid.state.column_widths, col.field) || col.width
-          case w do
-            :auto -> acc + 150
-            w when is_integer(w) -> acc + w
-          end
-        end)
-      left = base_offset + prev_width
-      "position: sticky; left: #{left}px; z-index: 2; background: inherit;"
-    else
-      ""
-    end
-  end
-
-  defp frozen_class(col_idx, grid) do
-    frozen_count = grid.options.frozen_columns
-    if frozen_count > 0 and col_idx < frozen_count do
-      "lv-grid__cell--frozen"
-    else
-      ""
-    end
-  end
-
-  defp sort_active?(nil, _field), do: false
-  defp sort_active?(%{field: sort_field}, field), do: sort_field == field
-
-  defp sort_icon(:asc), do: "▲"
-  defp sort_icon(:desc), do: "▼"
-
-  defp next_direction(nil, _field), do: "asc"
-  defp next_direction(%{field: sort_field, direction: :asc}, field) when sort_field == field, do: "desc"
-  defp next_direction(%{field: sort_field, direction: :desc}, field) when sort_field == field, do: "asc"
-  defp next_direction(_sort, _field), do: "asc"
-
-  defp has_filterable_columns?(columns) do
-    Enum.any?(columns, & &1.filterable)
-  end
-
-  defp filter_placeholder(%{filter_type: :number}), do: "예: >30, <=25"
-  defp filter_placeholder(%{filter_type: :date}), do: "날짜 선택"
-  defp filter_placeholder(_column), do: "검색..."
-
-  # 날짜 범위 필터값에서 from/to 파트 추출
-  defp parse_date_part(nil, _part), do: ""
-  defp parse_date_part("", _part), do: ""
-  defp parse_date_part(value, part) when is_binary(value) do
-    case String.split(value, "~", parts: 2) do
-      [from, to] -> if part == :from, do: from, else: to
-      _ -> ""
-    end
-  end
-  defp parse_date_part(_, _), do: ""
-
-  defp get_column_filter_type(columns, field) do
-    case Enum.find(columns, fn c -> c.field == field end) do
-      nil -> :text
-      col -> Map.get(col, :filter_type, :text)
-    end
-  end
-
-  # v0.7: Tree indent style (첫 번째 컬럼에 depth 기반 padding-left)
-  defp tree_indent_style(%{_tree_depth: depth}, 0) when depth > 0 do
-    "padding-left: #{16 + depth * 24}px;"
-  end
-  defp tree_indent_style(_row, _col_idx), do: ""
-
-  # v0.7: Aggregate value 포맷
-  defp format_agg_value(nil), do: "-"
-  defp format_agg_value(value) when is_number(value), do: Formatter.format(value, :number)
-  defp format_agg_value(value), do: to_string(value)
-
-  defp editing?(nil, _row_id, _field), do: false
-  defp editing?(%{row_id: rid, field: f}, row_id, field), do: rid == row_id and f == field
-
-  defp editor_input_type(%{editor_type: :number}), do: "number"
-  defp editor_input_type(%{editor_type: :date}), do: "date"
-  defp editor_input_type(%{filter_type: :date}), do: "date"
-  defp editor_input_type(_column), do: "text"
-
-  # Date 값을 <input type="date">의 value 형식(YYYY-MM-DD)으로 변환
-  defp format_date_for_input(%Date{} = d), do: Date.to_iso8601(d)
-  defp format_date_for_input(%DateTime{} = dt), do: dt |> DateTime.to_date() |> Date.to_iso8601()
-  defp format_date_for_input(%NaiveDateTime{} = dt), do: dt |> NaiveDateTime.to_date() |> Date.to_iso8601()
-  defp format_date_for_input(val) when is_binary(val), do: val
-  defp format_date_for_input(nil), do: ""
-  defp format_date_for_input(_), do: ""
-
-  # 날짜 문자열을 Date 타입으로 파싱
-  defp parse_date_value(""), do: nil
-  defp parse_date_value(nil), do: nil
-  defp parse_date_value(value) when is_binary(value) do
-    case Date.from_iso8601(value) do
-      {:ok, date} -> date
-      _ -> value
-    end
-  end
-  defp parse_date_value(value), do: value
-
-  defp render_status_badge(:normal), do: ""
-  defp render_status_badge(:new) do
-    Phoenix.HTML.raw(~s(<span class="lv-grid__status-badge lv-grid__status-badge--new">N</span>))
-  end
-  defp render_status_badge(:updated) do
-    Phoenix.HTML.raw(~s(<span class="lv-grid__status-badge lv-grid__status-badge--updated">U</span>))
-  end
-  defp render_status_badge(:deleted) do
-    Phoenix.HTML.raw(~s(<span class="lv-grid__status-badge lv-grid__status-badge--deleted">D</span>))
-  end
-
-  defp render_cell(assigns, row, column) do
-    if column.editable && editing?(assigns.grid.state.editing, row.id, column.field) do
-      if column.editor_type == :select do
-        # SELECT 편집 모드
-        assigns = assign(assigns, row: row, column: column)
-        ~H"""
-        <select
-          phx-value-row-id={@row.id}
-          phx-value-field={@column.field}
+      <%!-- F-800: Context Menu --%>
+      <%= if @context_menu do %>
+        <div
+          class="lv-grid__context-menu"
+          style={"position:fixed;left:#{@context_menu.x}px;top:#{@context_menu.y}px;z-index:9999;"}
+          phx-click-away="hide_context_menu"
           phx-target={@myself}
-          class="lv-grid__cell-editor"
-          id={"editor-#{@row.id}-#{@column.field}"}
-          phx-hook="CellEditor"
         >
-          <%= for {label, value} <- @column.editor_options do %>
-            <option value={value} selected={value == to_string(Map.get(@row, @column.field))}>
-              <%= label %>
-            </option>
-          <% end %>
-        </select>
-        """
-      else
-        input_type = editor_input_type(column)
+          <div class="lv-grid__context-menu-item" phx-click="context_menu_action" phx-value-action="copy_cell" phx-value-row-id={@context_menu.row_id} phx-value-col-idx={@context_menu.col_idx} phx-target={@myself}>
+            <span>📋</span> 셀 복사
+          </div>
+          <div class="lv-grid__context-menu-item" phx-click="context_menu_action" phx-value-action="copy_row" phx-value-row-id={@context_menu.row_id} phx-target={@myself}>
+            <span>📄</span> 행 복사
+          </div>
+          <div class="lv-grid__context-menu-divider"></div>
+          <div class="lv-grid__context-menu-item" phx-click="context_menu_action" phx-value-action="insert_row_above" phx-value-row-id={@context_menu.row_id} phx-target={@myself}>
+            <span>⬆</span> 위에 행 추가
+          </div>
+          <div class="lv-grid__context-menu-item" phx-click="context_menu_action" phx-value-action="insert_row_below" phx-value-row-id={@context_menu.row_id} phx-target={@myself}>
+            <span>⬇</span> 아래에 행 추가
+          </div>
+          <div class="lv-grid__context-menu-item" phx-click="context_menu_action" phx-value-action="duplicate_row" phx-value-row-id={@context_menu.row_id} phx-target={@myself}>
+            <span>⧉</span> 행 복제
+          </div>
+          <div class="lv-grid__context-menu-divider"></div>
+          <div class="lv-grid__context-menu-item lv-grid__context-menu-item--danger" phx-click="context_menu_action" phx-value-action="delete_row" phx-value-row-id={@context_menu.row_id} phx-target={@myself}>
+            <span>🗑</span> 행 삭제
+          </div>
+        </div>
+      <% end %>
 
-        if input_type == "date" do
-          # DATE 편집 모드 - date picker
-          cell_val = Map.get(row, column.field)
-          date_str = format_date_for_input(cell_val)
-          assigns = assign(assigns, row: row, column: column, date_value: date_str)
-          ~H"""
-          <form phx-change="cell_edit_date" phx-target={@myself} style="display: contents;">
-            <input type="hidden" name="row-id" value={@row.id} />
-            <input type="hidden" name="field" value={@column.field} />
-            <input
-              type="date"
-              name="value"
-              value={@date_value}
-              phx-blur="cell_edit_save"
-              phx-value-row-id={@row.id}
-              phx-value-field={@column.field}
-              phx-target={@myself}
-              class="lv-grid__cell-editor"
-              id={"editor-#{@row.id}-#{@column.field}"}
-              phx-hook="CellEditor"
-            />
-          </form>
-          """
-        else
-          # INPUT 편집 모드 (text/number)
-          assigns = assign(assigns, row: row, column: column)
-          ~H"""
-          <input
-            type={editor_input_type(@column)}
-            value={Map.get(@row, @column.field)}
-            phx-blur="cell_edit_save"
-            phx-keyup="cell_keydown"
-            phx-value-row-id={@row.id}
-            phx-value-field={@column.field}
-            phx-target={@myself}
-            class="lv-grid__cell-editor"
-            id={"editor-#{@row.id}-#{@column.field}"}
-            phx-hook="CellEditor"
-          />
-          """
-        end
-      end
-    else
-      # 보기 모드
-      cell_error = Grid.cell_error(assigns.grid, row.id, column.field)
-
-      if column.renderer do
-        # 커스텀 렌더러
-        render_with_renderer(assigns, row, column, cell_error)
-      else
-        # 기존 plain text
-        render_plain(assigns, row, column, cell_error)
-      end
-    end
-  end
-
-  defp render_with_renderer(assigns, row, column, cell_error) do
-    rendered_content =
-      try do
-        column.renderer.(row, column, assigns)
-      rescue
-        _ -> Phoenix.HTML.raw(to_string(Map.get(row, column.field)))
-      end
-
-    assigns = assign(assigns, row: row, column: column, cell_error: cell_error, rendered_content: rendered_content)
-
-    ~H"""
-    <div class={"lv-grid__cell-wrapper #{if @cell_error, do: "lv-grid__cell-wrapper--error"}"}>
-      <span
-        class={"lv-grid__cell-value #{if @column.editable, do: "lv-grid__cell-value--editable"} #{if @cell_error, do: "lv-grid__cell-value--error"}"}
-        id={if @column.editable, do: "cell-#{@row.id}-#{@column.field}"}
-        phx-hook={if @column.editable, do: "CellEditable"}
-        data-row-id={@row.id}
-        data-field={@column.field}
-        phx-target={@myself}
-        title={@cell_error}
-      >
-        <%= @rendered_content %>
-        <%= if @cell_error do %>
-          <span class="lv-grid__cell-error-icon">!</span>
-        <% end %>
-      </span>
-      <%= if @cell_error do %>
-        <span class="lv-grid__cell-error-msg"><%= @cell_error %></span>
+      <!-- Config Modal -->
+      <%= if @show_config_modal do %>
+        <.live_component
+          module={LiveViewGridWeb.Components.GridConfig.ConfigModal}
+          id="grid_config_modal"
+          grid={@grid}
+          parent_target={@myself}
+        />
       <% end %>
     </div>
     """
-  end
-
-  defp render_plain(assigns, row, column, cell_error) do
-    raw_value = Map.get(row, column.field)
-    formatted_value = Formatter.format(raw_value, column.formatter)
-    assigns = assign(assigns, row: row, column: column, cell_error: cell_error, formatted_value: formatted_value)
-
-    ~H"""
-    <div class={"lv-grid__cell-wrapper #{if @cell_error, do: "lv-grid__cell-wrapper--error"}"}>
-      <span
-        class={"lv-grid__cell-value #{if @column.editable, do: "lv-grid__cell-value--editable"} #{if @cell_error, do: "lv-grid__cell-value--error"}"}
-        id={if @column.editable, do: "cell-#{@row.id}-#{@column.field}"}
-        phx-hook={if @column.editable, do: "CellEditable"}
-        data-row-id={@row.id}
-        data-field={@column.field}
-        phx-target={@myself}
-        title={@cell_error}
-      >
-        <%= @formatted_value %>
-        <%= if @cell_error do %>
-          <span class="lv-grid__cell-error-icon">!</span>
-        <% end %>
-      </span>
-      <%= if @cell_error do %>
-        <span class="lv-grid__cell-error-msg"><%= @cell_error %></span>
-      <% end %>
-    </div>
-    """
-  end
-
-  defp page_range_for(total_rows, current_page, page_size) do
-    total = Pagination.total_pages(total_rows, page_size)
-
-    if total == 0 do
-      1..1
-    else
-      start = max(1, current_page - 2)
-      finish = min(total, current_page + 2)
-      start..finish
-    end
-  end
-
-  # 커스텀 CSS 변수를 인라인 style 문자열로 변환
-  defp build_custom_css_vars(nil), do: nil
-  defp build_custom_css_vars(vars) when is_map(vars) and map_size(vars) == 0, do: nil
-  defp build_custom_css_vars(vars) when is_map(vars) do
-    vars
-    |> Enum.map(fn {key, value} -> "#{key}: #{value}" end)
-    |> Enum.join("; ")
   end
 end
