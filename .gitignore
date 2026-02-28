@@ -56,3 +56,21 @@ toastgrid_function.md
 # Test artifacts
 test_scroll.html
 
+# Tool config files
+.bkit/
+.claude/agent-memory/
+.claude/agents.md
+.claude/hooks/
+
+# Korean specification docs (local only)
+API명세서.md
+기능목록및기능정의서.md
+데이터구조명세서.md
+성능요구사항.md
+스타일가이드.md
+유스케이스.md
+이벤트명세서.md
+추가기능목록.md
+테스트명세서.md
+필요명세서.md
+화면디자인.md
