@@ -14,6 +14,11 @@ defmodule LiveviewGridWeb.GridComponent.EventHandlers do
 
   # ── Sorting ──
 
+  @doc """
+  컬럼 정렬을 처리한다. 지정된 필드와 방향(asc/desc)으로 그리드를 정렬하고 스크롤을 초기화한다.
+  """
+  @spec handle_sort(params :: map(), socket :: Phoenix.LiveView.Socket.t()) ::
+          {:noreply, Phoenix.LiveView.Socket.t()}
   def handle_sort(%{"field" => field, "direction" => direction}, socket) do
     grid = socket.assigns.grid
     field_atom = String.to_atom(field)
@@ -32,6 +37,11 @@ defmodule LiveviewGridWeb.GridComponent.EventHandlers do
 
   # ── Pagination ──
 
+  @doc """
+  페이지 변경을 처리한다. 지정된 페이지 번호로 현재 페이지를 이동한다.
+  """
+  @spec handle_page_change(params :: map(), socket :: Phoenix.LiveView.Socket.t()) ::
+          {:noreply, Phoenix.LiveView.Socket.t()}
   def handle_page_change(%{"page" => page}, socket) do
     grid = socket.assigns.grid
     page_num = String.to_integer(page)
@@ -39,6 +49,11 @@ defmodule LiveviewGridWeb.GridComponent.EventHandlers do
     {:noreply, assign(socket, grid: updated_grid)}
   end
 
+  @doc """
+  페이지 크기 변경을 처리한다. 새 페이지 크기 적용 후 1페이지로 리셋한다.
+  """
+  @spec handle_page_size_change(params :: map(), socket :: Phoenix.LiveView.Socket.t()) ::
+          {:noreply, Phoenix.LiveView.Socket.t()}
   def handle_page_size_change(%{"page_size" => page_size}, socket) do
     grid = socket.assigns.grid
     new_size = String.to_integer(page_size)
@@ -52,6 +67,11 @@ defmodule LiveviewGridWeb.GridComponent.EventHandlers do
 
   # ── Column Operations ──
 
+  @doc """
+  컬럼 너비 변경을 처리한다. 최소 50px을 보장한다.
+  """
+  @spec handle_column_resize(params :: map(), socket :: Phoenix.LiveView.Socket.t()) ::
+          {:noreply, Phoenix.LiveView.Socket.t()}
   def handle_column_resize(%{"field" => field, "width" => width}, socket) do
     grid = socket.assigns.grid
     field_atom = String.to_existing_atom(field)
@@ -61,6 +81,11 @@ defmodule LiveviewGridWeb.GridComponent.EventHandlers do
     {:noreply, assign(socket, grid: updated_grid)}
   end
 
+  @doc """
+  컬럼 순서 변경을 처리한다. 드래그 앤 드롭으로 재배치된 컬럼 순서를 적용한다.
+  """
+  @spec handle_column_reorder(params :: map(), socket :: Phoenix.LiveView.Socket.t()) ::
+          {:noreply, Phoenix.LiveView.Socket.t()}
   def handle_column_reorder(%{"order" => order}, socket) do
     grid = socket.assigns.grid
     field_atoms = Enum.map(order, &String.to_existing_atom/1)
@@ -71,6 +96,11 @@ defmodule LiveviewGridWeb.GridComponent.EventHandlers do
 
   # ── Row Selection ──
 
+  @doc """
+  개별 행 선택/해제를 토글한다. 이미 선택된 행이면 해제, 아니면 선택 목록에 추가한다.
+  """
+  @spec handle_row_select(params :: map(), socket :: Phoenix.LiveView.Socket.t()) ::
+          {:noreply, Phoenix.LiveView.Socket.t()}
   def handle_row_select(%{"row-id" => row_id}, socket) do
     grid = socket.assigns.grid
     id = String.to_integer(row_id)
@@ -86,6 +116,11 @@ defmodule LiveviewGridWeb.GridComponent.EventHandlers do
     {:noreply, assign(socket, grid: updated_grid)}
   end
 
+  @doc """
+  전체 선택/해제를 토글한다. 이미 전체 선택 상태이면 해제, 아니면 모든 행을 선택한다.
+  """
+  @spec handle_select_all(params :: map(), socket :: Phoenix.LiveView.Socket.t()) ::
+          {:noreply, Phoenix.LiveView.Socket.t()}
   def handle_select_all(_params, socket) do
     grid = socket.assigns.grid
 
@@ -101,6 +136,11 @@ defmodule LiveviewGridWeb.GridComponent.EventHandlers do
 
   # ── Filter Toggle / Status ──
 
+  @doc """
+  필터 행 표시/숨김을 토글한다. 숨길 때 모든 필터 조건을 초기화하고 스크롤을 리셋한다.
+  """
+  @spec handle_toggle_filter(params :: map(), socket :: Phoenix.LiveView.Socket.t()) ::
+          {:noreply, Phoenix.LiveView.Socket.t()}
   def handle_toggle_filter(_params, socket) do
     grid = socket.assigns.grid
     show = !grid.state.show_filter_row
@@ -120,6 +160,11 @@ defmodule LiveviewGridWeb.GridComponent.EventHandlers do
     {:noreply, socket}
   end
 
+  @doc """
+  상태(status) 컬럼 표시/숨김을 토글한다.
+  """
+  @spec handle_toggle_status_column(params :: map(), socket :: Phoenix.LiveView.Socket.t()) ::
+          {:noreply, Phoenix.LiveView.Socket.t()}
   def handle_toggle_status_column(_params, socket) do
     grid = socket.assigns.grid
     updated_grid = put_in(grid.state.show_status_column, !grid.state.show_status_column)
@@ -128,6 +173,12 @@ defmodule LiveviewGridWeb.GridComponent.EventHandlers do
 
   # ── Filtering ──
 
+  @doc """
+  컬럼별 필터를 적용한다. 빈 값이면 해당 필터를 제거하고, 값이 있으면 필터를 설정한다.
+  필터 변경 시 1페이지로 이동하고 스크롤을 초기화한다.
+  """
+  @spec handle_filter(params :: map(), socket :: Phoenix.LiveView.Socket.t()) ::
+          {:noreply, Phoenix.LiveView.Socket.t()}
   def handle_filter(%{"field" => field, "value" => value}, socket) do
     grid = socket.assigns.grid
     field_atom = String.to_atom(field)
@@ -150,6 +201,11 @@ defmodule LiveviewGridWeb.GridComponent.EventHandlers do
     }
   end
 
+  @doc """
+  날짜 범위 필터를 처리한다. from/to 부분을 `~`로 결합하여 날짜 범위 필터를 구성한다.
+  """
+  @spec handle_filter_date(params :: map(), socket :: Phoenix.LiveView.Socket.t()) ::
+          {:noreply, Phoenix.LiveView.Socket.t()}
   def handle_filter_date(%{"field" => field, "part" => part, "value" => value}, socket) do
     grid = socket.assigns.grid
     field_atom = String.to_atom(field)
@@ -186,6 +242,11 @@ defmodule LiveviewGridWeb.GridComponent.EventHandlers do
     }
   end
 
+  @doc """
+  모든 컬럼 필터를 초기화한다. 1페이지로 이동하고 스크롤을 리셋한다.
+  """
+  @spec handle_clear_filters(params :: map(), socket :: Phoenix.LiveView.Socket.t()) ::
+          {:noreply, Phoenix.LiveView.Socket.t()}
   def handle_clear_filters(_params, socket) do
     grid = socket.assigns.grid
 
@@ -201,6 +262,11 @@ defmodule LiveviewGridWeb.GridComponent.EventHandlers do
     }
   end
 
+  @doc """
+  전체 검색(글로벌 서치)을 처리한다. 모든 컬럼에 걸쳐 검색어를 적용한다.
+  """
+  @spec handle_global_search(params :: map(), socket :: Phoenix.LiveView.Socket.t()) ::
+          {:noreply, Phoenix.LiveView.Socket.t()}
   def handle_global_search(%{"value" => value}, socket) do
     grid = socket.assigns.grid
 
@@ -218,6 +284,11 @@ defmodule LiveviewGridWeb.GridComponent.EventHandlers do
 
   # ── Scroll ──
 
+  @doc """
+  가상 스크롤 이벤트를 처리한다. scroll_top 값으로 현재 표시 오프셋을 계산한다.
+  """
+  @spec handle_scroll(params :: map(), socket :: Phoenix.LiveView.Socket.t()) ::
+          {:noreply, Phoenix.LiveView.Socket.t()}
   def handle_scroll(%{"scroll_top" => scroll_top}, socket) do
     grid = socket.assigns.grid
     row_height = grid.options.row_height
@@ -235,6 +306,11 @@ defmodule LiveviewGridWeb.GridComponent.EventHandlers do
 
   # ── Cell Editing ──
 
+  @doc """
+  셀 편집을 시작한다. 해당 행이 이미 행 편집 모드이면 무시한다.
+  """
+  @spec handle_cell_edit_start(params :: map(), socket :: Phoenix.LiveView.Socket.t()) ::
+          {:noreply, Phoenix.LiveView.Socket.t()}
   def handle_cell_edit_start(%{"row-id" => row_id, "field" => field}, socket) do
     grid = socket.assigns.grid
     row_id_int = String.to_integer(row_id)
@@ -248,10 +324,21 @@ defmodule LiveviewGridWeb.GridComponent.EventHandlers do
     end
   end
 
+  @doc """
+  편집 상태가 nil일 때 저장 요청을 무시한다.
+  """
+  @spec handle_cell_edit_save_nil_editing(socket :: Phoenix.LiveView.Socket.t()) ::
+          {:noreply, Phoenix.LiveView.Socket.t()}
   def handle_cell_edit_save_nil_editing(socket) do
     {:noreply, socket}
   end
 
+  @doc """
+  셀 편집 값을 저장한다. 타입에 따라 값을 파싱하고, data_source가 있으면 DB에 직접 업데이트한다.
+  InMemory 모드에서는 Undo 히스토리에 기록한다.
+  """
+  @spec handle_cell_edit_save(params :: map(), socket :: Phoenix.LiveView.Socket.t()) ::
+          {:noreply, Phoenix.LiveView.Socket.t()}
   def handle_cell_edit_save(%{"row-id" => row_id, "field" => field, "value" => value}, socket) do
     grid = socket.assigns.grid
     row_id_int = String.to_integer(row_id)
@@ -278,49 +365,105 @@ defmodule LiveviewGridWeb.GridComponent.EventHandlers do
       updated_grid = put_in(grid.state.editing, nil)
       {:noreply, assign(socket, grid: updated_grid)}
     else
-      updated_grid = grid
-        |> Grid.update_cell(row_id_int, field_atom, parsed_value)
-        |> Grid.validate_cell(row_id_int, field_atom)
-        |> Grid.push_edit_history({:update_cell, row_id_int, field_atom, original_value, parsed_value})
-        |> put_in([:state, :editing], nil)
+      # data_source가 있으면 DB에 직접 업데이트
+      case Map.get(grid, :data_source) do
+        {module, config} ->
+          changes = %{field_atom => parsed_value}
 
-      send(self(), {:grid_cell_updated, row_id_int, field_atom, parsed_value})
-      {:noreply, assign(socket, grid: updated_grid)}
+          case module.update_row(config, row_id_int, changes) do
+            {:ok, _updated_row} ->
+              updated_grid = grid
+                |> Grid.refresh_from_source()
+                |> put_in([:state, :editing], nil)
+
+              send(self(), {:grid_cell_updated, row_id_int, field_atom, parsed_value})
+              {:noreply, assign(socket, grid: updated_grid)}
+
+            {:error, _reason} ->
+              updated_grid = put_in(grid.state.editing, nil)
+              {:noreply, assign(socket, grid: updated_grid)}
+          end
+
+        _ ->
+          updated_grid = grid
+            |> Grid.update_cell(row_id_int, field_atom, parsed_value)
+            |> Grid.validate_cell(row_id_int, field_atom)
+            |> Grid.push_edit_history({:update_cell, row_id_int, field_atom, original_value, parsed_value})
+            |> put_in([:state, :editing], nil)
+
+          send(self(), {:grid_cell_updated, row_id_int, field_atom, parsed_value})
+          {:noreply, assign(socket, grid: updated_grid)}
+      end
     end
   end
 
+  @doc """
+  셀 편집을 취소하고 편집 상태를 초기화한다.
+  """
+  @spec handle_cell_edit_cancel(params :: map(), socket :: Phoenix.LiveView.Socket.t()) ::
+          {:noreply, Phoenix.LiveView.Socket.t()}
   def handle_cell_edit_cancel(_params, socket) do
     grid = socket.assigns.grid
     updated_grid = put_in(grid.state.editing, nil)
     {:noreply, assign(socket, grid: updated_grid)}
   end
 
+  @doc """
+  셀 편집 중 Enter 키 입력을 처리한다. 값을 저장하고 편집 모드를 종료한다.
+  """
+  @spec handle_cell_keydown_enter(params :: map(), socket :: Phoenix.LiveView.Socket.t()) ::
+          {:noreply, Phoenix.LiveView.Socket.t()}
   def handle_cell_keydown_enter(%{"value" => _value} = params, socket) do
     {:noreply, socket} = handle_cell_edit_save(params, socket)
     {:noreply, push_event(socket, "grid_edit_ended", %{direction: "stay"})}
   end
 
+  @doc """
+  셀 편집 중 Escape 키 입력을 처리한다. 편집을 취소하고 모드를 종료한다.
+  """
+  @spec handle_cell_keydown_escape(socket :: Phoenix.LiveView.Socket.t()) ::
+          {:noreply, Phoenix.LiveView.Socket.t()}
   def handle_cell_keydown_escape(socket) do
     {:noreply, socket} = handle_cell_edit_cancel(%{}, socket)
     {:noreply, push_event(socket, "grid_edit_ended", %{direction: "stay"})}
   end
 
+  @doc """
+  셀 편집 중 기타 키 입력을 무시한다.
+  """
+  @spec handle_cell_keydown_other(socket :: Phoenix.LiveView.Socket.t()) ::
+          {:noreply, Phoenix.LiveView.Socket.t()}
   def handle_cell_keydown_other(socket) do
     {:noreply, socket}
   end
 
+  @doc """
+  셀 편집 값을 저장하고 지정 방향(Tab/Shift+Tab)으로 포커스를 이동한다.
+  """
+  @spec handle_cell_edit_save_and_move(params :: map(), socket :: Phoenix.LiveView.Socket.t()) ::
+          {:noreply, Phoenix.LiveView.Socket.t()}
   def handle_cell_edit_save_and_move(%{"direction" => direction} = params, socket) do
     save_params = Map.take(params, ["row-id", "field", "value"])
     {:noreply, socket} = handle_cell_edit_save(save_params, socket)
     {:noreply, push_event(socket, "grid_edit_ended", %{direction: direction})}
   end
 
+  @doc """
+  날짜 셀 편집을 처리한다. date input 변경 시 호출되며 내부적으로 `handle_cell_edit_save/2`에 위임한다.
+  """
+  @spec handle_cell_edit_date(params :: map(), socket :: Phoenix.LiveView.Socket.t()) ::
+          {:noreply, Phoenix.LiveView.Socket.t()}
   def handle_cell_edit_date(%{"field" => field, "row-id" => row_id, "value" => value}, socket) do
     handle_cell_edit_save(%{"row-id" => row_id, "field" => field, "value" => value}, socket)
   end
 
   # ── Checkbox (F-905) ──
 
+  @doc """
+  체크박스 셀의 값을 토글한다. 현재 boolean 값을 반전시키고 Undo 히스토리에 기록한다.
+  """
+  @spec handle_checkbox_toggle(params :: map(), socket :: Phoenix.LiveView.Socket.t()) ::
+          {:noreply, Phoenix.LiveView.Socket.t()}
   def handle_checkbox_toggle(%{"row-id" => row_id, "field" => field}, socket) do
     grid = socket.assigns.grid
     row_id_int = String.to_integer(row_id)
@@ -341,6 +484,11 @@ defmodule LiveviewGridWeb.GridComponent.EventHandlers do
 
   # ── Select Change ──
 
+  @doc """
+  셀렉트(드롭다운) 셀의 값 변경을 처리한다. 기존 값과 동일하면 편집만 종료한다.
+  """
+  @spec handle_cell_select_change(params :: map(), socket :: Phoenix.LiveView.Socket.t()) ::
+          {:noreply, Phoenix.LiveView.Socket.t()}
   def handle_cell_select_change(%{"select_value" => value, "row-id" => row_id, "field" => field}, socket) do
     grid = socket.assigns.grid
     row_id_int = String.to_integer(row_id)
@@ -365,6 +513,11 @@ defmodule LiveviewGridWeb.GridComponent.EventHandlers do
 
   # ── Row Editing (F-920) ──
 
+  @doc """
+  행 편집 모드를 시작한다. 해당 행의 모든 편집 가능 컬럼이 입력 모드로 전환된다.
+  """
+  @spec handle_row_edit_start(params :: map(), socket :: Phoenix.LiveView.Socket.t()) ::
+          {:noreply, Phoenix.LiveView.Socket.t()}
   def handle_row_edit_start(%{"row-id" => row_id}, socket) do
     grid = socket.assigns.grid
     row_id_int = String.to_integer(row_id)
@@ -376,6 +529,11 @@ defmodule LiveviewGridWeb.GridComponent.EventHandlers do
     {:noreply, assign(socket, grid: updated_grid)}
   end
 
+  @doc """
+  행 편집 값을 일괄 저장한다. 변경된 필드만 감지하여 Undo 히스토리에 기록한다.
+  """
+  @spec handle_row_edit_save(params :: map(), socket :: Phoenix.LiveView.Socket.t()) ::
+          {:noreply, Phoenix.LiveView.Socket.t()}
   def handle_row_edit_save(%{"row-id" => row_id, "values" => values}, socket) do
     grid = socket.assigns.grid
     row_id_int = String.to_integer(row_id)
@@ -415,6 +573,11 @@ defmodule LiveviewGridWeb.GridComponent.EventHandlers do
     {:noreply, assign(socket, grid: final_grid)}
   end
 
+  @doc """
+  행 편집을 취소하고 편집 모드를 종료한다.
+  """
+  @spec handle_row_edit_cancel(params :: map(), socket :: Phoenix.LiveView.Socket.t()) ::
+          {:noreply, Phoenix.LiveView.Socket.t()}
   def handle_row_edit_cancel(%{"row-id" => _row_id}, socket) do
     grid = socket.assigns.grid
     updated_grid = put_in(grid.state.editing_row, nil)
@@ -423,6 +586,11 @@ defmodule LiveviewGridWeb.GridComponent.EventHandlers do
 
   # ── Undo/Redo (F-700) ──
 
+  @doc """
+  마지막 편집을 되돌린다(Undo). 히스토리가 비어있으면 무시한다.
+  """
+  @spec handle_undo(params :: map(), socket :: Phoenix.LiveView.Socket.t()) ::
+          {:noreply, Phoenix.LiveView.Socket.t()}
   def handle_undo(_params, socket) do
     grid = socket.assigns.grid
 
@@ -437,6 +605,11 @@ defmodule LiveviewGridWeb.GridComponent.EventHandlers do
     end
   end
 
+  @doc """
+  되돌린 편집을 다시 적용한다(Redo). Redo 스택이 비어있으면 무시한다.
+  """
+  @spec handle_redo(params :: map(), socket :: Phoenix.LiveView.Socket.t()) ::
+          {:noreply, Phoenix.LiveView.Socket.t()}
   def handle_redo(_params, socket) do
     grid = socket.assigns.grid
 
@@ -473,15 +646,44 @@ defmodule LiveviewGridWeb.GridComponent.EventHandlers do
 
   # ── CRUD ──
 
+  @doc """
+  새 행을 추가한다. data_source가 있으면 DB에 삽입, 없으면 InMemory에 추가한다.
+  컬럼 타입별 기본값이 자동으로 설정된다.
+  """
+  @spec handle_add_row(params :: map(), socket :: Phoenix.LiveView.Socket.t()) ::
+          {:noreply, Phoenix.LiveView.Socket.t()}
   def handle_add_row(_params, socket) do
     grid = socket.assigns.grid
     defaults = build_column_defaults(grid.columns)
 
-    updated_grid = Grid.add_row(grid, defaults, :top)
-    send(self(), {:grid_row_added, hd(updated_grid.data)})
-    {:noreply, assign(socket, grid: updated_grid)}
+    # data_source가 있으면 DB에 직접 삽입
+    case Map.get(grid, :data_source) do
+      {module, config} ->
+        case module.insert_row(config, defaults) do
+          {:ok, new_row} ->
+            updated_grid = Grid.refresh_from_source(grid)
+            send(self(), {:grid_row_added, new_row})
+            {:noreply, assign(socket, grid: updated_grid)}
+
+          {:error, reason} ->
+            require Logger
+            Logger.error("[GridComponent] insert_row failed: #{inspect(reason)}")
+            {:noreply, socket}
+        end
+
+      _ ->
+        updated_grid = Grid.add_row(grid, defaults, :top)
+        send(self(), {:grid_row_added, hd(updated_grid.data)})
+        {:noreply, assign(socket, grid: updated_grid)}
+    end
   end
 
+  @doc """
+  선택된 행들을 삭제한다. data_source가 있으면 DB에서 삭제, 없으면 InMemory에서 제거한다.
+  선택이 비어있으면 무시한다.
+  """
+  @spec handle_delete_selected(params :: map(), socket :: Phoenix.LiveView.Socket.t()) ::
+          {:noreply, Phoenix.LiveView.Socket.t()}
   def handle_delete_selected(_params, socket) do
     grid = socket.assigns.grid
     selected_ids = grid.state.selection.selected_ids
@@ -489,16 +691,38 @@ defmodule LiveviewGridWeb.GridComponent.EventHandlers do
     if selected_ids == [] do
       {:noreply, socket}
     else
-      updated_grid = grid
-        |> Grid.delete_rows(selected_ids)
-        |> put_in([:state, :selection, :selected_ids], [])
-        |> put_in([:state, :selection, :select_all], false)
+      # data_source가 있으면 DB에서 직접 삭제
+      case Map.get(grid, :data_source) do
+        {module, config} ->
+          Enum.each(selected_ids, fn row_id ->
+            module.delete_row(config, row_id)
+          end)
 
-      send(self(), {:grid_rows_deleted, selected_ids})
-      {:noreply, assign(socket, grid: updated_grid)}
+          updated_grid = grid
+            |> Grid.refresh_from_source()
+            |> put_in([:state, :selection, :selected_ids], [])
+            |> put_in([:state, :selection, :select_all], false)
+
+          send(self(), {:grid_rows_deleted, selected_ids})
+          {:noreply, assign(socket, grid: updated_grid)}
+
+        _ ->
+          updated_grid = grid
+            |> Grid.delete_rows(selected_ids)
+            |> put_in([:state, :selection, :selected_ids], [])
+            |> put_in([:state, :selection, :select_all], false)
+
+          send(self(), {:grid_rows_deleted, selected_ids})
+          {:noreply, assign(socket, grid: updated_grid)}
+      end
     end
   end
 
+  @doc """
+  변경 사항 저장을 요청한다. 유효성 오류가 있으면 저장을 차단하고, 없으면 부모에게 저장 이벤트를 전송한다.
+  """
+  @spec handle_save(params :: map(), socket :: Phoenix.LiveView.Socket.t()) ::
+          {:noreply, Phoenix.LiveView.Socket.t()}
   def handle_save(_params, socket) do
     grid = socket.assigns.grid
 
@@ -513,6 +737,11 @@ defmodule LiveviewGridWeb.GridComponent.EventHandlers do
     end
   end
 
+  @doc """
+  변경 사항을 폐기한다. 행 상태와 셀 오류를 초기화하고 부모에게 폐기 이벤트를 전송한다.
+  """
+  @spec handle_discard(params :: map(), socket :: Phoenix.LiveView.Socket.t()) ::
+          {:noreply, Phoenix.LiveView.Socket.t()}
   def handle_discard(_params, socket) do
     grid = socket.assigns.grid
     send(self(), :grid_discard_requested)
@@ -525,6 +754,11 @@ defmodule LiveviewGridWeb.GridComponent.EventHandlers do
 
   # ── Import (F-511) ──
 
+  @doc """
+  CSV/Excel 파일 데이터를 그리드에 임포트한다. 헤더를 컬럼에 매핑하고 각 행을 추가한다.
+  """
+  @spec handle_import_file(params :: map(), socket :: Phoenix.LiveView.Socket.t()) ::
+          {:noreply, Phoenix.LiveView.Socket.t()}
   def handle_import_file(%{"headers" => headers, "data" => data_rows}, socket) do
     grid = socket.assigns.grid
     display_cols = Grid.display_columns(grid)
@@ -560,6 +794,11 @@ defmodule LiveviewGridWeb.GridComponent.EventHandlers do
 
   # ── Paste (F-932) ──
 
+  @doc """
+  클립보드 붙여넣기를 처리한다. 시작 셀부터 붙여넣기 데이터를 편집 가능한 셀에 적용한다.
+  """
+  @spec handle_paste_cells(params :: map(), socket :: Phoenix.LiveView.Socket.t()) ::
+          {:noreply, Phoenix.LiveView.Socket.t()}
   def handle_paste_cells(%{"start_row_id" => start_row_id, "start_col_idx" => start_col_idx, "data" => paste_rows}, socket) do
     grid = socket.assigns.grid
     display_cols = Grid.display_columns(grid)
@@ -600,6 +839,11 @@ defmodule LiveviewGridWeb.GridComponent.EventHandlers do
 
   # ── Export ──
 
+  @doc """
+  Excel(XLSX) 형식으로 데이터를 내보낸다. type에 따라 전체/필터된/선택된 데이터를 내보낸다.
+  """
+  @spec handle_export_excel(params :: map(), socket :: Phoenix.LiveView.Socket.t()) ::
+          {:noreply, Phoenix.LiveView.Socket.t()}
   def handle_export_excel(%{"type" => type}, socket) do
     grid = socket.assigns.grid
     {data, columns} = export_data(grid, type)
@@ -625,6 +869,11 @@ defmodule LiveviewGridWeb.GridComponent.EventHandlers do
     end
   end
 
+  @doc """
+  CSV 형식으로 데이터를 내보낸다. type에 따라 전체/필터된/선택된 데이터를 내보낸다.
+  """
+  @spec handle_export_csv(params :: map(), socket :: Phoenix.LiveView.Socket.t()) ::
+          {:noreply, Phoenix.LiveView.Socket.t()}
   def handle_export_csv(%{"type" => type}, socket) do
     grid = socket.assigns.grid
     {data, columns} = export_data(grid, type)
@@ -643,6 +892,11 @@ defmodule LiveviewGridWeb.GridComponent.EventHandlers do
     {:noreply, assign(socket, export_menu_open: nil)}
   end
 
+  @doc """
+  내보내기 메뉴(Excel/CSV 하위 옵션)를 토글한다.
+  """
+  @spec handle_toggle_export_menu(params :: map(), socket :: Phoenix.LiveView.Socket.t()) ::
+          {:noreply, Phoenix.LiveView.Socket.t()}
   def handle_toggle_export_menu(%{"format" => format}, socket) do
     current = socket.assigns[:export_menu_open]
     new_value = if current == format, do: nil, else: format
@@ -666,6 +920,11 @@ defmodule LiveviewGridWeb.GridComponent.EventHandlers do
 
   # ── Advanced Filter (F-310) ──
 
+  @doc """
+  고급 필터 패널 표시/숨김을 토글한다.
+  """
+  @spec handle_toggle_advanced_filter(params :: map(), socket :: Phoenix.LiveView.Socket.t()) ::
+          {:noreply, Phoenix.LiveView.Socket.t()}
   def handle_toggle_advanced_filter(_params, socket) do
     grid = socket.assigns.grid
     show = !Map.get(grid.state, :show_advanced_filter, false)
@@ -673,6 +932,11 @@ defmodule LiveviewGridWeb.GridComponent.EventHandlers do
     {:noreply, assign(socket, grid: updated_grid)}
   end
 
+  @doc """
+  고급 필터에 새 조건을 추가한다. 기본값은 field: nil, operator: :contains, value: "".
+  """
+  @spec handle_add_filter_condition(params :: map(), socket :: Phoenix.LiveView.Socket.t()) ::
+          {:noreply, Phoenix.LiveView.Socket.t()}
   def handle_add_filter_condition(_params, socket) do
     grid = socket.assigns.grid
     adv = Map.get(grid.state, :advanced_filters, %{logic: :and, conditions: []})
@@ -682,6 +946,12 @@ defmodule LiveviewGridWeb.GridComponent.EventHandlers do
     {:noreply, assign(socket, grid: updated_grid)}
   end
 
+  @doc """
+  고급 필터 조건의 필드/연산자/값을 변경한다.
+  필드 변경 시 해당 컬럼 타입에 맞는 기본 연산자가 자동 선택된다.
+  """
+  @spec handle_update_filter_condition(params :: map(), socket :: Phoenix.LiveView.Socket.t()) ::
+          {:noreply, Phoenix.LiveView.Socket.t()}
   def handle_update_filter_condition(params, socket) do
     grid = socket.assigns.grid
     adv = Map.get(grid.state, :advanced_filters, %{logic: :and, conditions: []})
@@ -723,6 +993,11 @@ defmodule LiveviewGridWeb.GridComponent.EventHandlers do
     {:noreply, assign(socket, grid: updated_grid)}
   end
 
+  @doc """
+  고급 필터에서 지정 인덱스의 조건을 제거한다.
+  """
+  @spec handle_remove_filter_condition(params :: map(), socket :: Phoenix.LiveView.Socket.t()) ::
+          {:noreply, Phoenix.LiveView.Socket.t()}
   def handle_remove_filter_condition(%{"index" => index}, socket) do
     grid = socket.assigns.grid
     adv = Map.get(grid.state, :advanced_filters, %{logic: :and, conditions: []})
@@ -733,6 +1008,11 @@ defmodule LiveviewGridWeb.GridComponent.EventHandlers do
     {:noreply, assign(socket, grid: updated_grid)}
   end
 
+  @doc """
+  고급 필터의 논리 연산자(AND/OR)를 변경한다.
+  """
+  @spec handle_change_filter_logic(params :: map(), socket :: Phoenix.LiveView.Socket.t()) ::
+          {:noreply, Phoenix.LiveView.Socket.t()}
   def handle_change_filter_logic(%{"logic" => logic}, socket) do
     grid = socket.assigns.grid
     adv = Map.get(grid.state, :advanced_filters, %{logic: :and, conditions: []})
@@ -742,18 +1022,33 @@ defmodule LiveviewGridWeb.GridComponent.EventHandlers do
     {:noreply, assign(socket, grid: updated_grid)}
   end
 
+  @doc """
+  모든 고급 필터 조건을 초기화한다.
+  """
+  @spec handle_clear_advanced_filter(params :: map(), socket :: Phoenix.LiveView.Socket.t()) ::
+          {:noreply, Phoenix.LiveView.Socket.t()}
   def handle_clear_advanced_filter(_params, socket) do
     grid = socket.assigns.grid
     updated_grid = put_in(grid.state[:advanced_filters], %{logic: :and, conditions: []})
     {:noreply, assign(socket, grid: updated_grid)}
   end
 
+  @doc """
+  폼 서브밋 기본 동작을 무시한다. 실수로 발생하는 form submit 이벤트 방지용.
+  """
+  @spec handle_noop_submit(params :: map(), socket :: Phoenix.LiveView.Socket.t()) ::
+          {:noreply, Phoenix.LiveView.Socket.t()}
   def handle_noop_submit(_params, socket) do
     {:noreply, socket}
   end
 
   # ── Grouping (v0.7) ──
 
+  @doc """
+  그룹핑 필드를 설정한다. 쉼표로 구분된 필드 문자열을 파싱하여 그룹핑을 적용한다.
+  """
+  @spec handle_group_by(params :: map(), socket :: Phoenix.LiveView.Socket.t()) ::
+          {:noreply, Phoenix.LiveView.Socket.t()}
   def handle_group_by(%{"fields" => fields_str}, socket) do
     grid = socket.assigns.grid
     fields = fields_str
@@ -764,6 +1059,11 @@ defmodule LiveviewGridWeb.GridComponent.EventHandlers do
     {:noreply, assign(socket, grid: updated_grid)}
   end
 
+  @doc """
+  그룹 집계 함수를 설정한다. JSON 문자열을 파싱하여 필드별 집계(sum, avg, count 등)를 적용한다.
+  """
+  @spec handle_group_aggregates(params :: map(), socket :: Phoenix.LiveView.Socket.t()) ::
+          {:noreply, Phoenix.LiveView.Socket.t()}
   def handle_group_aggregates(%{"aggregates" => agg_str}, socket) do
     grid = socket.assigns.grid
     aggregates = agg_str
@@ -775,12 +1075,22 @@ defmodule LiveviewGridWeb.GridComponent.EventHandlers do
     {:noreply, assign(socket, grid: updated_grid)}
   end
 
+  @doc """
+  그룹의 접기/펼치기를 토글한다.
+  """
+  @spec handle_toggle_group(params :: map(), socket :: Phoenix.LiveView.Socket.t()) ::
+          {:noreply, Phoenix.LiveView.Socket.t()}
   def handle_toggle_group(%{"group-key" => group_key}, socket) do
     grid = socket.assigns.grid
     updated_grid = Grid.toggle_group(grid, group_key)
     {:noreply, assign(socket, grid: updated_grid)}
   end
 
+  @doc """
+  그룹핑을 해제하고 플랫 뷰로 전환한다.
+  """
+  @spec handle_clear_grouping(params :: map(), socket :: Phoenix.LiveView.Socket.t()) ::
+          {:noreply, Phoenix.LiveView.Socket.t()}
   def handle_clear_grouping(_params, socket) do
     grid = socket.assigns.grid
     updated_grid = Grid.set_group_by(grid, [])
@@ -789,6 +1099,11 @@ defmodule LiveviewGridWeb.GridComponent.EventHandlers do
 
   # ── Tree Grid (v0.7) ──
 
+  @doc """
+  트리 모드 활성화/비활성화를 토글한다.
+  """
+  @spec handle_toggle_tree(params :: map(), socket :: Phoenix.LiveView.Socket.t()) ::
+          {:noreply, Phoenix.LiveView.Socket.t()}
   def handle_toggle_tree(%{"enabled" => enabled}, socket) do
     grid = socket.assigns.grid
     parent_field = Map.get(grid.state, :tree_parent_field, :parent_id)
@@ -796,6 +1111,11 @@ defmodule LiveviewGridWeb.GridComponent.EventHandlers do
     {:noreply, assign(socket, grid: updated_grid)}
   end
 
+  @doc """
+  트리 노드의 접기/펼치기를 토글한다.
+  """
+  @spec handle_toggle_tree_node(params :: map(), socket :: Phoenix.LiveView.Socket.t()) ::
+          {:noreply, Phoenix.LiveView.Socket.t()}
   def handle_toggle_tree_node(%{"node-id" => node_id_str}, socket) do
     grid = socket.assigns.grid
     node_id = String.to_integer(node_id_str)
@@ -805,6 +1125,10 @@ defmodule LiveviewGridWeb.GridComponent.EventHandlers do
 
   # ── v0.7 Options ──
 
+  @doc """
+  v0.7 옵션(그룹핑, 트리 모드)을 그리드에 적용한다. Grid 초기화 시 사용된다.
+  """
+  @spec apply_v07_options(grid :: map(), options :: map()) :: map()
   def apply_v07_options(grid, options) do
     grid = if Map.has_key?(options, :group_by) do
       group_by = Map.get(options, :group_by, [])
@@ -831,6 +1155,11 @@ defmodule LiveviewGridWeb.GridComponent.EventHandlers do
 
   # ── F-800: Context Menu ──
 
+  @doc """
+  셀 우클릭 컨텍스트 메뉴를 표시한다. 클릭 좌표(x, y)와 대상 셀 정보를 저장한다.
+  """
+  @spec handle_show_context_menu(params :: map(), socket :: Phoenix.LiveView.Socket.t()) ::
+          {:noreply, Phoenix.LiveView.Socket.t()}
   def handle_show_context_menu(params, socket) do
     menu = %{
       row_id: params["row_id"],
@@ -841,10 +1170,20 @@ defmodule LiveviewGridWeb.GridComponent.EventHandlers do
     {:noreply, assign(socket, context_menu: menu)}
   end
 
+  @doc """
+  컨텍스트 메뉴를 숨긴다.
+  """
+  @spec handle_hide_context_menu(params :: map(), socket :: Phoenix.LiveView.Socket.t()) ::
+          {:noreply, Phoenix.LiveView.Socket.t()}
   def handle_hide_context_menu(_params, socket) do
     {:noreply, assign(socket, context_menu: nil)}
   end
 
+  @doc """
+  컨텍스트 메뉴 항목 클릭을 처리한다. copy_cell, copy_row, insert_row_above/below, duplicate_row, delete_row를 지원한다.
+  """
+  @spec handle_context_menu_action(params :: map(), socket :: Phoenix.LiveView.Socket.t()) ::
+          {:noreply, Phoenix.LiveView.Socket.t()}
   def handle_context_menu_action(params, socket) do
     action = params["action"]
     row_id_str = params["row-id"] || params["row_id"]
@@ -980,6 +1319,11 @@ defmodule LiveviewGridWeb.GridComponent.EventHandlers do
 
   # ── F-940: Cell Range Selection ──
 
+  @doc """
+  셀 범위 선택을 설정한다. 앵커 셀과 확장 셀의 좌표를 저장한다.
+  """
+  @spec handle_set_cell_range(params :: map(), socket :: Phoenix.LiveView.Socket.t()) ::
+          {:noreply, Phoenix.LiveView.Socket.t()}
   def handle_set_cell_range(params, socket) do
     grid = socket.assigns.grid
 
@@ -994,6 +1338,11 @@ defmodule LiveviewGridWeb.GridComponent.EventHandlers do
     {:noreply, assign(socket, grid: updated_grid)}
   end
 
+  @doc """
+  셀 범위 선택을 해제한다.
+  """
+  @spec handle_clear_cell_range(params :: map(), socket :: Phoenix.LiveView.Socket.t()) ::
+          {:noreply, Phoenix.LiveView.Socket.t()}
   def handle_clear_cell_range(_params, socket) do
     grid = socket.assigns.grid
     updated_grid = Grid.clear_cell_range(grid)
@@ -1044,6 +1393,11 @@ defmodule LiveviewGridWeb.GridComponent.EventHandlers do
     |> Enum.find_value(0, fn {col, idx} -> if col.editable, do: idx end)
   end
 
+  @doc """
+  선택된 셀 범위의 데이터를 탭/줄바꿈 구분 텍스트로 클립보드에 복사한다.
+  """
+  @spec handle_copy_cell_range(params :: map(), socket :: Phoenix.LiveView.Socket.t()) ::
+          {:noreply, Phoenix.LiveView.Socket.t()}
   def handle_copy_cell_range(_params, socket) do
     grid = socket.assigns.grid
 

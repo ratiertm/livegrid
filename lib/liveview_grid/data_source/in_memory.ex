@@ -11,6 +11,9 @@ defmodule LiveViewGrid.DataSource.InMemory do
 
   alias LiveViewGrid.{Filter, Sorting, Pagination}
 
+  @doc """
+  InMemory 데이터에 검색/필터/정렬/페이지네이션을 적용하여 반환한다. 가상 스크롤도 지원한다.
+  """
   @impl true
   def fetch_data(%{data: data}, state, options, columns) do
     # Apply the same pipeline as Grid.visible_data/1
@@ -32,18 +35,27 @@ defmodule LiveViewGrid.DataSource.InMemory do
     {rows, total_count, filtered_count}
   end
 
+  @doc """
+  InMemory 모드에서 행 삽입을 처리한다. 실제 데이터 관리는 Grid 모듈이 담당한다.
+  """
   @impl true
   def insert_row(%{data: _data}, row_data) do
     # In-memory: just return the row as-is (ID management is handled by Grid)
     {:ok, row_data}
   end
 
+  @doc """
+  InMemory 모드에서 행 업데이트를 처리한다. 실제 데이터 갱신은 Grid 모듈이 담당한다.
+  """
   @impl true
   def update_row(%{data: _data}, _row_id, changes) do
     # In-memory: return changes (actual data update is handled by Grid)
     {:ok, changes}
   end
 
+  @doc """
+  InMemory 모드에서 행 삭제를 처리한다. 실제 데이터 제거는 Grid 모듈이 담당한다.
+  """
   @impl true
   def delete_row(%{data: _data}, _row_id) do
     # In-memory: just acknowledge (actual removal is handled by Grid)

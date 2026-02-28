@@ -227,6 +227,16 @@
   overflow: visible;
 }
 
+.lv-grid__cell--align-center {
+  align-items: center;
+  text-align: center;
+}
+
+.lv-grid__cell--align-right {
+  align-items: flex-end;
+  text-align: right;
+}
+
 .lv-grid__cell-error-msg {
   font-size: 11px;
   color: var(--lv-grid-danger);
@@ -244,4 +254,12 @@
 
 .lv-grid__save-btn--disabled:hover {
   background: var(--lv-grid-scrollbar-thumb);
+}
+
+/* 6.6 Toolbar Separator (FR-10) */
+.lv-grid__toolbar-separator {
+  width: 1px;
+  height: 24px;
+  background: var(--lv-grid-border);
+  flex-shrink: 0;
 }

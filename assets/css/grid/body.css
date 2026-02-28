@@ -6,14 +6,14 @@
 .lv-grid__body {
   max-height: 600px;
   overflow-y: auto;
-  overflow-x: hidden;
+  overflow-x: auto;
 }
 
 /* Virtual Scroll Body - 고정 높이로 스크롤바 보장 */
 .lv-grid__body--virtual {
   height: 600px;
   overflow-y: scroll;
-  overflow-x: hidden;
+  overflow-x: auto;
 }
 
 .lv-grid__row {
@@ -28,7 +28,7 @@
 
 .lv-grid__row--selected {
   background: var(--lv-grid-selected);
-  border-left: 3px solid var(--lv-grid-primary);
+  box-shadow: inset 3px 0 0 var(--lv-grid-primary);
 }
 
 .lv-grid__row--selected:hover {
@@ -43,7 +43,7 @@
   align-items: center;
 
   font-size: var(--lv-grid-font-size-md);
-  color: var(--lv-grid-text-secondary);
+  color: var(--lv-grid-text);
 
   overflow: hidden;
   text-overflow: ellipsis;
@@ -62,13 +62,15 @@
   cursor: pointer;
   padding: 2px 4px;
   border-radius: 2px;
-  transition: background 0.15s ease;
+  border-bottom: 1px dashed var(--lv-grid-border-input);
+  transition: background 0.15s ease, border-color 0.15s ease;
   min-height: var(--lv-grid-cell-content-h);
   display: inline-block;
 }
 
 .lv-grid__cell-value--editable:hover {
   background: var(--lv-grid-warning-light);
+  border-bottom-color: var(--lv-grid-primary);
 }
 
 .lv-grid__cell-editor {
@@ -305,7 +307,13 @@ select.lv-grid__cell-editor {
 
 /* 5.8 Deleted Row Style */
 .lv-grid__row--deleted {
-  opacity: 0.5;
+  opacity: 0.6;
   text-decoration: line-through;
   background: var(--lv-grid-danger-light);
+}
+
+/* 5.10 Numeric Cell (FR-06) */
+.lv-grid__cell--numeric {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
 }

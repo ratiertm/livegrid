@@ -10,11 +10,13 @@ defmodule LiveviewGridWeb.RendererDemoLive do
 
   alias LiveViewGrid.Renderers
 
+  @doc "마운트 시 쇼케이스용 샘플 데이터를 생성하여 할당한다."
   @impl true
   def mount(_params, _session, socket) do
     {:ok, assign(socket, data: generate_showcase_data())}
   end
 
+  @doc "렌더러 쇼케이스 데모 페이지를 렌더링한다."
   @impl true
   def render(assigns) do
     ~H"""
@@ -133,7 +135,7 @@ defmodule LiveviewGridWeb.RendererDemoLive do
               renderer: Renderers.link(prefix: "tel:")},
             %{field: :website, label: "웹사이트 (새탭)", width: 200,
               renderer: Renderers.link(target: "_blank")},
-            %{field: :name, label: "프로필 (커스텀URL)", width: 150,
+            %{field: :profile, label: "프로필 (커스텀URL)", width: 150,
               renderer: Renderers.link(
                 href: fn row, _col -> "/profile/#{row.id}" end
               )}
@@ -182,7 +184,7 @@ defmodule LiveviewGridWeb.RendererDemoLive do
               renderer: Renderers.progress(max: 100, color: "red")},
             %{field: :rating, label: "평점 (yellow, max:5)", width: 180,
               renderer: Renderers.progress(max: 5, color: "yellow")},
-            %{field: :score, label: "바만 표시", width: 140,
+            %{field: :score_bar, label: "바만 표시", width: 140,
               renderer: Renderers.progress(max: 100, color: "blue", show_value: false)}
           ]}
           options={%{page_size: 99999, show_footer: false}}
@@ -368,6 +370,7 @@ defmodule LiveviewGridWeb.RendererDemoLive do
         name: name,
         email: "user#{i}@example.com",
         phone: "010-#{String.pad_leading(to_string(Enum.random(1000..9999)), 4, "0")}-#{String.pad_leading(to_string(Enum.random(1000..9999)), 4, "0")}",
+        profile: name,
         website: "https://example.com/user/#{i}",
         age: Enum.random(22..58),
         city: Enum.at(cities, rem(i - 1, 5)),
@@ -375,6 +378,7 @@ defmodule LiveviewGridWeb.RendererDemoLive do
         grade: Enum.at(grades, rem(i - 1, 4)),
         department: Enum.at(departments, rem(i - 1, 5)),
         score: Enum.random(10..100),
+        score_bar: Enum.random(10..100),
         completion: Enum.random(0..100),
         rating: Enum.random(1..5),
         is_active: rem(i, 3) != 0,

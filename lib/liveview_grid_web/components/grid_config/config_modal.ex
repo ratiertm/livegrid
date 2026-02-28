@@ -17,6 +17,7 @@ defmodule LiveViewGridWeb.Components.GridConfig.ConfigModal do
       <.config_modal id="grid_config" grid={@grid} on_apply={...} />
   """
 
+  @doc "Grid Configuration Modal의 전체 UI를 렌더링한다. 탭 네비게이션과 설정 패널을 포함한다."
   @impl true
   def render(assigns) do
     ~H"""
@@ -69,14 +70,14 @@ defmodule LiveViewGridWeb.Components.GridConfig.ConfigModal do
             <% "properties" -> %>
               <.column_properties_tab
                 myself={@myself}
-                grid={@grid}
+                column_order={@column_order}
                 column_configs={@column_configs}
                 selected_column={@selected_column}
               />
             <% "formatters" -> %>
               <.formatters_tab
                 myself={@myself}
-                grid={@grid}
+                column_order={@column_order}
                 column_configs={@column_configs}
                 selected_formatter_column={@selected_formatter_column}
                 validators={@validators}
@@ -88,6 +89,37 @@ defmodule LiveViewGridWeb.Components.GridConfig.ConfigModal do
               />
           <% end %>
         </div>
+
+        <!-- Change Summary Panel (Phase 3) -->
+        <%= if @changes.total > 0 do %>
+          <div class="px-6 py-3 bg-amber-50 border-t border-amber-200">
+            <div class="flex items-center gap-2 mb-2">
+              <span class="text-amber-600 font-semibold text-sm">
+                Changes: <%= @changes.total %>
+              </span>
+            </div>
+            <ul class="text-xs text-gray-600 space-y-1 max-h-24 overflow-y-auto">
+              <%= for diff <- @changes.columns do %>
+                <li>
+                  <code class="bg-gray-100 px-1 rounded"><%= diff.field %></code>
+                  <%= diff.property %>: "<%= diff.from %>" -> "<%= diff.to %>"
+                </li>
+              <% end %>
+              <%= for diff <- @changes.hidden do %>
+                <li>
+                  <code class="bg-gray-100 px-1 rounded"><%= diff.field %></code>
+                  <%= if diff.action == :show, do: "show (restore)", else: "hidden" %>
+                </li>
+              <% end %>
+              <%= for diff <- @changes.options do %>
+                <li><%= diff.key %>: "<%= diff.from %>" -> "<%= diff.to %>"</li>
+              <% end %>
+              <%= for _diff <- Map.get(@changes, :order, []) do %>
+                <li>Column order changed</li>
+              <% end %>
+            </ul>
+          </div>
+        <% end %>
 
         <!-- Modal Footer -->
         <div class="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-200 bg-gray-50">
@@ -108,10 +140,18 @@ defmodule LiveViewGridWeb.Components.GridConfig.ConfigModal do
           <button
             phx-click="apply_grid_config"
             phx-target={@parent_target}
-            phx-value-config={build_config_json(@column_configs, @column_order, @columns_visible, @grid_options)}
-            class="px-4 py-2 text-white bg-blue-600 rounded hover:bg-blue-700"
+            phx-value-config={build_config_json(@column_configs, @column_order, @columns_visible, @grid_options, @validators)}
+            class={[
+              "px-4 py-2 rounded transition-colors",
+              if @changes.total > 0 do
+                "text-white bg-blue-600 hover:bg-blue-700"
+              else
+                "text-gray-400 bg-gray-200 cursor-not-allowed"
+              end
+            ]}
+            disabled={@changes.total == 0}
           >
-            Apply
+            Apply (<%= @changes.total %>)
           </button>
         </div>
       </div>
@@ -119,6 +159,7 @@ defmodule LiveViewGridWeb.Components.GridConfig.ConfigModal do
     """
   end
 
+  @doc "마운트 시 탭 상태, 컬럼 설정, 그리드 옵션 등 초기 상태를 설정한다."
   @impl true
   def mount(socket) do
     default_options = %{
@@ -143,18 +184,28 @@ defmodule LiveViewGridWeb.Components.GridConfig.ConfigModal do
      |> assign(:validators, %{})
      |> assign(:parent_target, nil)
      |> assign(:grid_options, default_options)
-     |> assign(:options_backup, default_options)}
+     |> assign(:options_backup, default_options)
+     |> assign(:changes, %{columns: [], hidden: [], options: [], total: 0})}
   end
 
+  @doc "부모에서 전달된 Grid 정보로 컬럼/옵션 상태를 초기화한다. 최초 마운트 시에만 실행된다."
   @impl true
   def update(assigns, socket) do
-    socket =
-      socket
-      |> assign(assigns)
-      |> init_column_state()
-      |> init_grid_options_state()
+    socket = assign(socket, assigns)
 
-    {:ok, socket}
+    # 최초 마운트 시에만 column/options state 초기화
+    # (부모 재렌더링 시 사용자 편집 내용이 리셋되는 것을 방지)
+    socket =
+      if socket.assigns[:initialized] do
+        socket
+      else
+        socket
+        |> init_column_state()
+        |> init_grid_options_state()
+        |> assign(:initialized, true)
+      end
+
+    {:ok, compute_changes(socket)}
   end
 
   # Phase 2: Grid options 상태 초기화
@@ -183,14 +234,22 @@ defmodule LiveViewGridWeb.Components.GridConfig.ConfigModal do
   defp init_column_state(socket) do
     grid = socket.assigns.grid
 
+    # runtime 변경을 우선 사용, 없으면 definition 원본 (하위 호환)
+    all_columns =
+      cond do
+        grid.state[:all_columns] -> grid.state[:all_columns]
+        grid.definition -> grid.definition.columns
+        true -> grid.columns
+      end
+
     column_order =
       case grid.state[:column_order] do
-        nil -> Enum.map(grid.columns, & &1.field)
+        nil -> Enum.map(all_columns, & &1.field)
         order -> order
       end
 
     column_configs =
-      Enum.reduce(grid.columns, %{}, fn col, acc ->
+      Enum.reduce(all_columns, %{}, fn col, acc ->
         Map.put(acc, col.field, %{
           label: col.label,
           width: col.width,
@@ -206,7 +265,7 @@ defmodule LiveViewGridWeb.Components.GridConfig.ConfigModal do
 
     # 모든 컬럼을 기본적으로 visible로 설정
     columns_visible =
-      Enum.reduce(grid.columns, %{}, fn col, acc ->
+      Enum.reduce(all_columns, %{}, fn col, acc ->
         Map.put(acc, col.field, true)
       end)
 
@@ -218,10 +277,11 @@ defmodule LiveViewGridWeb.Components.GridConfig.ConfigModal do
         Map.put(acc, field, false)
       end)
 
-    # 컬럼별 validators 맵 구성
+    # 컬럼별 validators 맵 구성 (tuple → map 변환)
     validators =
-      Enum.reduce(grid.columns, %{}, fn col, acc ->
-        Map.put(acc, col.field, col.validators || [])
+      Enum.reduce(all_columns, %{}, fn col, acc ->
+        converted = Enum.map(col.validators || [], &tuple_to_validator_map/1)
+        Map.put(acc, col.field, converted)
       end)
 
     socket
@@ -237,16 +297,33 @@ defmodule LiveViewGridWeb.Components.GridConfig.ConfigModal do
   # Event Handlers
   # ============================================================================
 
+  @doc "Config Modal의 이벤트를 처리한다. 탭 전환, 컬럼 속성 변경, 포매터/검증자 설정, 그리드 옵션 변경 등을 지원한다."
   @impl true
   def handle_event("select_tab", %{"tab" => tab}, socket) do
     {:noreply, assign(socket, :active_tab, tab)}
   end
 
   def handle_event("reset", _params, socket) do
+    grid = socket.assigns.grid
+
+    # definition.options가 있으면 grid_options도 원본으로
+    original_options =
+      if grid.definition do
+        Map.merge(
+          LiveViewGrid.Grid.default_options(),
+          grid.definition.options
+        )
+        |> Map.take([:page_size, :theme, :virtual_scroll, :row_height,
+                     :frozen_columns, :show_row_number, :show_header, :show_footer])
+      else
+        socket.assigns.options_backup
+      end
+
     socket =
       socket
+      |> assign(:grid_options, original_options)
       |> init_column_state()
-      |> assign(:grid_options, socket.assigns.options_backup)
+      |> compute_changes()
 
     {:noreply, socket}
   end
@@ -256,7 +333,7 @@ defmodule LiveViewGridWeb.Components.GridConfig.ConfigModal do
     coerced_value = coerce_option_value(option_key, value)
     key_atom = String.to_atom(option_key)
     new_options = Map.put(socket.assigns.grid_options, key_atom, coerced_value)
-    {:noreply, assign(socket, :grid_options, new_options)}
+    {:noreply, socket |> assign(:grid_options, new_options) |> compute_changes()}
   end
 
   # Phase 2: Handle checkbox for grid settings (checkboxes send phx-click, not phx-change)
@@ -264,7 +341,7 @@ defmodule LiveViewGridWeb.Components.GridConfig.ConfigModal do
     key_atom = String.to_atom(option_key)
     current_value = Map.get(socket.assigns.grid_options, key_atom, false)
     new_options = Map.put(socket.assigns.grid_options, key_atom, !current_value)
-    {:noreply, assign(socket, :grid_options, new_options)}
+    {:noreply, socket |> assign(:grid_options, new_options) |> compute_changes()}
   end
 
   def handle_event("close", _params, socket) do
@@ -273,12 +350,22 @@ defmodule LiveViewGridWeb.Components.GridConfig.ConfigModal do
   end
 
   # Tab 1: Toggle column visibility
+  # Tab 1: Drag to reorder columns
+  def handle_event("reorder_columns", %{"order" => order}, socket) do
+    new_order =
+      Enum.map(order, fn field_str ->
+        String.to_existing_atom(field_str)
+      end)
+
+    {:noreply, socket |> assign(:column_order, new_order) |> compute_changes()}
+  end
+
   def handle_event("toggle_column_visibility", %{"field" => field_str}, socket) do
     field = String.to_existing_atom(field_str)
     columns_visible = socket.assigns.columns_visible
     current = Map.get(columns_visible, field, true)
     updated = Map.put(columns_visible, field, !current)
-    {:noreply, assign(socket, :columns_visible, updated)}
+    {:noreply, socket |> assign(:columns_visible, updated) |> compute_changes()}
   end
 
   # Tab 2: Select a column to edit
@@ -293,7 +380,8 @@ defmodule LiveViewGridWeb.Components.GridConfig.ConfigModal do
   end
 
   # Tab 2: Update a column property
-  def handle_event("update_property", %{"field" => field_str, "key" => key_str, "value" => value}, socket) do
+  def handle_event("update_property", %{"field" => field_str, "key" => key_str} = params, socket) do
+    value = params["value"] || params["val"]
     field = String.to_existing_atom(field_str)
     key = String.to_atom(key_str)
     column_configs = socket.assigns.column_configs
@@ -316,7 +404,7 @@ defmodule LiveViewGridWeb.Components.GridConfig.ConfigModal do
 
     updated_config = Map.put(current, key, coerced_value)
     updated_configs = Map.put(column_configs, field, updated_config)
-    {:noreply, assign(socket, :column_configs, updated_configs)}
+    {:noreply, socket |> assign(:column_configs, updated_configs) |> compute_changes()}
   end
 
   # Tab 3: Select column for formatter
@@ -338,7 +426,7 @@ defmodule LiveViewGridWeb.Components.GridConfig.ConfigModal do
     current = Map.get(column_configs, field, %{})
     updated = Map.put(current, :formatter, formatter)
     updated_configs = Map.put(column_configs, field, updated)
-    {:noreply, assign(socket, :column_configs, updated_configs)}
+    {:noreply, socket |> assign(:column_configs, updated_configs) |> compute_changes()}
   end
 
   # Tab 3: Add a validator placeholder
@@ -348,7 +436,7 @@ defmodule LiveViewGridWeb.Components.GridConfig.ConfigModal do
     current = Map.get(validators, field, [])
     new_validator = %{type: "required", message: "This field is required", enabled: true}
     updated = Map.put(validators, field, current ++ [new_validator])
-    {:noreply, assign(socket, :validators, updated)}
+    {:noreply, socket |> assign(:validators, updated) |> compute_changes()}
   end
 
   # Tab 3: Remove a validator by index
@@ -359,7 +447,7 @@ defmodule LiveViewGridWeb.Components.GridConfig.ConfigModal do
     current = Map.get(validators, field, [])
     updated_list = List.delete_at(current, index)
     updated = Map.put(validators, field, updated_list)
-    {:noreply, assign(socket, :validators, updated)}
+    {:noreply, socket |> assign(:validators, updated) |> compute_changes()}
   end
 
   # Tab 3: Toggle validator enabled/disabled
@@ -379,17 +467,131 @@ defmodule LiveViewGridWeb.Components.GridConfig.ConfigModal do
   end
 
   # ============================================================================
+  # Change Tracking (Phase 3: Preview & Apply)
+  # ============================================================================
+
+  defp compute_changes(socket) do
+    grid = socket.assigns.grid
+
+    original_columns =
+      cond do
+        grid.definition -> grid.definition.columns
+        grid.state[:all_columns] -> grid.state[:all_columns]
+        true -> grid.columns
+      end
+
+    current_configs = socket.assigns.column_configs
+    current_options = socket.assigns.grid_options
+
+    original_options =
+      if grid.definition do
+        Map.merge(LiveViewGrid.Grid.default_options(), grid.definition.options)
+      else
+        grid.options
+      end
+
+    column_diffs =
+      Enum.flat_map(current_configs, fn {field, config} ->
+        original = Enum.find(original_columns, &(&1.field == field)) || %{}
+        diff_column(field, original, config)
+      end)
+
+    # hidden columns diff: grid에 적용된 상태 vs 모달에서 변경된 상태 비교
+    applied_hidden = MapSet.new(Map.get(grid.state, :hidden_columns, []))
+    current_hidden =
+      socket.assigns.columns_visible
+      |> Enum.filter(fn {_, v} -> !v end)
+      |> Enum.map(fn {f, _} -> f end)
+      |> MapSet.new()
+
+    # 새로 숨긴 컬럼 (기존엔 보였는데 이제 숨김)
+    newly_hidden =
+      MapSet.difference(current_hidden, applied_hidden)
+      |> Enum.map(fn f -> %{type: :hidden, field: f, action: :hide} end)
+
+    # 다시 보이게 한 컬럼 (기존엔 숨겨졌는데 이제 보임)
+    newly_visible =
+      MapSet.difference(applied_hidden, current_hidden)
+      |> Enum.map(fn f -> %{type: :hidden, field: f, action: :show} end)
+
+    hidden_diffs = newly_hidden ++ newly_visible
+
+    option_diffs = diff_options(original_options, current_options)
+
+    # Validator 변경 감지: @validators vs 원본 validators 비교
+    validator_diffs =
+      Enum.flat_map(socket.assigns.validators, fn {field, current_vals} ->
+        original_col = Enum.find(original_columns, &(&1.field == field)) || %{}
+        original_vals = original_col[:validators] || []
+        if length(current_vals) != length(original_vals) do
+          [%{type: :validator, field: field, from: length(original_vals), to: length(current_vals)}]
+        else
+          []
+        end
+      end)
+
+    # Column order diff: 현재 순서 vs 원본 순서 비교
+    original_order = Enum.map(original_columns, & &1.field)
+    current_order = socket.assigns.column_order
+    order_diffs =
+      if current_order != original_order do
+        [%{type: :order, from: original_order, to: current_order}]
+      else
+        []
+      end
+
+    changes = %{
+      columns: column_diffs,
+      hidden: hidden_diffs,
+      options: option_diffs,
+      validators: validator_diffs,
+      order: order_diffs,
+      total: length(column_diffs) + length(hidden_diffs) + length(option_diffs) + length(validator_diffs) + length(order_diffs)
+    }
+
+    assign(socket, :changes, changes)
+  end
+
+  defp diff_column(field, original, current) do
+    [:label, :width, :align, :sortable, :filterable, :editable, :formatter]
+    |> Enum.filter(fn key ->
+      Map.get(original, key) != Map.get(current, key)
+    end)
+    |> Enum.map(fn key ->
+      %{
+        type: :column,
+        field: field,
+        property: key,
+        from: Map.get(original, key),
+        to: Map.get(current, key)
+      }
+    end)
+  end
+
+  defp diff_options(original, current) do
+    tracked_keys = [:page_size, :theme, :virtual_scroll, :row_height,
+                    :frozen_columns, :show_row_number, :show_header, :show_footer]
+
+    Enum.filter(tracked_keys, fn k ->
+      Map.get(original, k) != Map.get(current, k)
+    end)
+    |> Enum.map(fn k ->
+      %{type: :option, key: k, from: Map.get(original, k), to: Map.get(current, k)}
+    end)
+  end
+
+  # ============================================================================
   # Helpers
   # ============================================================================
 
   # Build JSON payload for Apply button (Phase 1 + Phase 2)
-  defp build_config_json(column_configs, column_order, columns_visible, grid_options) do
+  defp build_config_json(column_configs, column_order, columns_visible, grid_options, validators) do
     hidden_columns =
       columns_visible
       |> Enum.filter(fn {_field, visible} -> !visible end)
       |> Enum.map(fn {field, _} -> Atom.to_string(field) end)
 
-    columns_payload = build_column_changes(column_configs)
+    columns_payload = build_column_changes(column_configs, validators)
 
     # Phase 2: convert atom keys to string keys for JSON
     options_payload =
@@ -422,8 +624,11 @@ defmodule LiveViewGridWeb.Components.GridConfig.ConfigModal do
     end
   end
 
-  defp build_column_changes(column_configs) do
+  defp build_column_changes(column_configs, validators) do
     Enum.map(column_configs, fn {field, config} ->
+      # @validators에서 최신 validator 목록 사용 (Tab 3에서 추가/삭제된 것 반영)
+      field_validators = Map.get(validators, field, config.validators || [])
+
       %{
         "field" => Atom.to_string(field),
         "label" => config.label,
@@ -434,10 +639,32 @@ defmodule LiveViewGridWeb.Components.GridConfig.ConfigModal do
         "editable" => config.editable,
         "formatter" => if(config.formatter, do: to_string(config.formatter), else: nil),
         "formatter_options" => config.formatter_options,
-        "validators" => config.validators
+        "validators" => Enum.map(field_validators, &serialize_validator/1)
       }
     end)
   end
+
+  defp serialize_validator({:required, msg}), do: %{"type" => "required", "message" => msg}
+  defp serialize_validator({:min, val, msg}), do: %{"type" => "min", "value" => val, "message" => msg}
+  defp serialize_validator({:max, val, msg}), do: %{"type" => "max", "value" => val, "message" => msg}
+  defp serialize_validator({:pattern, _regex, msg}), do: %{"type" => "pattern", "message" => msg}
+  defp serialize_validator(other) when is_map(other) do
+    other
+    |> Map.drop([:enabled])
+    |> Map.new(fn
+      {k, v} when is_atom(k) -> {Atom.to_string(k), v}
+      {k, v} -> {k, v}
+    end)
+  end
+  defp serialize_validator(_), do: %{"type" => "unknown"}
+
+  # tuple 형태 validator를 Tab 3 UI용 map 형태로 변환
+  defp tuple_to_validator_map({:required, msg}), do: %{type: "required", message: msg, enabled: true}
+  defp tuple_to_validator_map({:min, val, msg}), do: %{type: "min", value: val, message: msg, enabled: true}
+  defp tuple_to_validator_map({:max, val, msg}), do: %{type: "max", value: val, message: msg, enabled: true}
+  defp tuple_to_validator_map({:pattern, _regex, msg}), do: %{type: "pattern", message: msg, enabled: true}
+  defp tuple_to_validator_map(%{} = map), do: Map.put_new(map, :enabled, true)
+  defp tuple_to_validator_map(_), do: %{type: "unknown", message: "", enabled: true}
 
   # ============================================================================
   # Tab 1: Column Visibility & Order
@@ -451,17 +678,19 @@ defmodule LiveViewGridWeb.Components.GridConfig.ConfigModal do
         Check to show columns, uncheck to hide. Drag to reorder.
       </p>
 
-      <div class="space-y-2 border border-gray-200 rounded p-3 bg-gray-50">
+      <div id="config-sortable-list" phx-hook="ConfigSortable" phx-target={@myself}
+           class="space-y-2 border border-gray-200 rounded p-3 bg-gray-50">
         <%= for field <- @column_order do %>
           <% visible = Map.get(@columns_visible, field, true) %>
-          <div class={[
-            "flex items-center p-2 rounded border transition-colors",
+          <div data-sortable-item data-field={field} class={[
+            "flex items-center p-2 rounded border transition-colors cursor-grab active:cursor-grabbing",
             if visible do
               "bg-white border-gray-200 hover:bg-blue-50"
             else
               "bg-gray-100 border-gray-200 opacity-60"
             end
           ]}>
+            <span class="mr-2 text-gray-400 select-none">::</span>
             <input
               type="checkbox"
               checked={visible}
@@ -471,15 +700,14 @@ defmodule LiveViewGridWeb.Components.GridConfig.ConfigModal do
               class="w-4 h-4 text-blue-600 cursor-pointer"
             />
             <span class={[
-              "ml-3 font-medium",
+              "ml-3 font-medium select-none",
               (if visible, do: "text-gray-700", else: "text-gray-400 line-through")
             ]}>
               <%= field %>
             </span>
-            <span class="ml-2 text-xs text-gray-400">
+            <span class="ml-2 text-xs text-gray-400 select-none">
               (<%= if visible, do: "visible", else: "hidden" %>)
             </span>
-            <span class="ml-auto text-gray-400 cursor-move">...</span>
           </div>
         <% end %>
       </div>
@@ -502,20 +730,21 @@ defmodule LiveViewGridWeb.Components.GridConfig.ConfigModal do
         <!-- Column Selector -->
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-2">Select Column</label>
-          <select
-            id="column_selector"
-            class="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-            phx-change="select_column"
-            phx-target={@myself}
-            name="column"
-          >
-            <option value="">-- Select a column --</option>
-            <%= for col <- @grid.columns do %>
-              <option value={col.field} selected={@selected_column == col.field}>
-                <%= col.field %>
-              </option>
-            <% end %>
-          </select>
+          <form phx-change="select_column" phx-target={@myself}>
+            <select
+              id="column_selector"
+              class="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+              name="column"
+            >
+              <option value="">-- Select a column --</option>
+              <%= for field <- @column_order do %>
+                <% cfg = Map.get(@column_configs, field, %{}) %>
+                <option value={field} selected={@selected_column == field}>
+                  <%= cfg[:label] || field %>
+                </option>
+              <% end %>
+            </select>
+          </form>
 
           <%= if @selected_column do %>
             <div class="mt-4 space-y-2 text-xs text-gray-500">
@@ -536,53 +765,51 @@ defmodule LiveViewGridWeb.Components.GridConfig.ConfigModal do
               <!-- Label -->
               <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">Label</label>
-                <input
-                  type="text"
-                  value={cfg[:label]}
-                  phx-change="update_property"
-                  phx-blur="update_property"
-                  phx-target={@myself}
-                  phx-value-field={@selected_column}
-                  phx-value-key="label"
-                  name="value"
-                  class="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Column label"
-                />
+                <form phx-change="update_property" phx-target={@myself}>
+                  <input type="hidden" name="field" value={@selected_column} />
+                  <input type="hidden" name="key" value="label" />
+                  <input
+                    type="text"
+                    value={cfg[:label]}
+                    name="value"
+                    class="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Column label"
+                  />
+                </form>
               </div>
 
               <!-- Width -->
               <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">Width (px)</label>
-                <input
-                  type="number"
-                  value={if is_integer(cfg[:width]), do: cfg[:width], else: 100}
-                  min="50"
-                  max="500"
-                  phx-change="update_property"
-                  phx-blur="update_property"
-                  phx-target={@myself}
-                  phx-value-field={@selected_column}
-                  phx-value-key="width"
-                  name="value"
-                  class="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
+                <form phx-change="update_property" phx-target={@myself}>
+                  <input type="hidden" name="field" value={@selected_column} />
+                  <input type="hidden" name="key" value="width" />
+                  <input
+                    type="number"
+                    value={if is_integer(cfg[:width]), do: cfg[:width], else: 100}
+                    min="50"
+                    max="500"
+                    name="value"
+                    class="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </form>
               </div>
 
               <!-- Alignment -->
               <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">Alignment</label>
-                <select
-                  phx-change="update_property"
-                  phx-target={@myself}
-                  phx-value-field={@selected_column}
-                  phx-value-key="align"
-                  name="value"
-                  class="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="left" selected={cfg[:align] == :left || cfg[:align] == "left"}>Left</option>
-                  <option value="center" selected={cfg[:align] == :center || cfg[:align] == "center"}>Center</option>
-                  <option value="right" selected={cfg[:align] == :right || cfg[:align] == "right"}>Right</option>
-                </select>
+                <form phx-change="update_property" phx-target={@myself}>
+                  <input type="hidden" name="field" value={@selected_column} />
+                  <input type="hidden" name="key" value="align" />
+                  <select
+                    name="value"
+                    class="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="left" selected={cfg[:align] == :left || cfg[:align] == "left"}>Left</option>
+                    <option value="center" selected={cfg[:align] == :center || cfg[:align] == "center"}>Center</option>
+                    <option value="right" selected={cfg[:align] == :right || cfg[:align] == "right"}>Right</option>
+                  </select>
+                </form>
               </div>
 
               <!-- Boolean Flags -->
@@ -595,7 +822,7 @@ defmodule LiveViewGridWeb.Components.GridConfig.ConfigModal do
                     phx-target={@myself}
                     phx-value-field={@selected_column}
                     phx-value-key="sortable"
-                    phx-value-value={if cfg[:sortable], do: "false", else: "true"}
+                    phx-value-val={if cfg[:sortable], do: "false", else: "true"}
                     class="w-4 h-4 text-blue-600 cursor-pointer"
                   />
                   <span class="text-sm text-gray-700">Sortable</span>
@@ -608,7 +835,7 @@ defmodule LiveViewGridWeb.Components.GridConfig.ConfigModal do
                     phx-target={@myself}
                     phx-value-field={@selected_column}
                     phx-value-key="filterable"
-                    phx-value-value={if cfg[:filterable], do: "false", else: "true"}
+                    phx-value-val={if cfg[:filterable], do: "false", else: "true"}
                     class="w-4 h-4 text-blue-600 cursor-pointer"
                   />
                   <span class="text-sm text-gray-700">Filterable</span>
@@ -621,7 +848,7 @@ defmodule LiveViewGridWeb.Components.GridConfig.ConfigModal do
                     phx-target={@myself}
                     phx-value-field={@selected_column}
                     phx-value-key="editable"
-                    phx-value-value={if cfg[:editable], do: "false", else: "true"}
+                    phx-value-val={if cfg[:editable], do: "false", else: "true"}
                     class="w-4 h-4 text-blue-600 cursor-pointer"
                   />
                   <span class="text-sm text-gray-700">Editable</span>
@@ -654,24 +881,24 @@ defmodule LiveViewGridWeb.Components.GridConfig.ConfigModal do
           <label class="block text-sm font-medium text-gray-700 mb-1" for="page_size">
             Page Size
           </label>
-          <select
-            id="page_size"
-            name="value"
-            phx-change="update_grid_option"
-            phx-value-option="page_size"
-            phx-target={@myself}
-            class="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="10" selected={@grid_options[:page_size] == 10}>10 rows per page</option>
-            <option value="25" selected={@grid_options[:page_size] == 25}>25 rows per page</option>
-            <option value="50" selected={@grid_options[:page_size] == 50}>50 rows per page</option>
-            <option value="100" selected={@grid_options[:page_size] == 100}>100 rows per page</option>
-            <%= if @grid_options[:page_size] not in [10, 25, 50, 100] do %>
-              <option value={@grid_options[:page_size]} selected={true}>
-                <%= @grid_options[:page_size] %> rows per page (custom)
-              </option>
-            <% end %>
-          </select>
+          <form phx-change="update_grid_option" phx-target={@myself}>
+            <input type="hidden" name="option" value="page_size" />
+            <select
+              id="page_size"
+              name="value"
+              class="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="10" selected={@grid_options[:page_size] == 10}>10 rows per page</option>
+              <option value="25" selected={@grid_options[:page_size] == 25}>25 rows per page</option>
+              <option value="50" selected={@grid_options[:page_size] == 50}>50 rows per page</option>
+              <option value="100" selected={@grid_options[:page_size] == 100}>100 rows per page</option>
+              <%= if @grid_options[:page_size] not in [10, 25, 50, 100] do %>
+                <option value={@grid_options[:page_size]} selected={true}>
+                  <%= @grid_options[:page_size] %> rows per page (custom)
+                </option>
+              <% end %>
+            </select>
+          </form>
           <p class="help-text text-xs text-gray-500 mt-1">Number of rows to display per page</p>
         </div>
       </div>
@@ -741,18 +968,18 @@ defmodule LiveViewGridWeb.Components.GridConfig.ConfigModal do
 
         <div class="form-group mb-4">
           <label class="block text-sm font-medium text-gray-700 mb-1" for="theme">Theme</label>
-          <select
-            id="theme"
-            name="value"
-            phx-change="update_grid_option"
-            phx-value-option="theme"
-            phx-target={@myself}
-            class="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="light" selected={@grid_options[:theme] == "light"}>Light (Default)</option>
-            <option value="dark" selected={@grid_options[:theme] == "dark"}>Dark</option>
-            <option value="custom" selected={@grid_options[:theme] == "custom"}>Custom</option>
-          </select>
+          <form phx-change="update_grid_option" phx-target={@myself}>
+            <input type="hidden" name="option" value="theme" />
+            <select
+              id="theme"
+              name="value"
+              class="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="light" selected={@grid_options[:theme] == "light"}>Light (Default)</option>
+              <option value="dark" selected={@grid_options[:theme] == "dark"}>Dark</option>
+              <option value="custom" selected={@grid_options[:theme] == "custom"}>Custom</option>
+            </select>
+          </form>
           <p class="text-xs text-gray-500 mt-1">Choose color scheme for the grid</p>
 
           <!-- Theme Preview -->
@@ -802,18 +1029,18 @@ defmodule LiveViewGridWeb.Components.GridConfig.ConfigModal do
               <%= @grid_options[:row_height] %> px
             </span>
           </label>
-          <input
-            type="range"
-            id="row_height"
-            name="value"
-            min="32"
-            max="80"
-            value={@grid_options[:row_height]}
-            phx-change="update_grid_option"
-            phx-value-option="row_height"
-            phx-target={@myself}
-            class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
-          />
+          <form phx-change="update_grid_option" phx-target={@myself}>
+            <input type="hidden" name="option" value="row_height" />
+            <input
+              type="range"
+              id="row_height"
+              name="value"
+              min="32"
+              max="80"
+              value={@grid_options[:row_height]}
+              class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
+            />
+          </form>
           <div class="flex justify-between text-xs text-gray-500 mt-1">
             <span>32px (Compact)</span>
             <span>80px (Spacious)</span>
@@ -830,18 +1057,18 @@ defmodule LiveViewGridWeb.Components.GridConfig.ConfigModal do
           <label class="block text-sm font-medium text-gray-700 mb-1" for="frozen_columns">
             Frozen Columns
           </label>
-          <input
-            type="number"
-            id="frozen_columns"
-            name="value"
-            min="0"
-            max="10"
-            value={@grid_options[:frozen_columns]}
-            phx-change="update_grid_option"
-            phx-value-option="frozen_columns"
-            phx-target={@myself}
-            class="w-32 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
+          <form phx-change="update_grid_option" phx-target={@myself}>
+            <input type="hidden" name="option" value="frozen_columns" />
+            <input
+              type="number"
+              id="frozen_columns"
+              name="value"
+              min="0"
+              max="10"
+              value={@grid_options[:frozen_columns]}
+              class="w-32 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </form>
           <p class="text-xs text-gray-500 mt-1">
             Number of leftmost columns to keep visible when horizontal scrolling (0 = no frozen columns)
           </p>
@@ -862,20 +1089,21 @@ defmodule LiveViewGridWeb.Components.GridConfig.ConfigModal do
         <!-- Column Selector -->
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-2">Select Column</label>
-          <select
-            id="formatter_column_selector"
-            class="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-            phx-change="select_formatter_column"
-            phx-target={@myself}
-            name="column"
-          >
-            <option value="">-- Select a column --</option>
-            <%= for col <- @grid.columns do %>
-              <option value={col.field} selected={@selected_formatter_column == col.field}>
-                <%= col.field %>
-              </option>
-            <% end %>
-          </select>
+          <form phx-change="select_formatter_column" phx-target={@myself}>
+            <select
+              id="formatter_column_selector"
+              class="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+              name="column"
+            >
+              <option value="">-- Select a column --</option>
+              <%= for field <- @column_order do %>
+                <% cfg = Map.get(@column_configs, field, %{}) %>
+                <option value={field} selected={@selected_formatter_column == field}>
+                  <%= cfg[:label] || field %>
+                </option>
+              <% end %>
+            </select>
+          </form>
         </div>
 
         <!-- Right panel -->
@@ -887,20 +1115,20 @@ defmodule LiveViewGridWeb.Components.GridConfig.ConfigModal do
             <!-- Formatter Section -->
             <div class="mb-6">
               <h4 class="text-sm font-semibold text-gray-700 mb-3">Formatter</h4>
-              <select
-                phx-change="select_formatter"
-                phx-target={@myself}
-                phx-value-field={@selected_formatter_column}
-                name="formatter"
-                class="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="" selected={is_nil(cfg[:formatter])}>-- No Formatter --</option>
-                <option value="currency" selected={cfg[:formatter] == :currency}>Currency</option>
-                <option value="number" selected={cfg[:formatter] == :number}>Number</option>
-                <option value="date" selected={cfg[:formatter] == :date}>Date</option>
-                <option value="percent" selected={cfg[:formatter] == :percent}>Percent</option>
-                <option value="badge" selected={cfg[:formatter] == :badge}>Badge</option>
-              </select>
+              <form phx-change="select_formatter" phx-target={@myself}>
+                <input type="hidden" name="field" value={@selected_formatter_column} />
+                <select
+                  name="formatter"
+                  class="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="" selected={is_nil(cfg[:formatter])}>-- No Formatter --</option>
+                  <option value="currency" selected={cfg[:formatter] == :currency}>Currency</option>
+                  <option value="number" selected={cfg[:formatter] == :number}>Number</option>
+                  <option value="date" selected={cfg[:formatter] == :date}>Date</option>
+                  <option value="percent" selected={cfg[:formatter] == :percent}>Percent</option>
+                  <option value="badge" selected={cfg[:formatter] == :badge}>Badge</option>
+                </select>
+              </form>
 
               <!-- Formatter-specific preview -->
               <%= if cfg[:formatter] do %>

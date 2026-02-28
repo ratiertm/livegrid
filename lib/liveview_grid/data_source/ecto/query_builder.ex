@@ -12,6 +12,8 @@ defmodule LiveViewGrid.DataSource.Ecto.QueryBuilder do
   import Ecto.Query
 
   @doc "Apply global search across all searchable columns using LIKE"
+  @spec apply_global_search(query :: Ecto.Query.t(), search_term :: String.t() | nil, columns :: [map()]) ::
+          Ecto.Query.t()
   def apply_global_search(query, "", _columns), do: query
   def apply_global_search(query, nil, _columns), do: query
   def apply_global_search(query, search_term, columns) do
@@ -27,6 +29,7 @@ defmodule LiveViewGrid.DataSource.Ecto.QueryBuilder do
   end
 
   @doc "Apply column filters"
+  @spec apply_filters(query :: Ecto.Query.t(), filters :: map(), columns :: [map()]) :: Ecto.Query.t()
   def apply_filters(query, filters, columns) when is_map(filters) do
     Enum.reduce(filters, query, fn {field_str, filter_value}, acc ->
       field = if is_atom(field_str), do: field_str, else: String.to_existing_atom(field_str)
@@ -38,6 +41,7 @@ defmodule LiveViewGrid.DataSource.Ecto.QueryBuilder do
   end
 
   @doc "Apply advanced filters (AND/OR conditions)"
+  @spec apply_advanced_filters(query :: Ecto.Query.t(), advanced_filters :: map()) :: Ecto.Query.t()
   def apply_advanced_filters(query, %{conditions: []}), do: query
   def apply_advanced_filters(query, %{logic: logic, conditions: conditions}) do
     dynamic_conditions =
@@ -61,6 +65,7 @@ defmodule LiveViewGrid.DataSource.Ecto.QueryBuilder do
   end
 
   @doc "Apply sort"
+  @spec apply_sort(query :: Ecto.Query.t(), sort :: map() | nil) :: Ecto.Query.t()
   def apply_sort(query, nil), do: query
   def apply_sort(query, %{field: field, direction: :asc}) do
     from(r in query, order_by: [asc: field(r, ^field)])
@@ -70,6 +75,8 @@ defmodule LiveViewGrid.DataSource.Ecto.QueryBuilder do
   end
 
   @doc "Apply pagination (limit/offset)"
+  @spec apply_pagination(query :: Ecto.Query.t(), pagination :: map(), page_size :: pos_integer()) ::
+          Ecto.Query.t()
   def apply_pagination(query, pagination, page_size) do
     page = pagination.current_page
     offset_val = (page - 1) * page_size

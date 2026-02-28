@@ -31,6 +31,8 @@ defmodule LiveViewGrid.Export do
       {:ok, {_name, binary}} = Export.to_xlsx(users, columns)
       {:ok, {_name, binary}} = Export.to_xlsx(users, columns, sheet_name: "사용자")
   """
+  @spec to_xlsx(data :: [map()], columns :: [map()], opts :: keyword()) ::
+          {:ok, {String.t(), binary()}} | {:error, any()}
   def to_xlsx(data, columns, opts \\ []) do
     sheet_name = Keyword.get(opts, :sheet_name, "Sheet1")
     header_style = Keyword.get(opts, :header_style, true)
@@ -67,6 +69,7 @@ defmodule LiveViewGrid.Export do
   ## Returns
     binary (CSV 문자열, UTF-8 BOM 포함)
   """
+  @spec to_csv(data :: [map()], columns :: [map()]) :: binary()
   def to_csv(data, columns) do
     # UTF-8 BOM (Excel에서 한글 깨짐 방지)
     bom = <<0xEF, 0xBB, 0xBF>>

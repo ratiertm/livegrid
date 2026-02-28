@@ -28,6 +28,8 @@ Open in browser:
 - **DBMS Demo**: http://localhost:5001/dbms-demo
 - **API Demo**: http://localhost:5001/api-demo
 - **Advanced Demo**: http://localhost:5001/advanced-demo (Grouping/Tree/Pivot)
+- **Grid Config Demo**: http://localhost:5001/grid-config-demo
+- **Grid Builder**: http://localhost:5001/builder
 - **API Docs**: http://localhost:5001/api-docs
 
 ### Development Setup
@@ -123,20 +125,33 @@ open doc/index.html
 - [x] Row edit mode (edit all cells in a row simultaneously)
 - [x] Undo/Redo (Ctrl+Z/Y edit history with 50-action stack)
 
+### v0.10 - Grid Config & Architecture
+- [x] Grid Configuration Modal (column visibility, order, width, frozen columns, formatters, validators)
+- [x] Grid Settings tab (page size, virtual scroll, theme, row height)
+- [x] Grid Builder (dynamic grid creation with column definition UI)
+- [x] Raw Table DataSource adapter (schema-less direct DB table access)
+- [x] Sample Data generator (auto-generate demo data by column type)
+- [x] Schema Registry & Table Inspector (DB introspection for Grid Builder)
+- [x] Real-time collaboration (Phoenix Presence + PubSub bridge)
+- [x] Keyboard navigation (arrow keys, Tab, Enter for cell movement)
+- [x] JS Hook module split (10 separate modules from monolithic app.js)
+- [x] CSS module split (9 separate stylesheets from monolithic CSS)
+- [x] GridComponent refactoring (EventHandlers + RenderHelpers extraction)
+- [x] ExDoc documentation (@doc/@spec across all public modules)
+
 ## 📊 Implementation Status
 
 | Item | Count |
 |------|-------|
-| Total Features | 42 |
-| Completed | 42 (100%) |
+| Total Features | 54 |
+| Completed | 54 (100%) |
 | Remaining | 0 |
-| Versions Shipped | v0.1 ~ v0.9 |
-| Tests | 255 passing |
+| Versions Shipped | v0.1 ~ v0.10 |
+| Tests | 428 passing |
 
 ## 🗺️ Roadmap
 
 ### v1.0 - Enterprise
-- [ ] Real-time sync (Phoenix PubSub-based multi-user concurrent editing)
 - [ ] Cell locking (concurrent edit conflict prevention)
 - [ ] Multi-DB drivers - PostgreSQL (`postgrex`), MySQL/MariaDB (`myxql`)
 - [ ] Multi-DB drivers - MSSQL (`tds_ecto`), Oracle (`ecto_oracle`)
@@ -152,13 +167,15 @@ open doc/index.html
 lib/
 ├── liveview_grid/              # Business logic
 │   ├── grid.ex                 # Grid core module (data/state management)
+│   ├── grid_definition.ex      # Grid definition struct (v0.10)
 │   ├── data_source.ex          # DataSource behaviour (adapter pattern)
 │   ├── data_source/
 │   │   ├── in_memory.ex        # InMemory adapter (v0.1)
 │   │   ├── ecto.ex             # Ecto/DB adapter (v0.3)
 │   │   ├── ecto/
 │   │   │   └── query_builder.ex # SQL query builder
-│   │   └── rest.ex             # REST API adapter (v0.5)
+│   │   ├── rest.ex             # REST API adapter (v0.5)
+│   │   └── raw_table.ex        # Raw table adapter (v0.10)
 │   ├── operations/
 │   │   ├── sorting.ex          # Sorting engine (v0.1)
 │   │   ├── filter.ex           # Filter engine - basic+advanced (v0.1/v0.2)
@@ -172,21 +189,36 @@ lib/
 │   ├── api_key.ex              # API Key schema
 │   ├── api_keys.ex             # API Key context (CRUD)
 │   ├── demo_user.ex            # Demo User schema
+│   ├── sample_data.ex          # Sample data generator (v0.10)
+│   ├── schema_registry.ex      # Schema registry for Grid Builder (v0.10)
+│   ├── table_inspector.ex      # DB table introspection (v0.10)
+│   ├── grid_presence.ex        # Phoenix Presence for collaboration (v0.10)
+│   ├── pub_sub_bridge.ex       # PubSub bridge for real-time sync (v0.10)
 │   ├── repo.ex                 # Ecto Repo
 │   └── application.ex
 └── liveview_grid_web/          # Web layer
     ├── live/
     │   ├── grid_live.ex         # Grid LiveView
-    │   ├── grid_live.html.heex  # Grid template
     │   ├── demo_live.ex         # InMemory demo
     │   ├── dbms_demo_live.ex    # DBMS demo (SQLite)
     │   ├── api_demo_live.ex     # REST API demo
     │   ├── renderer_demo_live.ex # Renderer demo
     │   ├── advanced_demo_live.ex # Advanced features demo (v0.7)
+    │   ├── grid_config_demo_live.ex # Grid Config demo (v0.10)
+    │   ├── builder_live.ex      # Grid Builder page (v0.10)
     │   ├── api_key_live.ex      # API Key management
     │   └── api_doc_live.ex      # API documentation
     ├── components/
     │   ├── grid_component.ex    # Grid LiveComponent (core)
+    │   ├── grid_component/
+    │   │   ├── event_handlers.ex  # Event handler callbacks (v0.10)
+    │   │   └── render_helpers.ex  # Render helper functions (v0.10)
+    │   ├── grid_config/
+    │   │   └── config_modal.ex    # Grid Configuration Modal (v0.10)
+    │   ├── grid_builder/
+    │   │   ├── builder_modal.ex   # Grid Builder Modal (v0.10)
+    │   │   ├── builder_helpers.ex # Builder helper functions (v0.10)
+    │   │   └── builder_data_source.ex # Builder data source logic (v0.10)
     │   ├── core_components.ex   # Phoenix core components
     │   └── layouts/
     │       └── dashboard.html.heex  # Sidebar dashboard layout
@@ -198,18 +230,37 @@ lib/
     └── router.ex
 
 assets/
-├── js/app.js                   # JS Hooks (VirtualScroll, CellEditor, etc.)
-└── css/liveview_grid.css       # Grid stylesheet
+├── js/
+│   ├── app.js                     # JS entry point + hook registry
+│   └── hooks/                     # Modular JS hooks (v0.10)
+│       ├── virtual-scroll.js      # Virtual scrolling
+│       ├── cell-editor.js         # Cell editing
+│       ├── cell-editable.js       # Cell editable behavior
+│       ├── column-resize.js       # Column resize
+│       ├── column-reorder.js      # Column reorder
+│       ├── grid-scroll.js         # Grid scroll sync
+│       ├── keyboard-nav.js        # Keyboard navigation
+│       ├── row-edit-save.js       # Row edit/save
+│       ├── file-import.js         # File import
+│       └── config-sortable.js     # Config sortable drag
+└── css/
+    ├── liveview_grid.css          # CSS entry point (imports)
+    └── grid/                      # Modular CSS (v0.10)
+        ├── variables.css          # CSS variables & themes
+        ├── layout.css             # Grid layout
+        ├── header.css             # Header styles
+        ├── body.css               # Body & cell styles
+        ├── toolbar.css            # Toolbar styles
+        ├── interactions.css       # Interactions (selection, editing)
+        ├── advanced.css           # Advanced features (grouping, tree, pivot)
+        ├── config-modal.css       # Config modal styles
+        └── context-menu.css       # Context menu styles
 
 guides/                            # ex_doc guide documents
 ├── getting-started.md / -en.md    # Installation & basic usage
 ├── formatters.md / -en.md         # 16 formatter types reference
 ├── data-sources.md / -en.md       # InMemory, Ecto, REST adapters
 └── advanced-features.md / -en.md  # CRUD, Grouping, Tree, Pivot
-
-projects/skills/                   # Development workflow skills
-├── dev-cycle.md                   # PDCA dev cycle (plan→design→develop→test→docs→review)
-└── dev-status.md                  # Project status summary
 ```
 
 ## 🔧 Tech Stack

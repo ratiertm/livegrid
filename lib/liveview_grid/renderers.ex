@@ -23,6 +23,7 @@ defmodule LiveViewGrid.Renderers do
 
   Available colors: blue, green, red, yellow, gray, purple
   """
+  @spec badge(opts :: keyword()) :: (map(), map(), map() -> Phoenix.LiveView.Rendered.t())
   def badge(opts \\ []) do
     colors = Keyword.get(opts, :colors, %{})
     default_color = Keyword.get(opts, :default_color, "gray")
@@ -46,6 +47,7 @@ defmodule LiveViewGrid.Renderers do
     - `target` - link target (e.g. "_blank")
     - `href` - custom URL function `fn(row, column) -> url`
   """
+  @spec link(opts :: keyword()) :: (map(), map(), map() -> Phoenix.LiveView.Rendered.t())
   def link(opts \\ []) do
     prefix = Keyword.get(opts, :prefix, "")
     target = Keyword.get(opts, :target, nil)
@@ -70,6 +72,7 @@ defmodule LiveViewGrid.Renderers do
     - `color` - bar color: "blue", "green", "red", "yellow" (default: "blue")
     - `show_value` - show numeric text (default: true)
   """
+  @spec progress(opts :: keyword()) :: (map(), map(), map() -> Phoenix.LiveView.Rendered.t())
   def progress(opts \\ []) do
     max_val = Keyword.get(opts, :max, 100)
     color = Keyword.get(opts, :color, "blue")

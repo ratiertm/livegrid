@@ -11,6 +11,11 @@ config :liveview_grid,
   generators: [timestamp_type: :utc_datetime],
   ecto_repos: [LiveviewGrid.Repo]
 
+# Schema registry for Grid Builder DB connection
+config :liveview_grid, :schema_registry, [
+  LiveviewGrid.DemoUser
+]
+
 # SQLite database for demo
 config :liveview_grid, LiveviewGrid.Repo,
   database: Path.expand("../liveview_grid_#{config_env()}.db", __DIR__),

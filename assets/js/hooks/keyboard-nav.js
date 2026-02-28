@@ -686,7 +686,11 @@ export const GridKeyboardNav = {
   },
 
   destroyed() {
-    this.clearFocus()
+    // DOM에서 제거될 때는 서버 이벤트 발송 없이 로컬 정리만 수행
+    this.clearFocusVisual()
+    this.clearCellRange()
+    this.focusedRowId = null
+    this.focusedColIdx = null
     if (this._onMouseUp) {
       document.removeEventListener("mouseup", this._onMouseUp)
     }

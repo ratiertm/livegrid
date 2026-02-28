@@ -31,11 +31,13 @@ defmodule LiveviewGridWeb.GridComponent do
   alias LiveviewGridWeb.GridComponent.EventHandlers
   import LiveviewGridWeb.GridComponent.RenderHelpers
 
+  @doc "컴포넌트 마운트 시 Config Modal 상태를 초기화한다."
   @impl true
   def mount(socket) do
     {:ok, assign(socket, :show_config_modal, false)}
   end
 
+  @doc "부모 LiveView에서 전달된 assigns를 Grid 상태로 변환한다. 초기 생성 또는 기존 Grid 업데이트를 처리한다."
   @impl true
   def update(assigns, socket) do
     new_options = Map.get(assigns, :options, %{})
@@ -115,6 +117,7 @@ defmodule LiveviewGridWeb.GridComponent do
   # ── Event Handler Dispatch ──
   # 모든 비즈니스 로직은 EventHandlers 모듈에 위임
 
+  @doc "Grid의 모든 사용자 이벤트를 EventHandlers 모듈로 디스패치한다. 정렬, 필터, 페이지네이션, 셀 편집, 행 편집, 내보내기 등을 지원한다."
   @impl true
   def handle_event("grid_sort", params, socket),
     do: EventHandlers.handle_sort(params, socket)
@@ -369,6 +372,8 @@ defmodule LiveviewGridWeb.GridComponent do
       # JSON 문자열 파싱
       {:ok, config_changes} = Jason.decode(config_json)
 
+
+
       # Phase 1: 컬럼 설정 변경 적용
       updated_grid = Grid.apply_config_changes(grid, config_changes)
 
@@ -406,6 +411,7 @@ defmodule LiveviewGridWeb.GridComponent do
   # ── Render ──
 
   @impl true
+  @doc "Grid 컴포넌트의 전체 UI를 렌더링한다. 툴바, 헤더, 바디, 푸터, Config Modal을 포함한다."
   def render(assigns) do
     ~H"""
     <div class="lv-grid" id={"#{@grid.id}-keyboard-nav"} phx-hook="GridKeyboardNav" tabindex="0" data-theme={@grid.options[:theme] || "light"} style={build_custom_css_vars(@grid.options[:custom_css_vars])}>
@@ -481,6 +487,8 @@ defmodule LiveviewGridWeb.GridComponent do
             </button>
           <% end %>
         </div>
+
+        <span class="lv-grid__toolbar-separator"></span>
 
         <%= if Grid.has_changes?(@grid) do %>
           <div class="lv-grid__save-area">
@@ -883,7 +891,7 @@ defmodule LiveviewGridWeb.GridComponent do
                     </div>
                   <% end %>
                   <%= for {column, col_idx} <- Enum.with_index(Grid.display_columns(@grid)) do %>
-                    <div class={"lv-grid__cell #{frozen_class(col_idx, @grid)} #{if cell_in_range?(@grid.state.cell_range, row.id, col_idx, v_row_id_to_pos), do: "lv-grid__cell--in-range"}"} style={"#{column_width_style(column, @grid)}; #{frozen_style(col_idx, @grid)}"} data-col-index={col_idx}>
+                    <div class={"lv-grid__cell #{frozen_class(col_idx, @grid)} #{if cell_in_range?(@grid.state.cell_range, row.id, col_idx, v_row_id_to_pos), do: "lv-grid__cell--in-range"} #{if Map.get(column, :filter_type) == :number, do: "lv-grid__cell--numeric"}"} style={"#{column_width_style(column, @grid)}; #{frozen_style(col_idx, @grid)}"} data-col-index={col_idx}>
                       <%= render_cell(assigns, row, column) %>
                     </div>
                   <% end %>
@@ -978,7 +986,7 @@ defmodule LiveviewGridWeb.GridComponent do
                   </div>
                 <% end %>
                 <%= for {column, col_idx} <- Enum.with_index(Grid.display_columns(@grid)) do %>
-                  <div class={"lv-grid__cell #{frozen_class(col_idx, @grid)} #{if cell_in_range?(@grid.state.cell_range, row.id, col_idx, p_row_id_to_pos), do: "lv-grid__cell--in-range"}"} style={"#{column_width_style(column, @grid)}; #{frozen_style(col_idx, @grid)}; #{tree_indent_style(row, col_idx)}"} data-col-index={col_idx}>
+                  <div class={"lv-grid__cell #{frozen_class(col_idx, @grid)} #{if cell_in_range?(@grid.state.cell_range, row.id, col_idx, p_row_id_to_pos), do: "lv-grid__cell--in-range"} #{if Map.get(column, :filter_type) == :number, do: "lv-grid__cell--numeric"}"} style={"#{column_width_style(column, @grid)}; #{frozen_style(col_idx, @grid)}; #{tree_indent_style(row, col_idx)}"} data-col-index={col_idx}>
                     <%= if col_idx == 0 && Map.has_key?(row, :_tree_has_children) do %>
                       <%= if row._tree_has_children do %>
                         <button
@@ -1068,6 +1076,30 @@ defmodule LiveviewGridWeb.GridComponent do
           <% end %>
 
           <div class="lv-grid__info">
+            <%!-- F-941: Cell Range Summary --%>
+            <%= if (range_summary = Grid.cell_range_summary(@grid)) do %>
+              <div class="lv-grid__range-summary">
+                <span class="lv-grid__range-summary-label">선택 영역:</span>
+                <span class="lv-grid__range-summary-item">
+                  Count: <strong><%= range_summary.count %></strong>
+                </span>
+                <%= if range_summary.numeric_count > 0 do %>
+                  <span class="lv-grid__range-summary-item">
+                    Sum: <strong><%= format_summary_number(range_summary.sum) %></strong>
+                  </span>
+                  <span class="lv-grid__range-summary-item">
+                    Avg: <strong><%= format_summary_number(range_summary.avg) %></strong>
+                  </span>
+                  <span class="lv-grid__range-summary-item">
+                    Min: <strong><%= format_summary_number(range_summary.min) %></strong>
+                  </span>
+                  <span class="lv-grid__range-summary-item">
+                    Max: <strong><%= format_summary_number(range_summary.max) %></strong>
+                  </span>
+                <% end %>
+              </div>
+              <span style="margin: 0 8px; color: #ccc;">|</span>
+            <% end %>
             <%= if length(@grid.state.selection.selected_ids) > 0 do %>
               <span style="color: #2196f3; font-weight: 600;">
                 <%= length(@grid.state.selection.selected_ids) %>개 선택됨

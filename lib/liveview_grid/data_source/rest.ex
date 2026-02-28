@@ -66,6 +66,9 @@ defmodule LiveViewGrid.DataSource.Rest do
     retry_delay: 1_000
   }
 
+  @doc """
+  REST API에서 데이터를 조회한다. 페이지네이션, 정렬, 필터를 쿼리 파라미터로 전달하고 리트라이를 지원한다.
+  """
   @impl true
   def fetch_data(config, state, options, _columns) do
     url = build_url(config, state, options)
@@ -90,6 +93,9 @@ defmodule LiveViewGrid.DataSource.Rest do
     end
   end
 
+  @doc """
+  REST API에 POST 요청으로 새 행을 생성한다.
+  """
   @impl true
   def insert_row(config, row) do
     url = base_endpoint_url(config)
@@ -107,6 +113,9 @@ defmodule LiveViewGrid.DataSource.Rest do
     end
   end
 
+  @doc """
+  REST API에 PUT 요청으로 행을 업데이트한다.
+  """
   @impl true
   def update_row(config, row_id, changes) do
     url = "#{base_endpoint_url(config)}/#{row_id}"
@@ -124,6 +133,9 @@ defmodule LiveViewGrid.DataSource.Rest do
     end
   end
 
+  @doc """
+  REST API에 PATCH 요청으로 행을 부분 업데이트한다.
+  """
   @impl true
   def partial_update_row(config, row_id, changes) do
     url = "#{base_endpoint_url(config)}/#{row_id}"
@@ -141,6 +153,9 @@ defmodule LiveViewGrid.DataSource.Rest do
     end
   end
 
+  @doc """
+  REST API에 DELETE 요청으로 행을 삭제한다.
+  """
   @impl true
   def delete_row(config, row_id) do
     url = "#{base_endpoint_url(config)}/#{row_id}"

@@ -1,6 +1,7 @@
 /* ========================================
    Grid Config Modal - Phase 2 Styles
    Grid Settings Tab (Tab 4)
+   All colors use CSS variables for dark mode support
    ======================================== */
 
 /* ── Grid Settings Tab Container ── */
@@ -14,7 +15,7 @@
 .form-section {
   margin-bottom: 2rem;
   padding-bottom: 2rem;
-  border-bottom: 1px solid #e0e0e0;
+  border-bottom: 1px solid var(--lv-grid-border, #e0e0e0);
 }
 
 .form-section:last-child {
@@ -27,7 +28,7 @@
   font-size: 1rem;
   font-weight: 600;
   margin-bottom: 1rem;
-  color: #333;
+  color: var(--lv-grid-text, #333);
 }
 
 /* ── Form Groups ── */
@@ -44,23 +45,25 @@
   margin-bottom: 0.5rem;
   font-weight: 500;
   font-size: 0.875rem;
-  color: #555;
+  color: var(--lv-grid-text-secondary, #555);
 }
 
 .form-group select,
 .form-group input[type="number"] {
   width: 100%;
   padding: 0.5rem 0.75rem;
-  border: 1px solid #ccc;
+  border: 1px solid var(--lv-grid-border-input, #ccc);
   border-radius: 4px;
   font-size: 1rem;
+  color: var(--lv-grid-text, #333);
+  background: var(--lv-grid-bg-input, #fff);
   transition: border-color 0.2s;
 }
 
 .form-group select:focus,
 .form-group input[type="number"]:focus {
   outline: none;
-  border-color: #2196f3;
+  border-color: var(--lv-grid-primary, #2196f3);
   box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.2);
 }
 
@@ -71,9 +74,9 @@
   gap: 0.75rem;
   margin-bottom: 0.75rem;
   padding: 0.75rem;
-  background: #f9f9f9;
+  background: var(--lv-grid-bg-tertiary, #f9f9f9);
   border-radius: 4px;
-  border: 1px solid #e8e8e8;
+  border: 1px solid var(--lv-grid-border-light, #e8e8e8);
 }
 
 .form-checkbox-group label {
@@ -84,14 +87,14 @@
   cursor: pointer;
   font-weight: 500;
   font-size: 0.875rem;
-  color: #444;
+  color: var(--lv-grid-text-secondary, #444);
 }
 
 .form-checkbox-group input[type="checkbox"] {
   width: 18px;
   height: 18px;
   cursor: pointer;
-  accent-color: #2196f3;
+  accent-color: var(--lv-grid-primary, #2196f3);
 }
 
 /* ── Slider Styling ── */
@@ -99,10 +102,10 @@
   width: 100%;
   height: 6px;
   border-radius: 3px;
-  background: #e0e0e0;
+  background: var(--lv-grid-border, #e0e0e0);
   outline: none;
   -webkit-appearance: none;
-  accent-color: #2196f3;
+  accent-color: var(--lv-grid-primary, #2196f3);
 }
 
 .form-slider::-webkit-slider-thumb {
@@ -110,7 +113,7 @@
   width: 20px;
   height: 20px;
   border-radius: 50%;
-  background: #2196f3;
+  background: var(--lv-grid-primary, #2196f3);
   cursor: pointer;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
 }
@@ -119,7 +122,7 @@
   width: 20px;
   height: 20px;
   border-radius: 50%;
-  background: #2196f3;
+  background: var(--lv-grid-primary, #2196f3);
   cursor: pointer;
   border: none;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
@@ -129,29 +132,32 @@
   display: flex;
   justify-content: space-between;
   font-size: 0.8rem;
-  color: #666;
+  color: var(--lv-grid-text-placeholder, #666);
   margin-top: 0.5rem;
 }
 
 /* ── Value Display Badge ── */
 .value-display {
   font-family: monospace;
-  background: #f0f0f0;
+  background: var(--lv-grid-disabled-bg, #f0f0f0);
   padding: 0.2rem 0.5rem;
   border-radius: 3px;
   font-size: 0.875rem;
   margin-left: 0.5rem;
+  color: var(--lv-grid-text, #333);
 }
 
 /* ── Help Text ── */
 .help-text {
   font-size: 0.8rem;
-  color: #777;
+  color: var(--lv-grid-text-muted, #777);
   margin-top: 0.4rem;
   line-height: 1.4;
 }
 
 /* ── Theme Preview ── */
+/* NOTE: preview-box variants intentionally use hardcoded colors
+   because they demonstrate specific theme appearances */
 .theme-preview {
   margin-top: 1rem;
 }
@@ -190,7 +196,7 @@
   gap: 0.5rem;
   margin-top: 1rem;
   padding: 0.75rem;
-  background: #f9f9f9;
+  background: var(--lv-grid-bg-tertiary, #f9f9f9);
   border-radius: 4px;
   flex-wrap: wrap;
   font-size: 0.8rem;
@@ -198,14 +204,14 @@
 
 .col-indicator {
   padding: 0.4rem 0.6rem;
-  background: #e0e0e0;
+  background: var(--lv-grid-border, #e0e0e0);
   border-radius: 3px;
   transition: all 0.3s ease;
-  color: #555;
+  color: var(--lv-grid-text-secondary, #555);
 }
 
 .col-indicator.frozen {
-  background: #4caf50;
+  background: var(--lv-grid-success, #4caf50);
   color: white;
   font-weight: 600;
 }

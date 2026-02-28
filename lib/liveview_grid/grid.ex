@@ -74,7 +74,7 @@ defmodule LiveViewGrid.Grid do
       })
   """
 
-  alias LiveViewGrid.{Grouping, Tree, Pivot}
+  alias LiveViewGrid.{GridDefinition, Grouping, Tree, Pivot}
 
   @max_edit_history 50
 
@@ -82,6 +82,7 @@ defmodule LiveViewGrid.Grid do
     id: String.t(),
     data: list(map()),
     columns: list(map()),
+    definition: GridDefinition.t() | nil,
     state: map(),
     options: map(),
     data_source: {module(), map()} | nil
@@ -106,10 +107,16 @@ defmodule LiveViewGrid.Grid do
     id = Keyword.get(opts, :id, generate_id())
     data_source = Keyword.get(opts, :data_source, nil)
 
+    normalized_columns = normalize_columns(columns)
+
+    # Definition: 원본 컬럼 + 옵션 보존 (Blueprint)
+    definition = GridDefinition.new(columns, options)
+
     grid = %{
       id: id,
       data: data,
-      columns: normalize_columns(columns),
+      columns: normalized_columns,
+      definition: definition,
       state: initial_state(),
       options: merge_default_options(options),
       data_source: data_source
@@ -157,6 +164,7 @@ defmodule LiveViewGrid.Grid do
       state: merged_state
     }
     |> Map.put(:data_source, data_source)
+    |> Map.put(:definition, Map.get(grid, :definition))
 
     # data_source가 있으면 total_rows를 length(data)로 덮어쓰지 않음
     # (data_source 모드에서 data는 빈 리스트이므로 0이 되어 페이지네이션이 사라짐)
@@ -326,10 +334,24 @@ defmodule LiveViewGrid.Grid do
     put_in(grid.state.row_statuses, Map.put(grid.state.row_statuses, row_id, status))
   end
 
-  @doc "모든 행 상태를 초기화합니다."
+  @doc "모든 행 상태를 초기화합니다. :deleted 행은 데이터에서 제거합니다."
   @spec clear_row_statuses(grid :: t()) :: t()
   def clear_row_statuses(grid) do
-    put_in(grid.state.row_statuses, %{})
+    # :deleted 마킹된 행을 data에서 제거
+    deleted_ids = grid.state.row_statuses
+      |> Enum.filter(fn {_id, status} -> status == :deleted end)
+      |> Enum.map(fn {id, _} -> id end)
+      |> MapSet.new()
+
+    updated_data = if MapSet.size(deleted_ids) > 0 do
+      Enum.reject(grid.data, fn row -> MapSet.member?(deleted_ids, row.id) end)
+    else
+      grid.data
+    end
+
+    %{grid | data: updated_data}
+    |> put_in([:state, :row_statuses], %{})
+    |> put_in([:state, :pagination, :total_rows], length(updated_data))
   end
 
   @doc "상태별 행 개수를 반환합니다."
@@ -627,7 +649,7 @@ defmodule LiveViewGrid.Grid do
   ConfigModal의 Tab 4 (Grid Settings)에서 전달받은 옵션 변경 사항을 검증하고
   Grid.options에 병합합니다.
 
-  - page_size: 1 ~ 1000 (정수)
+  - page_size: 1 ~ 100,000 (정수)
   - theme: "light" | "dark" | "custom"
   - virtual_scroll: boolean
   - row_height: 32 ~ 80 (픽셀)
@@ -642,8 +664,8 @@ defmodule LiveViewGrid.Grid do
       iex> Grid.apply_grid_settings(grid, %{"page_size" => 50, "theme" => "dark"})
       {:ok, %Grid{options: %{page_size: 50, theme: "dark", ...}}}
 
-      iex> Grid.apply_grid_settings(grid, %{"page_size" => 9999})
-      {:error, "Invalid page_size: must be between 1 and 1000"}
+      iex> Grid.apply_grid_settings(grid, %{"page_size" => 200_000})
+      {:error, "Invalid page_size: must be between 1 and 100000"}
 
   """
   @spec apply_grid_settings(grid :: t(), options_changes :: map()) ::
@@ -677,8 +699,8 @@ defmodule LiveViewGrid.Grid do
       Enum.each(options, fn {key, value} ->
         case key do
           :page_size ->
-            unless is_integer(value) and value > 0 and value <= 1000 do
-              raise "Invalid page_size: must be between 1 and 1000"
+            unless is_integer(value) and value > 0 and value <= 100_000 do
+              raise "Invalid page_size: must be between 1 and 100000"
             end
 
           :theme ->
@@ -757,12 +779,73 @@ defmodule LiveViewGrid.Grid do
   @spec apply_config_changes(grid :: t(), config_changes :: map()) :: t()
   def apply_config_changes(grid, config_changes) do
     config_changes = normalize_config_changes(config_changes)
-    validate_columns!(config_changes, grid)
 
-    new_columns = update_columns(grid.columns, config_changes)
-    new_columns = apply_column_visibility_and_order(new_columns, config_changes)
+    # definition.columns = 숨긴 컬럼 포함 전체 원본
+    all_columns = all_columns(grid)
+    validate_columns_list!(config_changes, all_columns)
 
-    %{grid | columns: new_columns}
+    # 전체 컬럼에 속성 변경 적용
+    updated_columns = update_columns(all_columns, config_changes)
+
+    # 순서 적용 (숨기기 전)
+    ordered_columns = apply_column_order(updated_columns, config_changes)
+
+    # hidden_columns 정보 추출
+    hidden = Map.get(config_changes, :hidden_columns, [])
+
+    # 보이는 컬럼만 grid.columns에 설정
+    visible_columns = Enum.reject(ordered_columns, fn col -> col.field in hidden end)
+
+    # state에 runtime config 저장
+    new_state =
+      grid.state
+      |> Map.put(:hidden_columns, hidden)
+      |> Map.put(:column_order, Map.get(config_changes, :column_order))
+
+    # runtime 변경을 state[:all_columns]에 항상 저장 (modal 재오픈 시 참조)
+    new_state = Map.put(new_state, :all_columns, ordered_columns)
+
+    %{grid | columns: visible_columns, state: new_state}
+  end
+
+  @doc "Definition 원본으로 Grid 컬럼/옵션을 완전 복원한다."
+  @spec reset_to_definition(t()) :: t()
+  def reset_to_definition(%{definition: nil} = grid), do: grid
+  def reset_to_definition(%{definition: definition} = grid) do
+    %{grid |
+      columns: normalize_columns(definition.columns),
+      options: merge_default_options(definition.options),
+      state: grid.state
+        |> Map.put(:hidden_columns, [])
+        |> Map.put(:column_order, nil)
+        |> Map.delete(:all_columns)
+    }
+  end
+
+  @doc "Grid의 기본 옵션 맵을 반환한다."
+  @spec default_options() :: map()
+  def default_options do
+    %{
+      page_size: 20,
+      show_header: true,
+      show_footer: true,
+      virtual_scroll: false,
+      virtual_buffer: 5,
+      row_height: 40,
+      frozen_columns: 0,
+      debug: false,
+      theme: "light",
+      show_row_number: false
+    }
+  end
+
+  # 안전한 원본 컬럼 조회 (definition → state[:all_columns] → grid.columns)
+  defp all_columns(grid) do
+    cond do
+      grid.state[:all_columns] -> grid.state[:all_columns]
+      grid.definition -> grid.definition.columns
+      true -> grid.columns
+    end
   end
 
   # Config 변경 사항 정규화 (문자열 키를 기존 형식으로 변환)
@@ -830,26 +913,38 @@ defmodule LiveViewGrid.Grid do
         Map.put(acc, :formatter_options, options)
 
       {"validators", validators}, acc when is_list(validators) ->
-        Map.put(acc, :validators, validators)
+        deserialized =
+          validators
+          |> Enum.map(&deserialize_validator/1)
+          |> Enum.reject(&is_nil/1)
+        Map.put(acc, :validators, deserialized)
 
       {_key, _value}, acc ->
         acc
     end)
   end
 
-  # 컬럼 존재 여부 및 유효성 검증
-  defp validate_columns!(config_changes, grid) do
+  # JSON map → validator tuple 역직렬화
+  defp deserialize_validator(%{"type" => "required", "message" => msg}), do: {:required, msg}
+  defp deserialize_validator(%{"type" => "min", "value" => val, "message" => msg}), do: {:min, val, msg}
+  defp deserialize_validator(%{"type" => "max", "value" => val, "message" => msg}), do: {:max, val, msg}
+  defp deserialize_validator(%{"type" => "pattern", "message" => msg}), do: {:pattern, ~r/.*/, msg}
+  defp deserialize_validator(tuple) when is_tuple(tuple), do: tuple
+  defp deserialize_validator(_), do: nil
+
+  # 컬럼 존재 여부 및 유효성 검증 (전체 컬럼 리스트 기준)
+  defp validate_columns_list!(config_changes, all_columns) do
     case Map.get(config_changes, :columns) do
       nil ->
         :ok
 
       columns when is_list(columns) ->
-        grid_fields = Enum.map(grid.columns, & &1.field)
+        all_fields = Enum.map(all_columns, & &1.field)
 
         Enum.each(columns, fn column ->
           field = Map.get(column, :field)
 
-          unless field && Enum.member?(grid_fields, field) do
+          unless field && Enum.member?(all_fields, field) do
             raise "컬럼 필드가 존재하지 않습니다: #{inspect(field)}"
           end
         end)
@@ -896,15 +991,13 @@ defmodule LiveViewGrid.Grid do
     end
   end
 
-  # 컬럼 표시/숨김 및 순서 적용
-  defp apply_column_visibility_and_order(columns, config_changes) do
-    # column_order가 있으면 그 순서대로 컬럼을 정렬
+  # 컬럼 순서만 적용 (숨기기는 apply_config_changes에서 처리)
+  defp apply_column_order(columns, config_changes) do
     case Map.get(config_changes, :column_order) do
       nil ->
         columns
 
       order when is_list(order) ->
-        # order에 포함된 필드만 표시, 포함되지 않은 필드는 숨김
         field_to_column = Map.new(columns, &{&1.field, &1})
 
         Enum.map(order, fn field ->
@@ -977,6 +1070,61 @@ defmodule LiveViewGrid.Grid do
   @spec clear_cell_range(t()) :: t()
   def clear_cell_range(grid), do: put_in(grid.state.cell_range, nil)
 
+  # ── F-941: Cell Range Summary ──
+
+  @doc """
+  셀 범위 내 값들의 통계를 계산합니다.
+  반환값: %{count: N, numeric_count: N, sum: N, avg: N, min: N, max: N} 또는 nil
+  """
+  @spec cell_range_summary(grid :: t()) :: map() | nil
+  def cell_range_summary(%{state: %{cell_range: nil}}), do: nil
+  def cell_range_summary(grid) do
+    range = grid.state.cell_range
+    visible_data = visible_data(grid)
+    display_cols = display_columns(grid)
+
+    row_ids = Enum.map(visible_data, & &1.id)
+    anchor_pos = Enum.find_index(row_ids, &(&1 == range.anchor_row_id))
+    extent_pos = Enum.find_index(row_ids, &(&1 == range.extent_row_id))
+
+    if anchor_pos && extent_pos do
+      min_row = min(anchor_pos, extent_pos)
+      max_row = max(anchor_pos, extent_pos)
+      min_col = min(range.anchor_col_idx, range.extent_col_idx)
+      max_col = max(range.anchor_col_idx, range.extent_col_idx)
+
+      values =
+        for row_pos <- min_row..max_row,
+            col_idx <- min_col..max_col do
+          row = Enum.at(visible_data, row_pos)
+          col = Enum.at(display_cols, col_idx)
+          if row && col, do: Map.get(row, col.field), else: nil
+        end
+        |> Enum.reject(&is_nil/1)
+
+      numbers = values
+        |> Enum.filter(&is_number/1)
+
+      count = length(values)
+      numeric_count = length(numbers)
+
+      if numeric_count > 0 do
+        %{
+          count: count,
+          numeric_count: numeric_count,
+          sum: Enum.sum(numbers),
+          avg: Enum.sum(numbers) / numeric_count,
+          min: Enum.min(numbers),
+          max: Enum.max(numbers)
+        }
+      else
+        %{count: count, numeric_count: 0, sum: nil, avg: nil, min: nil, max: nil}
+      end
+    else
+      nil
+    end
+  end
+
   # Private functions
 
   defp generate_id do
@@ -986,6 +1134,7 @@ defmodule LiveViewGrid.Grid do
   defp normalize_columns(columns) do
     Enum.map(columns, fn col ->
       Map.merge(%{
+        type: :string,
         width: :auto,
         sortable: false,
         filterable: false,
@@ -997,10 +1146,12 @@ defmodule LiveViewGrid.Grid do
         input_pattern: nil,
         renderer: nil,
         formatter: nil,
+        formatter_options: %{},
         align: :left,
         style_expr: nil,
         header_group: nil,
-        nulls: :last
+        nulls: :last,
+        required: false
       }, col)
     end)
   end
@@ -1048,18 +1199,7 @@ defmodule LiveViewGrid.Grid do
   end
 
   defp merge_default_options(options) do
-    Map.merge(%{
-      page_size: 20,
-      show_header: true,
-      show_footer: true,
-      virtual_scroll: false,
-      virtual_buffer: 5,
-      row_height: 40,
-      frozen_columns: 0,
-      debug: false,
-      theme: "light",
-      show_row_number: false
-    }, options)
+    Map.merge(default_options(), options)
   end
 
   # F-800-INSERT(B): :new 행이 필터에 걸려 사라지지 않도록 보장

@@ -7,9 +7,21 @@ defmodule LiveviewGridWeb.DemoLive do
   
   use Phoenix.LiveView
 
+  @grid_id "users-grid"
+
+  @doc "마운트 시 샘플 데이터 생성, PubSub 구독, Presence 등록 등 초기 상태를 설정한다."
   @impl true
   def mount(_params, _session, socket) do
+    # F-500: 실시간 협업 - PubSub 구독 + Presence 등록
+    if connected?(socket) do
+      LiveViewGrid.PubSubBridge.subscribe(@grid_id)
+      user_id = "user_#{:crypto.strong_rand_bytes(4) |> Base.encode16(case: :lower)}"
+      LiveViewGrid.GridPresence.track_user(self(), @grid_id, user_id, %{name: user_id})
+    end
+
     all_users = generate_sample_data(50)
+    online_users = if connected?(socket), do: LiveViewGrid.GridPresence.user_count(@grid_id), else: 0
+
     {:ok, assign(socket,
       all_users: all_users,
       saved_users: all_users,
@@ -21,6 +33,7 @@ defmodule LiveviewGridWeb.DemoLive do
       loaded_count: min(100, length(all_users)),
       virtual_scroll: false,
       theme: "light",
+      online_users: online_users,
       # 테마 커스터마이저 상태
       customizer_open: false,
       custom_css_vars: %{},
@@ -74,6 +87,7 @@ defmodule LiveviewGridWeb.DemoLive do
     )}
   end
 
+  @doc "데모 페이지의 UI 이벤트를 처리한다. 데이터 개수 변경, 검색, 테마 전환, 가상스크롤 등을 지원한다."
   @impl true
   def handle_event("change_data_count", %{"count" => count}, socket) do
     count_num = String.to_integer(count)
@@ -186,20 +200,17 @@ defmodule LiveviewGridWeb.DemoLive do
     {:noreply, assign(socket, theme: theme, custom_css_vars: %{})}
   end
 
-  # 테마 커스터마이저 토글
   @impl true
   def handle_event("toggle_customizer", _params, socket) do
     {:noreply, assign(socket, customizer_open: !socket.assigns.customizer_open)}
   end
 
-  # 개별 CSS 변수 변경 (color picker 에서)
   @impl true
   def handle_event("update_css_var", %{"var" => var_name, "value" => value}, socket) do
     custom_vars = Map.put(socket.assigns.custom_css_vars, var_name, value)
     {:noreply, assign(socket, custom_css_vars: custom_vars, theme: "custom")}
   end
 
-  # 프리셋 적용
   @impl true
   def handle_event("apply_preset", %{"name" => name}, socket) do
     case Map.get(socket.assigns.saved_presets, name) do
@@ -208,7 +219,6 @@ defmodule LiveviewGridWeb.DemoLive do
     end
   end
 
-  # 현재 커스텀 변수를 프리셋으로 저장
   @impl true
   def handle_event("save_preset", %{"name" => name}, socket) do
     name = String.trim(name)
@@ -222,26 +232,26 @@ defmodule LiveviewGridWeb.DemoLive do
     end
   end
 
-  # 프리셋 삭제
   @impl true
   def handle_event("delete_preset", %{"name" => name}, socket) do
     presets = Map.delete(socket.assigns.saved_presets, name)
     {:noreply, assign(socket, saved_presets: presets)}
   end
 
-  # 커스터마이저 리셋 (현재 테마의 기본 색상으로 복원)
   @impl true
   def handle_event("reset_customizer", _params, socket) do
     {:noreply, assign(socket, custom_css_vars: %{}, theme: "light")}
   end
 
-  # 프리셋 이름 입력
   @impl true
   def handle_event("update_preset_name", %{"value" => value}, socket) do
     {:noreply, assign(socket, preset_name_input: value)}
   end
 
-  # CSV/Excel Export: GridComponent → 부모 LiveView → push_event → JS 다운로드 (F-510)
+  # GridComponent 이벤트가 부모로 전파될 경우 안전하게 무시
+  def handle_event("clear_cell_range", _params, socket), do: {:noreply, socket}
+
+  @doc "GridComponent 및 PubSub에서 전달되는 메시지를 처리한다. 셀/행 편집, Undo/Redo, 저장, 실시간 협업 이벤트 등을 지원한다."
   @impl true
   def handle_info({:grid_download_file, payload}, socket) do
     {:noreply, push_event(socket, "download_file", payload)}
@@ -249,6 +259,9 @@ defmodule LiveviewGridWeb.DemoLive do
 
   @impl true
   def handle_info({:grid_cell_updated, row_id, field, value}, socket) do
+    # F-500: 다른 사용자에게 브로드캐스트
+    LiveViewGrid.PubSubBridge.broadcast_cell_update(@grid_id, row_id, field, value, self())
+
     # GridComponent에서 셀 편집 완료 시 원본 데이터 업데이트
     updated_users = Enum.map(socket.assigns.all_users, fn user ->
       if user.id == row_id, do: Map.put(user, field, value), else: user
@@ -269,7 +282,6 @@ defmodule LiveviewGridWeb.DemoLive do
     )}
   end
 
-  # F-920: 행 단위 편집 완료 시 원본 데이터 업데이트
   @impl true
   def handle_info({:grid_row_updated, row_id, changed_values}, socket) do
     update_row = fn users ->
@@ -291,7 +303,6 @@ defmodule LiveviewGridWeb.DemoLive do
     )}
   end
 
-  # F-700: Undo/Redo 알림 처리 — 부모 데이터 동기화
   @impl true
   def handle_info({:grid_undo, %{type: :cell, row_id: row_id, field: field, value: value}}, socket) do
     update_fn = fn users ->
@@ -347,14 +358,43 @@ defmodule LiveviewGridWeb.DemoLive do
       Logger.info("  - [#{status}] ID=#{row.id} #{inspect(row)}")
     end
 
-    # 데모에서는 이미 메모리에 반영되어 있으므로 saved_users를 현재 상태로 갱신
+    # F-500: 다른 사용자에게 저장 완료 브로드캐스트
+    LiveViewGrid.PubSubBridge.broadcast_rows_saved(@grid_id, self())
+
+    # :deleted 행은 부모 데이터에서도 제거
+    deleted_ids = changed_rows
+      |> Enum.filter(fn %{status: s} -> s == :deleted end)
+      |> Enum.map(fn %{row: r} -> r.id end)
+      |> MapSet.new()
+
+    remove_deleted = fn users ->
+      if MapSet.size(deleted_ids) > 0 do
+        Enum.reject(users, fn user -> MapSet.member?(deleted_ids, user.id) end)
+      else
+        users
+      end
+    end
+
+    updated_all = remove_deleted.(socket.assigns.all_users)
+    updated_filtered = remove_deleted.(socket.assigns.filtered_users)
+    updated_visible = remove_deleted.(socket.assigns.visible_users)
+
     {:noreply, socket
-      |> assign(saved_users: socket.assigns.all_users)
+      |> assign(
+        all_users: updated_all,
+        filtered_users: updated_filtered,
+        visible_users: updated_visible,
+        saved_users: updated_all,
+        loaded_count: length(updated_visible)
+      )
       |> put_flash(:info, "#{length(changed_rows)}건 저장 완료")}
   end
 
   @impl true
   def handle_info({:grid_row_added, new_row}, socket) do
+    # F-500: 다른 사용자에게 브로드캐스트
+    LiveViewGrid.PubSubBridge.broadcast_row_added(@grid_id, new_row, self())
+
     # 새 행을 부모 데이터에도 추가
     updated_all = [new_row | socket.assigns.all_users]
     updated_filtered = [new_row | socket.assigns.filtered_users]
@@ -370,6 +410,9 @@ defmodule LiveviewGridWeb.DemoLive do
 
   @impl true
   def handle_info({:grid_rows_deleted, row_ids}, socket) do
+    # F-500: 다른 사용자에게 브로드캐스트
+    LiveViewGrid.PubSubBridge.broadcast_rows_deleted(@grid_id, row_ids, self())
+
     require Logger
     Logger.info("🗑️ 행 삭제 요청: #{inspect(row_ids)}")
 
@@ -406,12 +449,94 @@ defmodule LiveviewGridWeb.DemoLive do
     )}
   end
 
+  # ── F-500: 실시간 협업 - PubSub 수신 ──
+
+  @impl true
+  def handle_info({:grid_event, %{type: :cell_updated, sender: sender} = event}, socket) do
+    # 자기 자신이 보낸 이벤트는 무시 (이미 로컬에서 처리됨)
+    if sender == self() do
+      {:noreply, socket}
+    else
+      update_fn = fn users ->
+        Enum.map(users, fn user ->
+          if user.id == event.row_id, do: Map.put(user, event.field, event.value), else: user
+        end)
+      end
+
+      {:noreply, assign(socket,
+        all_users: update_fn.(socket.assigns.all_users),
+        filtered_users: update_fn.(socket.assigns.filtered_users),
+        visible_users: update_fn.(socket.assigns.visible_users)
+      )}
+    end
+  end
+
+  @impl true
+  def handle_info({:grid_event, %{type: :row_added, sender: sender} = event}, socket) do
+    if sender == self() do
+      {:noreply, socket}
+    else
+      {:noreply, assign(socket,
+        all_users: [event.row | socket.assigns.all_users],
+        filtered_users: [event.row | socket.assigns.filtered_users],
+        visible_users: [event.row | socket.assigns.visible_users]
+      )}
+    end
+  end
+
+  @impl true
+  def handle_info({:grid_event, %{type: :rows_deleted, sender: sender} = event}, socket) do
+    if sender == self() do
+      {:noreply, socket}
+    else
+      remove_fn = fn users ->
+        Enum.reject(users, fn user -> user.id in event.row_ids end)
+      end
+
+      {:noreply, assign(socket,
+        all_users: remove_fn.(socket.assigns.all_users),
+        filtered_users: remove_fn.(socket.assigns.filtered_users),
+        visible_users: remove_fn.(socket.assigns.visible_users)
+      )}
+    end
+  end
+
+  @impl true
+  def handle_info({:grid_event, %{type: :rows_saved, sender: sender}}, socket) do
+    if sender == self() do
+      {:noreply, socket}
+    else
+      {:noreply, assign(socket, saved_users: socket.assigns.all_users)}
+    end
+  end
+
+  @impl true
+  def handle_info({:grid_event, %{type: :user_editing}}, socket) do
+    # 편집 위치 정보는 Presence로 처리 (향후 확장)
+    {:noreply, socket}
+  end
+
+  @impl true
+  def handle_info(%Phoenix.Socket.Broadcast{event: "presence_diff"}, socket) do
+    online_users = LiveViewGrid.GridPresence.user_count(@grid_id)
+    {:noreply, assign(socket, online_users: online_users)}
+  end
+
+  @doc "데모 페이지를 렌더링한다. 데이터 컨트롤, 테마 커스터마이저, 그리드를 표시한다."
   @impl true
   def render(assigns) do
     ~H"""
     <div style="padding: 20px;">
-      <h1>LiveView Grid 프로토타입 v0.1-alpha</h1>
-      <p>기본 기능: 정렬 + 페이징 + Virtual Scrolling</p>
+      <div>
+        <h1>LiveView Grid 프로토타입 v0.1-alpha</h1>
+        <p>기본 기능: 정렬 + 페이징 + Virtual Scrolling</p>
+        <%= if @online_users > 0 do %>
+          <div style="display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; background: #e8f5e9; border-radius: 12px; font-size: 13px; color: #2e7d32;">
+            <span style="display: inline-block; width: 8px; height: 8px; background: #4caf50; border-radius: 50%; animation: pulse 2s infinite;"></span>
+            <strong><%= @online_users %></strong> 명 접속 중
+          </div>
+        <% end %>
+      </div>
       
       <!-- 데모 컨트롤 (접기/펼치기) -->
       <details style="margin: 10px 0;">
@@ -672,7 +797,7 @@ defmodule LiveviewGridWeb.DemoLive do
             show_footer: !@virtual_scroll,
             frozen_columns: 1,
             show_row_number: true,
-            debug: true,
+            debug: Mix.env() == :dev,
             theme: @theme,
             custom_css_vars: @custom_css_vars
           }}
@@ -704,6 +829,7 @@ defmodule LiveviewGridWeb.DemoLive do
           ✅ 모든 데이터를 표시했습니다 (<%= @loaded_count %>개)
         </div>
       <% end %>
+
     </div>
     """
   end

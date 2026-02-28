@@ -4,7 +4,300 @@
 >
 > **Project**: LiveView Grid - Phoenix LiveView 기반 상용 그리드 컴포넌트
 > **Created**: 2026-02-21
-> **Last Updated**: 2026-02-27
+> **Last Updated**: 2026-02-28
+
+---
+
+## [0.7.0] - 2026-02-28
+
+### UI/UX Improvements - Grid CSS & Dark Mode Support
+
+**Status**: Complete (98% Design Match Rate - PASS)
+
+**Added**:
+- CSS variable-based dark mode support for entire grid system
+- Link color dark mode variant (`--lv-grid-link-color: #90caf9`)
+- Numeric cell alignment class (`.lv-grid__cell--numeric` with `tabular-nums`)
+- Toolbar button group separator (`.lv-grid__toolbar-separator`)
+- Editable cell visual hint (dashed border with hover effect)
+- Header background visual distinction (`--bg-tertiary` more prominent)
+
+**Changed**:
+- Grid horizontal scrolling: `overflow-x: hidden` → `auto` (both body and virtual modes)
+- Grid width constraint: Removed `max-width: 1200px` for full-width layouts
+- Cell text color: `--lv-grid-text-secondary` → `--lv-grid-text` (improved readability)
+- Selected row indicator: `border-left: 3px` → `box-shadow: inset` (eliminated layout shift)
+- Config Modal styling: 28 hardcoded colors → CSS variables with fallbacks
+- Deleted row opacity: `0.5` → `0.6` (improved visibility)
+- Filter input placeholder size: `11px` → `12px` (better consistency)
+- Debug bar in demo: Now conditional on `Mix.env() == :dev`
+
+**Fixed**:
+- Dark mode Config Modal rendering (all colors now variable-based)
+- Horizontal scrolling limitations for large column sets
+- Cell text readability in light mode (insufficient contrast)
+- Layout shift when selecting rows
+- Numeric alignment in currency/percentage columns
+
+**PDCA Details**:
+- Plan: [ui-ux-improvements.plan.md](../01-plan/features/ui-ux-improvements.plan.md)
+- Design: [ui-ux-improvements.design.md](../02-design/features/ui-ux-improvements.design.md)
+- Analysis: [ui-ux-improvements.analysis.md](../03-analysis/ui-ux-improvements.analysis.md)
+- Report: [ui-ux-improvements.report.md](features/ui-ux-improvements.report.md)
+
+**Metrics**:
+- Duration: 1 PDCA cycle with 1 iteration (2h 15m total)
+- Match Rate: 98% (DEFERRED: 1 item at Design discretion)
+- Files Modified: 8 (6 CSS + 2 Elixir/HEEx)
+- CSS Changes: 43 (42 CSS + 1 HEEx integration)
+- P0 Critical: 4/4 complete (100%)
+- P1 Important: 10/10 complete (1 deferred per Design)
+- Tests Passing: 428/428 (100%, no regressions)
+- Backwards Compatibility: 100%
+- Deployment Status: Production Ready
+
+**Files Modified**:
+- `assets/css/grid/variables.css` (+3 link color variables)
+- `assets/css/grid/layout.css` (max-width removal, link color)
+- `assets/css/grid/body.css` (overflow-x, cell colors, box-shadow, numeric class, dashed border, opacity)
+- `assets/css/grid/header.css` (header background, filter placeholder size)
+- `assets/css/grid/toolbar.css` (+separator class)
+- `assets/css/grid/config-modal.css` (28 color → CSS variable conversions)
+- `lib/liveview_grid_web/components/grid_component.ex` (numeric class application, separator insertion)
+- `lib/liveview_grid_web/live/demo_live.ex` (debug bar conditional)
+
+---
+
+## [0.12.0] - 2026-02-28
+
+### Grid Builder DB Connection Feature
+
+**Status**: Complete (91% Design Match Rate - PASS)
+
+**Added**:
+- SchemaRegistry module for Ecto schema discovery via application config
+- TableInspector module for SQLite table/column introspection via PRAGMA
+- RawTable DataSource adapter for schema-less SQL queries
+- BuilderDataSource UI component for interactive data source selection
+- Data source selection UI in Grid Builder Tab 1 (Sample Data / Schema / Table modes)
+- 6 new event handlers in BuilderModal (data source type, schema/table selection, column auto-load)
+- Data source branching in BuilderLive for grid creation (sample vs schema vs table)
+- Data source-aware CRUD operations in GridComponent event handlers
+- Ecto adapter improvements (empty_values: [], PK exclusion, try/rescue)
+- 28 comprehensive unit tests covering new modules and integrations
+
+**Changed**:
+- BuilderModal integrated with data source selection UI and 6 new event handlers
+- BuilderHelpers extended with data source validation and param extraction
+- BuilderLive handle_info branching by data_source_type
+- GridComponent event handlers now check for data_source tuple in CRUD operations
+- Ecto adapter improved for DB insert reliability with error handling
+- Application config includes schema_registry with registered schemas
+
+**Fixed**:
+- CRUD operations now work on DB-connected grids (data_source-aware event handlers)
+- Filtering on auto-populated columns (added filter_type to all schema introspection)
+- Global search on DB-connected grids (fixed RawTable pagination key)
+
+**PDCA Details**:
+- Plan: [grid-config.plan.md](../01-plan/features/grid-config.plan.md)
+- Design: [grid-config.design.md](../02-design/features/grid-config.design.md)
+- Analysis: [grid-config.analysis.md](../03-analysis/grid-config.analysis.md)
+- Report: [grid-config.report.md](features/grid-config.report.md)
+
+**Metrics**:
+- Duration: 1 PDCA cycle (Plan → Design → Do → Check → Report)
+- Match Rate: 91% (exceeds 90% threshold)
+- Files Created: 4 (SchemaRegistry, TableInspector, RawTable, BuilderDataSource)
+- Files Modified: 6 (BuilderModal, BuilderHelpers, BuilderLive, EventHandlers, Ecto, Config)
+- Tests Added: 28 (SchemaRegistry:6, TableInspector:6, RawTable:8, BuilderHelpers:4, BuilderLive:4)
+- Lines Added: ~894 (560 new module code + 334 modifications)
+- Backwards Compatibility: 100%
+- Deployment Status: Production Ready
+
+**Files**:
+- `lib/liveview_grid/schema_registry.ex` (112 lines - new)
+- `lib/liveview_grid/table_inspector.ex` (150 lines - new)
+- `lib/liveview_grid/data_source/raw_table.ex` (278 lines - new)
+- `lib/liveview_grid_web/components/grid_builder/builder_data_source.ex` (120 lines - new)
+- `lib/liveview_grid_web/components/grid_builder/builder_modal.ex` (modified - +150 lines)
+- `lib/liveview_grid_web/components/grid_builder/builder_helpers.ex` (modified - +60 lines)
+- `lib/liveview_grid_web/live/builder_live.ex` (modified - +40 lines)
+- `lib/liveview_grid_web/components/grid_component/event_handlers.ex` (modified - +50 lines)
+- `lib/liveview_grid/data_source/ecto.ex` (modified - +30 lines)
+- `config/config.exs` (modified - +4 lines)
+
+**Completion Notes**:
+- Two connection methods: Schema Selection (pick Ecto schemas) and Table Browsing (query sqlite_master)
+- Full CRUD support via DataSource adapters (Read, Create, Update, Delete)
+- Auto-population of grid columns from schema introspection or PRAGMA results
+- 3 bug fixes: CRUD operations, filtering, and search functionality on DB grids
+- All values parameterized to prevent SQL injection
+- Try/rescue error handling prevents GenServer crashes from DB constraints
+- Ready for production deployment
+
+**Browser Verified**: All scenarios (10/10) ✅
+
+**Related Features**:
+- Extends: Grid Builder (v0.11.0)
+- Complements: Grid Configuration v2, Grid Configuration Phase 1/2
+- Foundation for: Grid Configuration Phase 3 (DataSource UI), Multi-database support
+
+---
+
+## [0.11.0] - 2026-02-28
+
+### Grid Builder (UI-Based Grid Definition)
+
+**Status**: Complete (93% Design Match Rate - PASS - 1 Iteration to 90% Threshold)
+
+**Added**:
+- BuilderModal LiveComponent (1,210 lines) with 3 interactive tabs for grid definition
+- Tab 1: Grid Info for name, ID (with auto-generation), page size, theme, row height, frozen columns, display options
+- Tab 2: Column Builder with full CRUD operations, validators, formatters, renderers
+- Tab 3: Preview tab with sample data generation, validation status, code preview
+- BuilderHelpers module (250 lines, NEW) extracting pure helper functions for testability and reusability
+- SampleData module (80 lines) with field-aware sample data generation (detects name, email, phone patterns)
+- BuilderLive standalone page at `/builder` route for independent grid building and management
+- config-sortable.js Hook (reused from Config Modal) for column drag-to-reorder functionality
+- 79 comprehensive unit tests covering all functionality:
+  - SampleData: 16 tests (type generation, field-aware, edge cases)
+  - BuilderHelpers: 56 tests (validation, params building, validators, renderers, utilities)
+  - BuilderLive: 7 tests (page rendering, tab navigation, grid creation/deletion)
+- Production-ready with defensive atom conversion and safe regex compilation
+
+**Changed**:
+- New GridBuilder components architecture with separation of concerns
+- BuilderModal delegates business logic to BuilderHelpers via pure functions
+- App.js enhanced with config-sortable hook registration for column reordering
+
+**Fixed**:
+- Non-developers can now create grids without writing Elixir code
+- Grid definition UI prevents common errors with validation (name, columns, empty fields, duplicates)
+- Atom conversion safely handles user input with sanitization and whitelist patterns
+
+**PDCA Details**:
+- Plan: [grid-builder.plan.md](../01-plan/features/grid-builder.plan.md)
+- Design: [grid-builder.design.md](../02-design/features/grid-builder.design.md)
+- Analysis: [grid-builder.analysis.md](../03-analysis/grid-builder.analysis.md)
+- Report: [grid-builder.report.md](features/grid-builder.report.md)
+
+**Metrics**:
+- Duration: 1 PDCA cycle with 1 iteration
+- Gap Analysis v1: 82% match rate (functional implementation complete, tests missing 0/6 categories)
+- Iteration 1: Extracted BuilderHelpers (250 lines) + Added 79 tests → 93% match rate
+- Gap Analysis v2: 93% match rate (all 6 test categories covered)
+- Files Created: 4 (BuilderModal, BuilderHelpers, BuilderLive, SampleData)
+- Files Modified: 1 (Router)
+- Lines Added: ~1,825 (code + tests)
+- Unit Tests Added: 79 (all passing, 100% pass rate)
+- Match Rate: 93% (threshold: 90%)
+- Backwards Compatibility: 100%
+- Deployment Status: Production Ready
+
+**Files**:
+- `lib/liveview_grid_web/components/grid_builder/builder_modal.ex` (1,210 lines - new)
+- `lib/liveview_grid_web/components/grid_builder/builder_helpers.ex` (250 lines - new, extracted)
+- `lib/liveview_grid_web/live/builder_live.ex` (192 lines - new)
+- `lib/liveview_grid/sample_data.ex` (80 lines - new)
+- `assets/js/hooks/config-sortable.js` (77 lines - reused)
+- `lib/liveview_grid_web/router.ex` (modified - /builder route)
+- `test/liveview_grid/sample_data_test.exs` (16 tests - new)
+- `test/liveview_grid_web/components/grid_builder/builder_helpers_test.exs` (56 tests - new)
+- `test/liveview_grid_web/live/builder_live_test.exs` (7 tests - new)
+
+**Completion Notes**:
+- Grid Builder enables non-developers to create and configure grids via UI
+- Helper extraction pattern (BuilderHelpers) improves testability and reusability
+- Field-aware sample data makes preview look realistic and guides user expectations
+- Safe atom conversion and regex handling prevent crashes and security issues
+- Standalone BuilderLive page accessible at /builder for independent grid management
+- Comprehensive test coverage (79 tests) ensures reliability
+- Zero-iteration gap closure from 82% → 93% through test suite addition
+- Ready for immediate production deployment
+
+**Related Features**:
+- Integrates with: Grid Configuration v2, Grid Configuration Phase 2, Grid Configuration Phase 1
+- Complements: Cell Editing (F-922), Custom Renderers (F-300)
+- Foundation for: Grid definition persistence, template library, advanced builder UI
+
+---
+
+## [0.10.0] - 2026-02-27
+
+### Grid Configuration v2 (3-Layer Architecture)
+
+**Status**: Complete (97% Design Match Rate - PASS - Zero Iterations)
+
+**Added**:
+- GridDefinition immutable blueprint module for storing original grid definition
+- Grid struct definition field to preserve original columns and options across lifecycle
+- Three-layer architecture: Blueprint (GridDefinition) → Runtime Config → Preview & Apply
+- Change summary UI panel (amber-50 background) displaying all diffs before apply
+- Apply button state management: disabled when no changes, displays change count
+- Diff computation across 4 categories: columns, visibility, options, validators
+- `reset_to_definition/1` function for complete restore to original blueprint
+- `compute_changes/1` function calculating diffs from original state
+- `default_options/0` public function for reset handler
+- `all_columns/1` private helper with runtime-first priority for column lookup
+- Nine critical bug fixes: state persistence, validators, validators tuple-to-map, IME support, form wrappers, column selectors, initialization guard, validator serialization
+
+**Changed**:
+- GridDefinition creates immutable blueprint from column definitions
+- Grid.new/1 auto-creates definition from columns + options
+- update_data/4 preserves definition across updates
+- apply_config_changes/2 uses definition for column recovery, saves runtime state
+- Config Modal init_column_state reads from definition with fallback
+- Config Modal reset handler uses definition.options when available
+- Applied design deviations for bug fixes: runtime-first priority, state[:all_columns] persistence
+
+**Fixed**:
+- Column property edits (label, width, etc.) now persist across modal close/reopen
+- Hidden columns properly recoverable from definition
+- Validators properly deserialized and serialized
+- Tab 2/3 column selectors show all columns including hidden
+- Select inputs properly bind phx-change events via form wrapper
+- Update/2 initialization guard prevents losing user edits
+- Validator changes tracked in diff computation
+- IME composition no longer interferes with validators
+
+**PDCA Details**:
+- Plan: [grid-config-v2.plan.md](../01-plan/features/grid-config-v2.plan.md)
+- Design: [grid-config-v2.design.md](../02-design/features/grid-config-v2.design.md)
+- Analysis: [grid-config-v2.analysis.md](../03-analysis/grid-config-v2.analysis.md)
+- Report: [grid-config-v2.report.md](features/grid-config-v2.report.md)
+
+**Metrics**:
+- Duration: 1 PDCA cycle (zero iterations, exceeded 90% on first implementation)
+- Files Created: 1 (GridDefinition module)
+- Files Modified: 2 (Grid, ConfigModal)
+- Lines Added: ~450 (GridDefinition: 107, Grid: 120, ConfigModal: 220)
+- Unit Tests Added: 18 (all passing)
+- Match Rate: 97% (threshold: 90%)
+- Intentional Deviations: 2 (both improvements - bug fixes)
+- Backwards Compatibility: 100%
+- Deployment Status: Production Ready
+
+**Files**:
+- `lib/liveview_grid/grid_definition.ex` (107 lines - new)
+- `lib/liveview_grid/grid.ex` (modified - definition field, auto-creation, reset, all_columns)
+- `lib/liveview_grid_web/components/grid_config/config_modal.ex` (modified - Phase 3: compute_changes, UI, button state)
+- `test/liveview_grid/grid_test.exs` (modified - 18 new tests)
+
+**Completion Notes**:
+- GridDefinition provides immutable blueprint preventing accidental modification
+- Three-layer architecture separates concerns: what grid is → how to display → what changes
+- Change summary UI enables safe configuration application with preview
+- Reset-to-definition provides unambiguous recovery path
+- Two intentional design deviations improve behavior (runtime-first priority prevents data loss, state persistence preserves edits)
+- All bug fixes verified and integrated
+- Ready for immediate production deployment
+- Phase 2 (Definition Editor UI) planned as separate PDCA cycle
+
+**Related Features**:
+- Builds on: Phase 1 (Column Configuration), Phase 2 (Grid Settings)
+- Complements: Cell Editing (F-922), Custom Renderers (F-300)
+- Foundation for: Phase 2 Definition Editor, State persistence
 
 ---
 

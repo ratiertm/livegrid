@@ -1280,7 +1280,7 @@ defmodule LiveViewGrid.GridTest do
     end
 
     test "validates page_size upper bound", %{grid: grid} do
-      {:error, reason} = Grid.apply_grid_settings(grid, %{"page_size" => 2000})
+      {:error, reason} = Grid.apply_grid_settings(grid, %{"page_size" => 200_000})
       assert String.contains?(reason, "page_size")
     end
 
@@ -1326,6 +1326,337 @@ defmodule LiveViewGrid.GridTest do
       original_show_header = grid.options.show_header
       {:ok, new_grid} = Grid.apply_grid_settings(grid, %{"page_size" => 50})
       assert new_grid.options.show_header == original_show_header
+    end
+  end
+
+  # ==========================================================================
+  # GridDefinition Tests
+  # ==========================================================================
+
+  describe "GridDefinition.new/2" do
+    alias LiveViewGrid.GridDefinition
+
+    test "creates definition with columns and default options" do
+      columns = [%{field: :name, label: "Name"}, %{field: :age, label: "Age"}]
+      definition = GridDefinition.new(columns)
+
+      assert length(definition.columns) == 2
+      assert definition.options == %{}
+    end
+
+    test "merges column defaults" do
+      columns = [%{field: :name, label: "Name"}]
+      definition = GridDefinition.new(columns)
+
+      [col] = definition.columns
+      assert col.width == :auto
+      assert col.sortable == false
+      assert col.align == :left
+      assert col.type == :string
+      assert col.required == false
+    end
+
+    test "preserves user-specified column values" do
+      columns = [%{field: :name, label: "Name", width: 200, sortable: true}]
+      definition = GridDefinition.new(columns)
+
+      [col] = definition.columns
+      assert col.width == 200
+      assert col.sortable == true
+    end
+
+    test "preserves options" do
+      columns = [%{field: :id, label: "ID"}]
+      opts = %{page_size: 50, theme: "dark"}
+      definition = GridDefinition.new(columns, opts)
+
+      assert definition.options == opts
+    end
+
+    test "raises on missing field" do
+      assert_raise ArgumentError, ~r/field/, fn ->
+        GridDefinition.new([%{label: "Name"}])
+      end
+    end
+
+    test "raises on missing label" do
+      assert_raise ArgumentError, ~r/label/, fn ->
+        GridDefinition.new([%{field: :name}])
+      end
+    end
+
+    test "raises on duplicate fields" do
+      assert_raise ArgumentError, ~r/중복/, fn ->
+        GridDefinition.new([
+          %{field: :name, label: "Name"},
+          %{field: :name, label: "Name2"}
+        ])
+      end
+    end
+  end
+
+  describe "GridDefinition.get_column/2" do
+    alias LiveViewGrid.GridDefinition
+
+    test "returns column by field" do
+      definition = GridDefinition.new([
+        %{field: :name, label: "Name"},
+        %{field: :age, label: "Age"}
+      ])
+
+      col = GridDefinition.get_column(definition, :name)
+      assert col.field == :name
+      assert col.label == "Name"
+    end
+
+    test "returns nil for unknown field" do
+      definition = GridDefinition.new([%{field: :name, label: "Name"}])
+      assert GridDefinition.get_column(definition, :unknown) == nil
+    end
+  end
+
+  describe "GridDefinition.fields/1" do
+    alias LiveViewGrid.GridDefinition
+
+    test "returns all field atoms" do
+      definition = GridDefinition.new([
+        %{field: :id, label: "ID"},
+        %{field: :name, label: "Name"},
+        %{field: :email, label: "Email"}
+      ])
+
+      assert GridDefinition.fields(definition) == [:id, :name, :email]
+    end
+  end
+
+  describe "Grid.new with definition" do
+    test "definition field is auto-created" do
+      grid = Grid.new(
+        data: [%{id: 1, name: "Alice"}],
+        columns: [%{field: :name, label: "Name"}]
+      )
+
+      assert grid.definition != nil
+      assert length(grid.definition.columns) == 1
+    end
+
+    test "definition.columns preserves original column info" do
+      columns = [
+        %{field: :name, label: "Name", width: 200, sortable: true},
+        %{field: :email, label: "Email"}
+      ]
+      grid = Grid.new(data: [], columns: columns)
+
+      [name_col, _email_col] = grid.definition.columns
+      assert name_col.field == :name
+      assert name_col.width == 200
+      assert name_col.sortable == true
+    end
+
+    test "definition.options preserves grid options" do
+      grid = Grid.new(
+        data: [],
+        columns: [%{field: :id, label: "ID"}],
+        options: %{page_size: 50, theme: "dark"}
+      )
+
+      assert grid.definition.options == %{page_size: 50, theme: "dark"}
+    end
+  end
+
+  describe "apply_config_changes with definition" do
+    setup do
+      columns = [
+        %{field: :id, label: "ID", width: 80},
+        %{field: :name, label: "Name", width: 150, sortable: true, editable: true},
+        %{field: :email, label: "Email", width: 200},
+        %{field: :age, label: "Age", width: 80}
+      ]
+
+      grid = Grid.new(data: [%{id: 1, name: "Alice", email: "a@b.c", age: 30}], columns: columns)
+      %{grid: grid}
+    end
+
+    test "hidden columns are recoverable from definition", %{grid: grid} do
+      # Hide id and email
+      updated = Grid.apply_config_changes(grid, %{
+        "hidden_columns" => ["id", "email"]
+      })
+
+      assert length(updated.columns) == 2
+      fields = Enum.map(updated.columns, & &1.field)
+      assert :id not in fields
+      assert :email not in fields
+
+      # Apply again with id visible
+      restored = Grid.apply_config_changes(updated, %{
+        "hidden_columns" => ["email"]
+      })
+
+      assert length(restored.columns) == 3
+      restored_fields = Enum.map(restored.columns, & &1.field)
+      assert :id in restored_fields
+      assert :email not in restored_fields
+    end
+
+    test "state[:all_columns] always persists runtime column state", %{grid: grid} do
+      updated = Grid.apply_config_changes(grid, %{
+        "hidden_columns" => ["id"]
+      })
+
+      # runtime 변경사항은 항상 state[:all_columns]에 저장됨 (모달 재오픈 시 참조)
+      assert Map.has_key?(updated.state, :all_columns)
+      all_fields = Enum.map(updated.state[:all_columns], & &1.field)
+      assert :id in all_fields
+      assert :name in all_fields
+    end
+  end
+
+  describe "reset_to_definition/1" do
+    test "restores original columns" do
+      columns = [
+        %{field: :id, label: "ID"},
+        %{field: :name, label: "Name"},
+        %{field: :email, label: "Email"}
+      ]
+      grid = Grid.new(data: [], columns: columns)
+
+      # Hide a column
+      modified = Grid.apply_config_changes(grid, %{
+        "hidden_columns" => ["email"],
+        "columns" => [%{"field" => "name", "label" => "성명"}]
+      })
+
+      assert length(modified.columns) == 2
+
+      # Reset to definition
+      restored = Grid.reset_to_definition(modified)
+
+      assert length(restored.columns) == 3
+      assert restored.state[:hidden_columns] == []
+      assert restored.state[:column_order] == nil
+    end
+
+    test "restores original options" do
+      grid = Grid.new(
+        data: [],
+        columns: [%{field: :id, label: "ID"}],
+        options: %{page_size: 25, theme: "dark"}
+      )
+
+      assert grid.options.page_size == 25
+      assert grid.options.theme == "dark"
+
+      restored = Grid.reset_to_definition(grid)
+
+      assert restored.options.page_size == 25
+      assert restored.options.theme == "dark"
+    end
+
+    test "no-op when definition is nil" do
+      grid = %{
+        id: "test",
+        data: [],
+        columns: [],
+        definition: nil,
+        state: %{},
+        options: %{},
+        data_source: nil
+      }
+
+      assert Grid.reset_to_definition(grid) == grid
+    end
+  end
+
+  # ── F-941: Cell Range Summary ──
+
+  describe "cell_range_summary/1" do
+    setup do
+      data = [
+        %{id: 1, name: "Alice", age: 25, salary: 3000},
+        %{id: 2, name: "Bob", age: 30, salary: 4000},
+        %{id: 3, name: "Carol", age: 35, salary: 5000},
+        %{id: 4, name: "Dave", age: 40, salary: 6000}
+      ]
+      columns = [
+        %{field: :name, label: "이름"},
+        %{field: :age, label: "나이"},
+        %{field: :salary, label: "급여"}
+      ]
+      grid = Grid.new(data: data, columns: columns, options: %{page_size: 100})
+      %{grid: grid}
+    end
+
+    test "returns nil when no range is selected", %{grid: grid} do
+      assert Grid.cell_range_summary(grid) == nil
+    end
+
+    test "calculates summary for numeric range", %{grid: grid} do
+      # 나이 컬럼 (col_idx 1): rows 1~3 → ages 25, 30, 35
+      grid = Grid.set_cell_range(grid, %{
+        anchor_row_id: 1, anchor_col_idx: 1,
+        extent_row_id: 3, extent_col_idx: 1
+      })
+
+      summary = Grid.cell_range_summary(grid)
+      assert summary.count == 3
+      assert summary.numeric_count == 3
+      assert summary.sum == 90
+      assert summary.min == 25
+      assert summary.max == 35
+      assert_in_delta summary.avg, 30.0, 0.01
+    end
+
+    test "calculates summary for mixed text/numeric range", %{grid: grid} do
+      # 이름 + 나이 (col 0~1), rows 1~2
+      grid = Grid.set_cell_range(grid, %{
+        anchor_row_id: 1, anchor_col_idx: 0,
+        extent_row_id: 2, extent_col_idx: 1
+      })
+
+      summary = Grid.cell_range_summary(grid)
+      assert summary.count == 4   # 2 names + 2 ages
+      assert summary.numeric_count == 2
+      assert summary.sum == 55    # 25 + 30
+    end
+
+    test "returns count-only for non-numeric range", %{grid: grid} do
+      # 이름 컬럼만 (col 0), rows 1~4
+      grid = Grid.set_cell_range(grid, %{
+        anchor_row_id: 1, anchor_col_idx: 0,
+        extent_row_id: 4, extent_col_idx: 0
+      })
+
+      summary = Grid.cell_range_summary(grid)
+      assert summary.count == 4
+      assert summary.numeric_count == 0
+      assert summary.sum == nil
+      assert summary.avg == nil
+    end
+
+    test "handles single cell selection", %{grid: grid} do
+      grid = Grid.set_cell_range(grid, %{
+        anchor_row_id: 2, anchor_col_idx: 2,
+        extent_row_id: 2, extent_col_idx: 2
+      })
+
+      summary = Grid.cell_range_summary(grid)
+      assert summary.count == 1
+      assert summary.numeric_count == 1
+      assert summary.sum == 4000
+      assert summary.avg == 4000.0
+    end
+
+    test "handles full grid range", %{grid: grid} do
+      grid = Grid.set_cell_range(grid, %{
+        anchor_row_id: 1, anchor_col_idx: 0,
+        extent_row_id: 4, extent_col_idx: 2
+      })
+
+      summary = Grid.cell_range_summary(grid)
+      assert summary.count == 12   # 4 rows * 3 cols
+      assert summary.numeric_count == 8  # 4 ages + 4 salaries
+      assert summary.sum == 25 + 30 + 35 + 40 + 3000 + 4000 + 5000 + 6000
     end
   end
 end

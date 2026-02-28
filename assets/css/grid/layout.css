@@ -11,8 +11,6 @@
 /* 3. Container */
 .lv-grid {
   width: 100%;
-  max-width: 1200px;
-  margin: 0 auto;
 
   background: var(--lv-grid-bg);
   border: 1px solid var(--lv-grid-border);
@@ -80,6 +78,32 @@
   color: var(--lv-grid-text-secondary);
 }
 
+/* 6.1 Cell Range Summary (F-941) */
+.lv-grid__range-summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  padding: 2px 8px;
+  background: var(--lv-grid-primary-light, #e3f2fd);
+  border-radius: 4px;
+  font-size: 12px;
+  color: var(--lv-grid-text, #333);
+}
+
+.lv-grid__range-summary-label {
+  font-weight: 600;
+  color: var(--lv-grid-primary, #1976d2);
+}
+
+.lv-grid__range-summary-item {
+  white-space: nowrap;
+}
+
+.lv-grid__range-summary-item strong {
+  font-weight: 700;
+  color: var(--lv-grid-primary-dark, #0d47a1);
+}
+
 /* 7. Custom Renderers */
 
 /* 7.1 Badge Renderer */
@@ -100,7 +124,7 @@
 
 /* 7.2 Link Renderer */
 .lv-grid__link {
-  color: var(--lv-grid-primary-dark);
+  color: var(--lv-grid-link-color);
   text-decoration: none;
 }
 .lv-grid__link:hover {

@@ -5,7 +5,7 @@
 /* 4. Header */
 .lv-grid__header {
   display: flex;
-  background: var(--lv-grid-bg-secondary);
+  background: var(--lv-grid-bg-tertiary);
   border-bottom: 2px solid var(--lv-grid-border);
   position: sticky;
   top: 0;
@@ -157,7 +157,7 @@
 
 .lv-grid__filter-input::placeholder {
   color: var(--lv-grid-text-disabled);
-  font-size: 11px;
+  font-size: 12px;
 }
 
 /* Date Filter (F-062) */
