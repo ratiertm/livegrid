@@ -104,6 +104,32 @@
   color: var(--lv-grid-primary-dark, #0d47a1);
 }
 
+/* 6.2 Summary Row (F-950) */
+.lv-grid__summary-row {
+  display: flex;
+  border-top: 2px solid var(--lv-grid-border, #ddd);
+  border-bottom: 1px solid var(--lv-grid-border, #ddd);
+  background: var(--lv-grid-summary-bg, #f0f4f8);
+  font-weight: 600;
+  font-size: 13px;
+  min-height: 36px;
+}
+
+.lv-grid__summary-cell {
+  padding: 6px 8px;
+  display: flex;
+  align-items: center;
+  border-right: 1px solid var(--lv-grid-border, #ddd);
+}
+
+.lv-grid__summary-cell:last-child {
+  border-right: none;
+}
+
+.lv-grid__summary-value {
+  color: var(--lv-grid-text, #333);
+}
+
 /* 7. Custom Renderers */
 
 /* 7.1 Badge Renderer */

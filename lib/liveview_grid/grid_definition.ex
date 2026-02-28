@@ -52,7 +52,8 @@ defmodule LiveViewGrid.GridDefinition do
     input_pattern: nil,
     style_expr: nil,
     nulls: :last,
-    required: false
+    required: false,
+    summary: nil
   }
 
   @doc """

@@ -37,38 +37,61 @@ defmodule LiveviewGridWeb.GridComponent.RenderHelpers do
   """
   @spec frozen_style(col_idx :: non_neg_integer(), grid :: map()) :: String.t()
   def frozen_style(col_idx, grid) do
-    frozen_count = grid.options.frozen_columns
-    if frozen_count > 0 and col_idx < frozen_count do
-      row_num_w = if(grid.options.show_row_number, do: 50, else: 0)
-      status_w = if(grid.state.show_status_column, do: 60, else: 0)
-      base_offset = 90 + row_num_w + status_w
-      display_cols = Grid.display_columns(grid)
-      prev_width = display_cols
-        |> Enum.take(col_idx)
-        |> Enum.reduce(0, fn col, acc ->
-          w = Map.get(grid.state.column_widths, col.field) || col.width
-          case w do
-            :auto -> acc + 150
-            w when is_integer(w) -> acc + w
-          end
-        end)
-      left = base_offset + prev_width
-      "position: sticky; left: #{left}px; z-index: 2; background: inherit;"
-    else
-      ""
+    frozen_left = grid.options.frozen_columns
+    frozen_right = Map.get(grid.options, :frozen_right_columns, 0)
+    display_cols = Grid.display_columns(grid)
+    total_cols = length(display_cols)
+
+    cond do
+      frozen_left > 0 and col_idx < frozen_left ->
+        row_num_w = if(grid.options.show_row_number, do: 50, else: 0)
+        status_w = if(grid.state.show_status_column, do: 60, else: 0)
+        base_offset = 90 + row_num_w + status_w
+        prev_width = display_cols
+          |> Enum.take(col_idx)
+          |> Enum.reduce(0, fn col, acc ->
+            w = Map.get(grid.state.column_widths, col.field) || col.width
+            case w do
+              :auto -> acc + 150
+              w when is_integer(w) -> acc + w
+            end
+          end)
+        left = base_offset + prev_width
+        "position: sticky; left: #{left}px; z-index: 2; background: inherit;"
+
+      frozen_right > 0 and col_idx >= total_cols - frozen_right ->
+        after_width = display_cols
+          |> Enum.drop(col_idx + 1)
+          |> Enum.reduce(0, fn col, acc ->
+            w = Map.get(grid.state.column_widths, col.field) || col.width
+            case w do
+              :auto -> acc + 150
+              w when is_integer(w) -> acc + w
+            end
+          end)
+        "position: sticky; right: #{after_width}px; z-index: 2; background: inherit;"
+
+      true ->
+        ""
     end
   end
 
   @doc """
-  고정 컬럼이면 CSS 클래스를 반환한다.
+  고정 컬럼이면 CSS 클래스를 반환한다 (좌측 또는 우측).
   """
   @spec frozen_class(col_idx :: non_neg_integer(), grid :: map()) :: String.t()
   def frozen_class(col_idx, grid) do
-    frozen_count = grid.options.frozen_columns
-    if frozen_count > 0 and col_idx < frozen_count do
-      "lv-grid__cell--frozen"
-    else
-      ""
+    frozen_left = grid.options.frozen_columns
+    frozen_right = Map.get(grid.options, :frozen_right_columns, 0)
+    total_cols = length(Grid.display_columns(grid))
+
+    cond do
+      frozen_left > 0 and col_idx < frozen_left ->
+        "lv-grid__cell--frozen"
+      frozen_right > 0 and col_idx >= total_cols - frozen_right ->
+        "lv-grid__cell--frozen-right"
+      true ->
+        ""
     end
   end
 
@@ -487,7 +510,7 @@ defmodule LiveviewGridWeb.GridComponent.RenderHelpers do
     ~H"""
     <div class={"lv-grid__cell-wrapper #{@cell_align} #{if @cell_error, do: "lv-grid__cell-wrapper--error"}"} style={@cell_style}>
       <span
-        class={"lv-grid__cell-value #{if @column.editable, do: "lv-grid__cell-value--editable"} #{if @cell_error, do: "lv-grid__cell-value--error"}"}
+        class={"lv-grid__cell-value #{if @column.editable, do: "lv-grid__cell-value--editable"} #{if @cell_error, do: "lv-grid__cell-value--error"} #{if wordwrap?(@column), do: "lv-grid__cell-value--wordwrap"}"}
         id={if @column.editable, do: "cell-#{@row.id}-#{@column.field}"}
         phx-hook={if @column.editable, do: "CellEditable"}
         data-row-id={@row.id}
@@ -522,7 +545,7 @@ defmodule LiveviewGridWeb.GridComponent.RenderHelpers do
     ~H"""
     <div class={"lv-grid__cell-wrapper #{@cell_align} #{if @cell_error, do: "lv-grid__cell-wrapper--error"}"} style={@cell_style}>
       <span
-        class={"lv-grid__cell-value #{if @column.editable, do: "lv-grid__cell-value--editable"} #{if @cell_error, do: "lv-grid__cell-value--error"}"}
+        class={"lv-grid__cell-value #{if @column.editable, do: "lv-grid__cell-value--editable"} #{if @cell_error, do: "lv-grid__cell-value--error"} #{if wordwrap?(@column), do: "lv-grid__cell-value--wordwrap"}"}
         id={if @column.editable, do: "cell-#{@row.id}-#{@column.field}"}
         phx-hook={if @column.editable, do: "CellEditable"}
         data-row-id={@row.id}
@@ -641,6 +664,131 @@ defmodule LiveviewGridWeb.GridComponent.RenderHelpers do
     value
     |> Float.round(2)
     |> Formatter.format(:number)
+  end
+
+  # ── F-950: Summary Row ──
+
+  @doc """
+  Summary Row를 표시해야 하는지 확인합니다.
+  show_summary 옵션이 true이거나, 컬럼 중 summary가 지정된 것이 있으면 true.
+  show_footer가 true여야 함.
+  """
+  @spec has_summary?(map()) :: boolean()
+  def has_summary?(grid) do
+    (Map.get(grid.options, :show_summary, false) || Enum.any?(grid.columns, & &1.summary)) &&
+      Map.get(grid.options, :show_footer, true)
+  end
+
+  # ── F-904: Cell Merge ──
+
+  @doc "셀이 merge skip 대상인지 확인합니다."
+  @spec merge_skip?(map(), any(), atom()) :: boolean()
+  def merge_skip?(merge_skip_map, row_id, col_field) do
+    Map.has_key?(merge_skip_map, {row_id, col_field})
+  end
+
+  @doc "셀이 merge 원점인지 확인하고, 원점이면 {rowspan, colspan}를 반환합니다."
+  @spec merge_span(map(), any(), atom()) :: nil | {integer(), integer()}
+  def merge_span(merge_regions, row_id, col_field) do
+    case Map.get(merge_regions, {row_id, col_field}) do
+      %{rowspan: rs, colspan: cs} when rs > 1 or cs > 1 -> {rs, cs}
+      _ -> nil
+    end
+  end
+
+  @doc "colspan에 대한 합산 너비 스타일을 계산합니다."
+  @spec merged_width_style(map(), atom(), integer()) :: String.t() | nil
+  def merged_width_style(grid, col_field, colspan) when colspan > 1 do
+    display_cols = Grid.display_columns(grid)
+    col_fields = Enum.map(display_cols, & &1.field)
+    start_idx = Enum.find_index(col_fields, &(&1 == col_field)) || 0
+    target_cols = Enum.slice(display_cols, start_idx, colspan)
+
+    {total_px, auto_count} = Enum.reduce(target_cols, {0, 0}, fn col, {px, auto} ->
+      w = Map.get(grid.state.column_widths, col.field)
+      cond do
+        w != nil -> {px + w, auto}
+        col.width == :auto -> {px, auto + 1}
+        true -> {px + col.width, auto}
+      end
+    end)
+
+    border_px = colspan - 1
+
+    if auto_count > 0 do
+      "flex: #{auto_count} 1 #{total_px + border_px}px"
+    else
+      "width: #{total_px + border_px}px; flex: 0 0 #{total_px + border_px}px"
+    end
+  end
+  def merged_width_style(_grid, _col_field, _colspan), do: nil
+
+  @doc "rowspan에 대한 높이 스타일을 계산합니다."
+  @spec merged_height_style(map(), integer()) :: String.t() | nil
+  def merged_height_style(grid, rowspan) when rowspan > 1 do
+    row_h = Map.get(grid.options, :row_height, 40)
+    total_h = row_h * rowspan + (rowspan - 1)
+    "height: #{total_h}px; position: relative; z-index: 1;"
+  end
+  def merged_height_style(_grid, _rowspan), do: nil
+
+  # ── F-911: Wordwrap ──
+
+  @doc "컬럼의 wordwrap 설정에 따라 CSS 클래스를 반환합니다."
+  @spec wordwrap_class(column :: map()) :: String.t()
+  def wordwrap_class(%{wordwrap: :char}), do: "lv-grid__cell--wordwrap-char"
+  def wordwrap_class(%{wordwrap: :word}), do: "lv-grid__cell--wordwrap-word"
+  def wordwrap_class(_column), do: ""
+
+  @doc "컬럼이 wordwrap 설정되어 있는지 확인합니다."
+  @spec wordwrap?(column :: map()) :: boolean()
+  def wordwrap?(%{wordwrap: ww}) when ww in [:char, :word], do: true
+  def wordwrap?(_column), do: false
+
+  # ── F-903: Suppress (동일값 병합) ──
+
+  @doc """
+  suppress 모드에서 현재 셀의 값이 바로 위 행과 동일한지 확인합니다.
+  동일하면 true (= 값을 숨겨야 함).
+  """
+  @spec suppress_cell?(column :: map(), row :: map(), prev_row :: map() | nil) :: boolean()
+  def suppress_cell?(%{suppress: true}, _row, nil), do: false
+  def suppress_cell?(%{suppress: true} = column, row, prev_row) do
+    Map.get(row, column.field) == Map.get(prev_row, column.field)
+  end
+  def suppress_cell?(_column, _row, _prev_row), do: false
+
+  @doc """
+  행 목록과 컬럼 정의를 받아 suppress 대상 셀의 MapSet을 생성합니다.
+  `suppress: true`인 컬럼에서 바로 위 행과 동일한 값을 가진 셀을 {row_id, field} 형태로 수집합니다.
+  """
+  @spec build_suppress_map(rows :: [map()], columns :: [map()]) :: MapSet.t()
+  def build_suppress_map(rows, columns) do
+    suppress_cols = Enum.filter(columns, &Map.get(&1, :suppress, false))
+
+    if suppress_cols == [] do
+      MapSet.new()
+    else
+      rows
+      |> Enum.chunk_every(2, 1, :discard)
+      |> Enum.reduce(MapSet.new(), fn [prev_row, row], acc ->
+        Enum.reduce(suppress_cols, acc, fn col, inner_acc ->
+          if suppress_cell?(col, row, prev_row) do
+            MapSet.put(inner_acc, {Map.get(row, :id), col.field})
+          else
+            inner_acc
+          end
+        end)
+      end)
+    end
+  end
+
+  @doc """
+  특정 셀이 suppress 대상인지 확인합니다.
+  """
+  @spec suppressed?(suppress_map :: MapSet.t(), row_id :: any(), field :: atom()) :: boolean()
+  def suppressed?(suppress_map, row_id, field) do
+    MapSet.member?(suppress_map, {row_id, field})
   end
 
   # ── F-940: Cell Range Selection ──

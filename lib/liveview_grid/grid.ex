@@ -286,6 +286,205 @@ defmodule LiveViewGrid.Grid do
   end
 
   @doc """
+  Summary Row 집계 결과를 반환합니다.
+  컬럼에 summary가 지정된 필드만 집계합니다.
+  필터/검색 적용 후 데이터 기준.
+
+  ## Returns
+    - `%{field => value}` 맵 (summary 지정 컬럼만 포함)
+    - summary 지정 컬럼이 없으면 빈 맵 `%{}`
+  """
+  @spec summary_data(grid :: t()) :: map()
+  def summary_data(%{columns: columns} = grid) do
+    aggregates =
+      columns
+      |> Enum.filter(& &1.summary)
+      |> Map.new(& {&1.field, &1.summary})
+
+    if map_size(aggregates) == 0 do
+      %{}
+    else
+      data = filtered_data(grid)
+      Grouping.compute_aggregates(data, aggregates)
+    end
+  end
+
+  # ── F-904: Cell Merge API ──
+
+  @doc """
+  셀 병합 영역을 등록합니다.
+
+  ## Parameters
+  - grid: Grid 맵
+  - merge_spec: `%{row_id: any, col_field: atom, rowspan: integer, colspan: integer}`
+
+  ## Returns
+  - `{:ok, grid}` 또는 `{:error, reason}`
+  """
+  @spec merge_cells(grid :: t(), merge_spec :: map()) :: {:ok, t()} | {:error, String.t()}
+  def merge_cells(grid, %{row_id: row_id, col_field: col_field} = spec) do
+    rowspan = Map.get(spec, :rowspan, 1)
+    colspan = Map.get(spec, :colspan, 1)
+
+    if rowspan < 1 or colspan < 1 do
+      {:error, "rowspan and colspan must be >= 1"}
+    else
+      col_fields = display_columns(grid) |> Enum.map(& &1.field)
+      col_start_idx = Enum.find_index(col_fields, &(&1 == col_field))
+
+      cond do
+        is_nil(col_start_idx) ->
+          {:error, "column #{col_field} not found"}
+
+        col_start_idx + colspan > length(col_fields) ->
+          {:error, "colspan exceeds column count"}
+
+        rowspan == 1 and colspan == 1 ->
+          {:error, "merge must span more than one cell"}
+
+        has_merge_overlap?(grid, row_id, col_field, rowspan, colspan) ->
+          {:error, "merge region overlaps with existing merge"}
+
+        frozen_boundary_crossed?(grid, col_start_idx, colspan) ->
+          {:error, "merge cannot cross frozen column boundary"}
+
+        true ->
+          region = %{rowspan: rowspan, colspan: colspan}
+          new_regions = Map.put(grid.state.merge_regions, {row_id, col_field}, region)
+          {:ok, put_in(grid.state.merge_regions, new_regions)}
+      end
+    end
+  end
+
+  @doc "특정 셀 병합을 해제합니다."
+  @spec unmerge_cells(grid :: t(), row_id :: any(), col_field :: atom()) :: t()
+  def unmerge_cells(grid, row_id, col_field) do
+    new_regions = Map.delete(grid.state.merge_regions, {row_id, col_field})
+    put_in(grid.state.merge_regions, new_regions)
+  end
+
+  @doc "모든 병합을 해제합니다."
+  @spec clear_all_merges(grid :: t()) :: t()
+  def clear_all_merges(grid) do
+    put_in(grid.state.merge_regions, %{})
+  end
+
+  @doc "전체 병합 영역 목록을 반환합니다."
+  @spec merge_regions(grid :: t()) :: map()
+  def merge_regions(grid), do: grid.state.merge_regions
+
+  @doc "특정 셀이 병합(원점 또는 피병합)에 포함되는지 확인합니다."
+  @spec merged?(grid :: t(), row_id :: any(), col_field :: atom()) :: boolean()
+  def merged?(grid, row_id, col_field) do
+    Map.has_key?(grid.state.merge_regions, {row_id, col_field}) or
+      merge_origin(grid, row_id, col_field) != nil
+  end
+
+  @doc """
+  특정 셀이 다른 병합에 의해 가려지는 경우 원점 셀 정보를 반환합니다.
+  가려지는 셀이면 `{:origin, row_id, col_field}`, 아니면 `nil`.
+  """
+  @spec merge_origin(grid :: t(), row_id :: any(), col_field :: atom()) :: nil | tuple()
+  def merge_origin(grid, row_id, col_field) do
+    skip_map = build_merge_skip_map(grid)
+    Map.get(skip_map, {row_id, col_field})
+  end
+
+  @doc false
+  @spec build_merge_skip_map(grid :: t()) :: map()
+  def build_merge_skip_map(%{state: %{merge_regions: regions}} = _grid) when map_size(regions) == 0 do
+    %{}
+  end
+  def build_merge_skip_map(grid) do
+    display_cols = display_columns(grid)
+    col_fields = Enum.map(display_cols, & &1.field)
+    visible = visible_data(grid)
+    row_ids = Enum.map(visible, &Map.get(&1, :id))
+
+    Enum.reduce(grid.state.merge_regions, %{}, fn {{origin_row_id, origin_col_field}, %{rowspan: rs, colspan: cs}}, acc ->
+      origin_col_idx = Enum.find_index(col_fields, &(&1 == origin_col_field))
+      origin_row_idx = Enum.find_index(row_ids, &(&1 == origin_row_id))
+
+      if is_nil(origin_col_idx) or is_nil(origin_row_idx) do
+        acc
+      else
+        for r_offset <- 0..(rs - 1),
+            c_offset <- 0..(cs - 1),
+            not (r_offset == 0 and c_offset == 0),
+            r_idx = origin_row_idx + r_offset,
+            c_idx = origin_col_idx + c_offset,
+            r_idx < length(row_ids),
+            c_idx < length(col_fields),
+            reduce: acc do
+          inner_acc ->
+            target_row_id = Enum.at(row_ids, r_idx)
+            target_col_field = Enum.at(col_fields, c_idx)
+            Map.put(inner_acc, {target_row_id, target_col_field}, {:origin, origin_row_id, origin_col_field})
+        end
+      end
+    end)
+  end
+
+  # ── F-930: Row Move ──
+
+  @doc "행을 from_row_id 위치에서 to_row_id 위치 앞으로 이동합니다."
+  @spec move_row(t(), any(), any()) :: t()
+  def move_row(grid, from_row_id, to_row_id) when from_row_id == to_row_id, do: grid
+  def move_row(grid, from_row_id, to_row_id) do
+    data = grid.data
+    from_row = Enum.find(data, &(&1.id == from_row_id))
+
+    if from_row do
+      without_from = Enum.reject(data, &(&1.id == from_row_id))
+      to_idx = Enum.find_index(without_from, &(&1.id == to_row_id)) || length(without_from)
+      new_data = List.insert_at(without_from, to_idx, from_row)
+      %{grid | data: new_data}
+    else
+      grid
+    end
+  end
+
+  # ── Per-row Height (extendsizetype) ──
+
+  @doc "특정 행의 높이를 설정합니다."
+  @spec set_row_height(t(), any(), pos_integer()) :: t()
+  def set_row_height(grid, row_id, height) when is_integer(height) and height > 0 do
+    row_heights = Map.put(grid.state.row_heights, row_id, height)
+    %{grid | state: %{grid.state | row_heights: row_heights}}
+  end
+
+  @doc "특정 행의 높이를 초기화합니다 (기본 row_height 사용)."
+  @spec reset_row_height(t(), any()) :: t()
+  def reset_row_height(grid, row_id) do
+    row_heights = Map.delete(grid.state.row_heights, row_id)
+    %{grid | state: %{grid.state | row_heights: row_heights}}
+  end
+
+  @doc "특정 행의 실제 높이를 반환합니다 (개별 설정 또는 기본값)."
+  @spec get_row_height(t(), any()) :: pos_integer()
+  def get_row_height(grid, row_id) do
+    Map.get(grid.state.row_heights, row_id, grid.options.row_height)
+  end
+
+  # ── Dynamic Freeze ──
+
+  @doc "고정 컬럼 수를 동적으로 변경합니다."
+  @spec set_frozen_columns(t(), non_neg_integer()) :: t()
+  def set_frozen_columns(grid, count) when is_integer(count) and count >= 0 do
+    max_cols = length(grid.columns)
+    count = min(count, max_cols)
+    %{grid | options: %{grid.options | frozen_columns: count}}
+  end
+
+  # ── Dataset Merge (appendData) ──
+
+  @doc "외부 데이터를 현재 Grid 데이터에 병합(추가)합니다."
+  @spec append_data(t(), [map()]) :: t()
+  def append_data(grid, new_rows) when is_list(new_rows) do
+    %{grid | data: grid.data ++ new_rows}
+  end
+
+  @doc """
   Virtual Scroll 시 렌더링 시작 위치 (px)
   buffer를 고려한 실제 start_index 기반 오프셋
   """
@@ -835,7 +1034,9 @@ defmodule LiveViewGrid.Grid do
       frozen_columns: 0,
       debug: false,
       theme: "light",
-      show_row_number: false
+      show_row_number: false,
+      show_summary: false,
+      autofit_type: :none
     }
   end
 
@@ -1151,7 +1352,8 @@ defmodule LiveViewGrid.Grid do
         style_expr: nil,
         header_group: nil,
         nulls: :last,
-        required: false
+        required: false,
+        summary: nil
       }, col)
     end)
   end
@@ -1194,12 +1396,55 @@ defmodule LiveViewGrid.Grid do
       edit_history: [],
       redo_stack: [],
       # F-940: Cell Range Selection
-      cell_range: nil
+      cell_range: nil,
+      # F-904: Cell Merge
+      merge_regions: %{},
+      # Per-row Heights (extendsizetype)
+      row_heights: %{}
     }
   end
 
   defp merge_default_options(options) do
     Map.merge(default_options(), options)
+  end
+
+  # F-904: 병합 영역 겹침 검사
+  defp has_merge_overlap?(grid, new_row_id, new_col_field, new_rowspan, new_colspan) do
+    col_fields = display_columns(grid) |> Enum.map(& &1.field)
+    row_ids = visible_data(grid) |> Enum.map(&Map.get(&1, :id))
+
+    new_col_idx = Enum.find_index(col_fields, &(&1 == new_col_field)) || 0
+    new_row_idx = Enum.find_index(row_ids, &(&1 == new_row_id)) || 0
+
+    new_cells = for r <- new_row_idx..(new_row_idx + new_rowspan - 1),
+                    c <- new_col_idx..(new_col_idx + new_colspan - 1),
+                    into: MapSet.new(), do: {r, c}
+
+    Enum.any?(grid.state.merge_regions, fn {{origin_row_id, origin_col_field}, %{rowspan: rs, colspan: cs}} ->
+      if origin_row_id == new_row_id and origin_col_field == new_col_field do
+        false
+      else
+        origin_col_idx = Enum.find_index(col_fields, &(&1 == origin_col_field)) || 0
+        origin_row_idx = Enum.find_index(row_ids, &(&1 == origin_row_id)) || 0
+
+        existing = for r <- origin_row_idx..(origin_row_idx + rs - 1),
+                       c <- origin_col_idx..(origin_col_idx + cs - 1),
+                       into: MapSet.new(), do: {r, c}
+
+        MapSet.size(MapSet.intersection(new_cells, existing)) > 0
+      end
+    end)
+  end
+
+  # F-904: frozen 컬럼 경계 초과 검사
+  defp frozen_boundary_crossed?(grid, col_start_idx, colspan) do
+    frozen = grid.options.frozen_columns
+    if frozen > 0 do
+      col_end_idx = col_start_idx + colspan - 1
+      col_start_idx < frozen and col_end_idx >= frozen
+    else
+      false
+    end
   end
 
   # F-800-INSERT(B): :new 행이 필터에 걸려 사라지지 않도록 보장
@@ -1220,6 +1465,16 @@ defmodule LiveViewGrid.Grid do
         end)
       end
     end
+  end
+
+  # F-950: 필터/검색 적용 후 전체 데이터 (페이지네이션 전)
+  defp filtered_data(%{data_source: {_mod, _cfg}, data: data}), do: data
+  defp filtered_data(%{data: data, columns: columns, state: state}) do
+    data
+    |> apply_global_search(state.global_search, columns)
+    |> apply_filters(state.filters, columns)
+    |> apply_advanced_filters(state.advanced_filters, columns)
+    |> ensure_new_rows_included(data, state.row_statuses)
   end
 
   defp apply_global_search(data, "", _columns), do: data

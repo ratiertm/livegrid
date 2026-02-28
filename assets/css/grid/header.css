@@ -58,6 +58,13 @@
   height: 36px;
 }
 
+/* Header Wrap (헤더 줄 바꿈) */
+.lv-grid__header-cell--wrap {
+  white-space: normal;
+  height: auto;
+  min-height: 48px;
+}
+
 .lv-grid__header-cell--sortable {
   cursor: pointer;
   transition: background 0.2s ease;

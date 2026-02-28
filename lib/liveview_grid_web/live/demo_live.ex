@@ -760,11 +760,11 @@ defmodule LiveviewGridWeb.DemoLive do
               # input_pattern 제거: 국제 문자(한글, 중국어, 일본어, 이모지 등) 모두 허용
               validators: [{:required, "이름은 필수입니다"}]},
             %{field: :email, label: "이메일", width: 250, sortable: true, filterable: true, filter_type: :text, editable: true,
-              header_group: "인적 정보",
+              header_group: "인적 정보", wordwrap: :word,
               validators: [{:required, "이메일은 필수입니다"}, {:pattern, ~r/@/, "이메일 형식이 올바르지 않습니다"}],
               renderer: LiveViewGrid.Renderers.link(prefix: "mailto:")},
             %{field: :age, label: "나이", width: 100, sortable: true, filterable: true, filter_type: :number, editable: true, editor_type: :number,
-              header_group: "인적 정보",
+              header_group: "인적 정보", summary: :avg,
               validators: [{:required, "나이는 필수입니다"}, {:min, 1, "1 이상이어야 합니다"}, {:max, 150, "150 이하이어야 합니다"}],
               renderer: LiveViewGrid.Renderers.progress(max: 60, color: "green"),
               style_expr: fn row ->
@@ -776,9 +776,9 @@ defmodule LiveviewGridWeb.DemoLive do
                   true -> nil
                 end
               end},
-            %{field: :active, label: "활성", width: 70, editable: true, editor_type: :checkbox, header_group: "부가 정보"},
+            %{field: :active, label: "활성", width: 70, editable: true, editor_type: :checkbox, header_group: "부가 정보", summary: :count},
             %{field: :city, label: "도시", width: 120, sortable: true, filterable: true, filter_type: :text, editable: true, editor_type: :select,
-              header_group: "부가 정보",
+              header_group: "부가 정보", suppress: true,
               renderer: LiveViewGrid.Renderers.badge(
                 colors: %{"서울" => "blue", "부산" => "green", "대구" => "red",
                           "인천" => "purple", "광주" => "yellow", "대전" => "gray",
@@ -796,10 +796,16 @@ defmodule LiveviewGridWeb.DemoLive do
             row_height: 40,
             show_footer: !@virtual_scroll,
             frozen_columns: 1,
+            frozen_right_columns: 1,
             show_row_number: true,
             debug: Mix.env() == :dev,
             theme: @theme,
-            custom_css_vars: @custom_css_vars
+            custom_css_vars: @custom_css_vars,
+            row_reorder: true,
+            merge_regions: [
+              %{row_id: 1, col_field: :name, colspan: 2},
+              %{row_id: 3, col_field: :age, rowspan: 2}
+            ]
           }}
         />
         

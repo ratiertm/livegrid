@@ -20,6 +20,8 @@ import {CellEditor} from "./hooks/cell-editor"
 import {RowEditSave} from "./hooks/row-edit-save"
 import {GridKeyboardNav} from "./hooks/keyboard-nav"
 import {ConfigSortable} from "./hooks/config-sortable"
+import {RowReorder} from "./hooks/row-reorder"
+import {ScrollSync} from "./hooks/scroll-sync"
 
 // Assemble hooks
 let Hooks = {
@@ -31,7 +33,9 @@ let Hooks = {
   CellEditor,
   RowEditSave,
   GridKeyboardNav,
-  ConfigSortable
+  ConfigSortable,
+  RowReorder,
+  ScrollSync
 }
 
 // Progress bar

@@ -1150,7 +1150,66 @@ defmodule LiveviewGridWeb.GridComponent.EventHandlers do
       grid
     end
 
+    grid = if Map.has_key?(options, :merge_regions) do
+      Enum.reduce(Map.get(options, :merge_regions, []), grid, fn spec, acc ->
+        case Grid.merge_cells(acc, spec) do
+          {:ok, updated} -> updated
+          {:error, _reason} -> acc
+        end
+      end)
+    else
+      grid
+    end
+
     grid
+  end
+
+  # ── F-930: Row Move ──
+
+  @doc "행 드래그 이동 이벤트를 처리합니다."
+  @spec handle_move_row(params :: map(), socket :: Phoenix.LiveView.Socket.t()) ::
+          {:noreply, Phoenix.LiveView.Socket.t()}
+  def handle_move_row(%{"from_id" => from_id_str, "to_id" => to_id_str}, socket) do
+    grid = socket.assigns.grid
+    from_id = parse_row_id(from_id_str, grid)
+    to_id = parse_row_id(to_id_str, grid)
+
+    if from_id && to_id do
+      updated_grid = Grid.move_row(grid, from_id, to_id)
+      {:noreply, assign(socket, grid: updated_grid)}
+    else
+      {:noreply, socket}
+    end
+  end
+
+  defp parse_row_id(id_str, grid) do
+    case Integer.parse(id_str) do
+      {id, ""} -> id
+      _ ->
+        # 문자열 ID 지원
+        atom_id = String.to_existing_atom(id_str)
+        if Enum.any?(grid.data, &(&1.id == atom_id)), do: atom_id, else: nil
+    end
+  rescue
+    _ -> nil
+  end
+
+  # ── Dynamic Freeze ──
+
+  @doc "특정 컬럼까지 고정하거나, 이미 해당 위치에 고정되어 있으면 해제한다."
+  def handle_freeze_to_column(%{"col_idx" => col_idx_str}, socket) do
+    col_idx = String.to_integer(col_idx_str)
+    grid = socket.assigns.grid
+    new_count = col_idx + 1
+
+    updated_grid =
+      if grid.options.frozen_columns == new_count do
+        Grid.set_frozen_columns(grid, 0)
+      else
+        Grid.set_frozen_columns(grid, new_count)
+      end
+
+    {:noreply, assign(socket, grid: updated_grid)}
   end
 
   # ── F-800: Context Menu ──

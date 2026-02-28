@@ -1659,4 +1659,454 @@ defmodule LiveViewGrid.GridTest do
       assert summary.sum == 25 + 30 + 35 + 40 + 3000 + 4000 + 5000 + 6000
     end
   end
+
+  # ── F-950: Summary Row ──
+
+  describe "summary_data/1" do
+    test "returns aggregates for columns with summary" do
+      grid = Grid.new(
+        data: [
+          %{id: 1, name: "A", salary: 100, age: 20},
+          %{id: 2, name: "B", salary: 200, age: 30},
+          %{id: 3, name: "C", salary: 300, age: 40}
+        ],
+        columns: [
+          %{field: :name, label: "Name"},
+          %{field: :salary, label: "Salary", summary: :sum},
+          %{field: :age, label: "Age", summary: :avg}
+        ]
+      )
+
+      result = Grid.summary_data(grid)
+      assert result.salary == 600
+      assert result.age == 30.0
+      refute Map.has_key?(result, :name)
+    end
+
+    test "returns empty map when no summary columns" do
+      grid = Grid.new(
+        data: [%{id: 1, name: "A"}],
+        columns: [%{field: :name, label: "Name"}]
+      )
+      assert Grid.summary_data(grid) == %{}
+    end
+
+    test "handles nil values gracefully" do
+      grid = Grid.new(
+        data: [
+          %{id: 1, salary: 100},
+          %{id: 2, salary: nil},
+          %{id: 3, salary: 300}
+        ],
+        columns: [%{field: :salary, label: "Salary", summary: :sum}]
+      )
+      result = Grid.summary_data(grid)
+      assert result.salary == 400
+    end
+
+    test "count includes all rows" do
+      grid = Grid.new(
+        data: [
+          %{id: 1, active: true},
+          %{id: 2, active: false},
+          %{id: 3, active: true}
+        ],
+        columns: [%{field: :active, label: "Active", summary: :count}]
+      )
+      result = Grid.summary_data(grid)
+      assert result.active == 3
+    end
+
+    test "min and max functions" do
+      grid = Grid.new(
+        data: [
+          %{id: 1, score: 85},
+          %{id: 2, score: 92},
+          %{id: 3, score: 78}
+        ],
+        columns: [%{field: :score, label: "Score", summary: :min}]
+      )
+      assert Grid.summary_data(grid).score == 78
+
+      grid2 = Grid.new(
+        data: grid.data,
+        columns: [%{field: :score, label: "Score", summary: :max}]
+      )
+      assert Grid.summary_data(grid2).score == 92
+    end
+
+    test "respects active filters" do
+      grid = Grid.new(
+        data: [
+          %{id: 1, name: "Alice", salary: 100},
+          %{id: 2, name: "Bob", salary: 200},
+          %{id: 3, name: "Carol", salary: 300}
+        ],
+        columns: [
+          %{field: :name, label: "Name", filterable: true},
+          %{field: :salary, label: "Salary", summary: :sum}
+        ]
+      )
+
+      grid = put_in(grid.state.filters, %{name: "Alice"})
+      result = Grid.summary_data(grid)
+      assert result.salary == 100
+    end
+  end
+
+  describe "cell merge (F-904)" do
+    setup do
+      columns = [
+        %{field: :name, label: "Name"},
+        %{field: :email, label: "Email"},
+        %{field: :age, label: "Age", align: :right},
+        %{field: :city, label: "City"}
+      ]
+      data = [
+        %{id: 1, name: "Alice", email: "a@test.com", age: 30, city: "Seoul"},
+        %{id: 2, name: "Bob", email: "b@test.com", age: 25, city: "Seoul"},
+        %{id: 3, name: "Carol", email: "c@test.com", age: 35, city: "Busan"}
+      ]
+      grid = Grid.new(data: data, columns: columns, options: %{page_size: 99999})
+      %{grid: grid}
+    end
+
+    test "merge_cells/2 registers colspan", %{grid: grid} do
+      assert {:ok, grid} = Grid.merge_cells(grid, %{row_id: 1, col_field: :name, colspan: 2})
+      assert Map.has_key?(grid.state.merge_regions, {1, :name})
+      assert grid.state.merge_regions[{1, :name}] == %{rowspan: 1, colspan: 2}
+    end
+
+    test "merge_cells/2 registers rowspan", %{grid: grid} do
+      assert {:ok, grid} = Grid.merge_cells(grid, %{row_id: 1, col_field: :city, rowspan: 3})
+      assert grid.state.merge_regions[{1, :city}] == %{rowspan: 3, colspan: 1}
+    end
+
+    test "merge_cells/2 rejects single cell merge", %{grid: grid} do
+      assert {:error, _msg} = Grid.merge_cells(grid, %{row_id: 1, col_field: :name, rowspan: 1, colspan: 1})
+    end
+
+    test "merge_cells/2 rejects overlapping merge", %{grid: grid} do
+      {:ok, grid} = Grid.merge_cells(grid, %{row_id: 1, col_field: :name, colspan: 2})
+      assert {:error, _msg} = Grid.merge_cells(grid, %{row_id: 1, col_field: :email, colspan: 2})
+    end
+
+    test "merge_cells/2 rejects colspan exceeding columns", %{grid: grid} do
+      assert {:error, _msg} = Grid.merge_cells(grid, %{row_id: 1, col_field: :city, colspan: 5})
+    end
+
+    test "unmerge_cells/3 removes merge", %{grid: grid} do
+      {:ok, grid} = Grid.merge_cells(grid, %{row_id: 1, col_field: :name, colspan: 2})
+      grid = Grid.unmerge_cells(grid, 1, :name)
+      assert grid.state.merge_regions == %{}
+    end
+
+    test "clear_all_merges/1 removes all merges", %{grid: grid} do
+      {:ok, grid} = Grid.merge_cells(grid, %{row_id: 1, col_field: :name, colspan: 2})
+      {:ok, grid} = Grid.merge_cells(grid, %{row_id: 2, col_field: :age, rowspan: 2})
+      grid = Grid.clear_all_merges(grid)
+      assert grid.state.merge_regions == %{}
+    end
+
+    test "merge_regions/1 returns all regions", %{grid: grid} do
+      {:ok, grid} = Grid.merge_cells(grid, %{row_id: 1, col_field: :name, colspan: 2})
+      regions = Grid.merge_regions(grid)
+      assert map_size(regions) == 1
+    end
+
+    test "merged?/3 detects merged cells", %{grid: grid} do
+      {:ok, grid} = Grid.merge_cells(grid, %{row_id: 1, col_field: :name, colspan: 2})
+      assert Grid.merged?(grid, 1, :name) == true
+      assert Grid.merged?(grid, 1, :email) == true
+      assert Grid.merged?(grid, 1, :age) == false
+    end
+
+    test "build_merge_skip_map/1 generates skip entries", %{grid: grid} do
+      {:ok, grid} = Grid.merge_cells(grid, %{row_id: 1, col_field: :name, colspan: 2})
+      skip_map = Grid.build_merge_skip_map(grid)
+      assert Map.has_key?(skip_map, {1, :email})
+      refute Map.has_key?(skip_map, {1, :name})
+    end
+
+    test "frozen boundary merge is rejected", %{grid: grid} do
+      grid = %{grid | options: Map.put(grid.options, :frozen_columns, 1)}
+      assert {:error, _msg} = Grid.merge_cells(grid, %{row_id: 1, col_field: :name, colspan: 2})
+    end
+  end
+
+  describe "wordwrap (F-911)" do
+    alias LiveviewGridWeb.GridComponent.RenderHelpers
+
+    test "wordwrap_class/1 returns correct class for :char" do
+      assert RenderHelpers.wordwrap_class(%{wordwrap: :char}) == "lv-grid__cell--wordwrap-char"
+    end
+
+    test "wordwrap_class/1 returns correct class for :word" do
+      assert RenderHelpers.wordwrap_class(%{wordwrap: :word}) == "lv-grid__cell--wordwrap-word"
+    end
+
+    test "wordwrap_class/1 returns empty for no wordwrap" do
+      assert RenderHelpers.wordwrap_class(%{}) == ""
+      assert RenderHelpers.wordwrap_class(%{wordwrap: :none}) == ""
+    end
+
+    test "wordwrap?/1 detects wordwrap columns" do
+      assert RenderHelpers.wordwrap?(%{wordwrap: :char}) == true
+      assert RenderHelpers.wordwrap?(%{wordwrap: :word}) == true
+      assert RenderHelpers.wordwrap?(%{wordwrap: :none}) == false
+      assert RenderHelpers.wordwrap?(%{}) == false
+    end
+
+    test "column with wordwrap option is preserved in grid" do
+      grid = Grid.new(
+        data: [%{id: 1, name: "test"}],
+        columns: [%{field: :name, label: "Name", wordwrap: :word}]
+      )
+
+      col = hd(grid.columns)
+      assert Map.get(col, :wordwrap) == :word
+    end
+  end
+
+  describe "row move (F-930)" do
+    setup do
+      grid = Grid.new(
+        data: [
+          %{id: 1, name: "Alice"},
+          %{id: 2, name: "Bob"},
+          %{id: 3, name: "Charlie"},
+          %{id: 4, name: "David"}
+        ],
+        columns: [%{field: :name, label: "Name"}]
+      )
+      %{grid: grid}
+    end
+
+    test "move_row/3 moves row to new position", %{grid: grid} do
+      updated = Grid.move_row(grid, 3, 1)
+      ids = Enum.map(updated.data, & &1.id)
+      assert ids == [3, 1, 2, 4]
+    end
+
+    test "move_row/3 to end of list", %{grid: grid} do
+      updated = Grid.move_row(grid, 1, 4)
+      ids = Enum.map(updated.data, & &1.id)
+      assert ids == [2, 3, 1, 4]
+    end
+
+    test "move_row/3 same id returns unchanged", %{grid: grid} do
+      updated = Grid.move_row(grid, 2, 2)
+      assert updated.data == grid.data
+    end
+
+    test "move_row/3 invalid from_id returns unchanged", %{grid: grid} do
+      updated = Grid.move_row(grid, 999, 1)
+      assert updated.data == grid.data
+    end
+  end
+
+  describe "right column freeze" do
+    alias LiveviewGridWeb.GridComponent.RenderHelpers
+
+    test "frozen_class returns frozen-right for rightmost column" do
+      grid = Grid.new(
+        data: [%{id: 1, name: "A", age: 20, city: "Seoul"}],
+        columns: [
+          %{field: :name, label: "Name", width: 150},
+          %{field: :age, label: "Age", width: 100},
+          %{field: :city, label: "City", width: 120}
+        ],
+        options: %{frozen_right_columns: 1}
+      )
+      # col_idx 2 (city) should be frozen-right (3 columns, last 1 frozen)
+      assert RenderHelpers.frozen_class(2, grid) == "lv-grid__cell--frozen-right"
+      assert RenderHelpers.frozen_class(1, grid) == ""
+      assert RenderHelpers.frozen_class(0, grid) == ""
+    end
+
+    test "frozen_style returns sticky right for frozen-right column" do
+      grid = Grid.new(
+        data: [%{id: 1, name: "A", age: 20, city: "Seoul"}],
+        columns: [
+          %{field: :name, label: "Name", width: 150},
+          %{field: :age, label: "Age", width: 100},
+          %{field: :city, label: "City", width: 120}
+        ],
+        options: %{frozen_right_columns: 1}
+      )
+      style = RenderHelpers.frozen_style(2, grid)
+      assert style =~ "position: sticky"
+      assert style =~ "right: 0px"
+    end
+
+    test "both left and right freeze work together" do
+      grid = Grid.new(
+        data: [%{id: 1, name: "A", age: 20, city: "Seoul"}],
+        columns: [
+          %{field: :name, label: "Name", width: 150},
+          %{field: :age, label: "Age", width: 100},
+          %{field: :city, label: "City", width: 120}
+        ],
+        options: %{frozen_columns: 1, frozen_right_columns: 1}
+      )
+      assert RenderHelpers.frozen_class(0, grid) == "lv-grid__cell--frozen"
+      assert RenderHelpers.frozen_class(1, grid) == ""
+      assert RenderHelpers.frozen_class(2, grid) == "lv-grid__cell--frozen-right"
+    end
+  end
+
+  describe "F-903: Suppress (동일값 병합)" do
+    alias LiveviewGridWeb.GridComponent.RenderHelpers
+
+    test "suppress_cell? returns true when current value equals previous row" do
+      col = %{field: :city, suppress: true}
+      row = %{id: 2, city: "서울"}
+      prev = %{id: 1, city: "서울"}
+      assert RenderHelpers.suppress_cell?(col, row, prev) == true
+    end
+
+    test "suppress_cell? returns false when values differ" do
+      col = %{field: :city, suppress: true}
+      row = %{id: 2, city: "부산"}
+      prev = %{id: 1, city: "서울"}
+      assert RenderHelpers.suppress_cell?(col, row, prev) == false
+    end
+
+    test "suppress_cell? returns false for first row (nil prev)" do
+      col = %{field: :city, suppress: true}
+      row = %{id: 1, city: "서울"}
+      assert RenderHelpers.suppress_cell?(col, row, nil) == false
+    end
+
+    test "suppress_cell? returns false when suppress not set" do
+      col = %{field: :city}
+      row = %{id: 2, city: "서울"}
+      prev = %{id: 1, city: "서울"}
+      assert RenderHelpers.suppress_cell?(col, row, prev) == false
+    end
+
+    test "build_suppress_map builds correct set for adjacent duplicates" do
+      rows = [
+        %{id: 1, city: "서울", name: "A"},
+        %{id: 2, city: "서울", name: "B"},
+        %{id: 3, city: "부산", name: "B"},
+        %{id: 4, city: "부산", name: "B"}
+      ]
+      columns = [
+        %{field: :city, suppress: true},
+        %{field: :name, suppress: true}
+      ]
+      result = RenderHelpers.build_suppress_map(rows, columns)
+      assert MapSet.member?(result, {2, :city})
+      assert MapSet.member?(result, {3, :name})
+      assert MapSet.member?(result, {4, :city})
+      assert MapSet.member?(result, {4, :name})
+      refute MapSet.member?(result, {1, :city})
+      refute MapSet.member?(result, {1, :name})
+      refute MapSet.member?(result, {2, :name})
+      refute MapSet.member?(result, {3, :city})
+    end
+
+    test "build_suppress_map returns empty set when no suppress columns" do
+      rows = [%{id: 1, city: "서울"}, %{id: 2, city: "서울"}]
+      columns = [%{field: :city}]
+      result = RenderHelpers.build_suppress_map(rows, columns)
+      assert MapSet.size(result) == 0
+    end
+
+    test "suppressed? checks membership correctly" do
+      smap = MapSet.new([{2, :city}])
+      assert RenderHelpers.suppressed?(smap, 2, :city) == true
+      assert RenderHelpers.suppressed?(smap, 1, :city) == false
+    end
+  end
+
+  describe "Auto-fit Height & Per-row Height" do
+    test "set_row_height sets individual row height" do
+      grid = Grid.new(
+        columns: [%{field: :name, label: "Name"}],
+        data: [%{id: 1, name: "A"}, %{id: 2, name: "B"}]
+      )
+      updated = Grid.set_row_height(grid, 1, 80)
+      assert updated.state.row_heights == %{1 => 80}
+    end
+
+    test "reset_row_height removes individual row height" do
+      grid = Grid.new(
+        columns: [%{field: :name, label: "Name"}],
+        data: [%{id: 1, name: "A"}]
+      )
+      updated = grid |> Grid.set_row_height(1, 80) |> Grid.reset_row_height(1)
+      assert updated.state.row_heights == %{}
+    end
+
+    test "get_row_height returns per-row height or default" do
+      grid = Grid.new(
+        columns: [%{field: :name, label: "Name"}],
+        data: [%{id: 1, name: "A"}, %{id: 2, name: "B"}]
+      )
+      updated = Grid.set_row_height(grid, 1, 60)
+      assert Grid.get_row_height(updated, 1) == 60
+      assert Grid.get_row_height(updated, 2) == 40
+    end
+
+    test "autofit_type defaults to :none" do
+      grid = Grid.new(
+        columns: [%{field: :name, label: "Name"}],
+        data: []
+      )
+      assert grid.options.autofit_type == :none
+    end
+  end
+
+  describe "Dynamic Freeze" do
+    test "set_frozen_columns changes frozen count" do
+      grid = Grid.new(
+        columns: [%{field: :a, label: "A"}, %{field: :b, label: "B"}, %{field: :c, label: "C"}],
+        data: []
+      )
+      updated = Grid.set_frozen_columns(grid, 2)
+      assert updated.options.frozen_columns == 2
+    end
+
+    test "set_frozen_columns caps at column count" do
+      grid = Grid.new(
+        columns: [%{field: :a, label: "A"}, %{field: :b, label: "B"}],
+        data: []
+      )
+      updated = Grid.set_frozen_columns(grid, 5)
+      assert updated.options.frozen_columns == 2
+    end
+
+    test "set_frozen_columns to 0 unfreezes" do
+      grid = Grid.new(
+        columns: [%{field: :a, label: "A"}],
+        data: [],
+        options: %{frozen_columns: 1}
+      )
+      updated = Grid.set_frozen_columns(grid, 0)
+      assert updated.options.frozen_columns == 0
+    end
+  end
+
+  describe "Dataset Merge (append_data)" do
+    test "append_data adds rows to end of data" do
+      grid = Grid.new(
+        columns: [%{field: :name, label: "Name"}],
+        data: [%{id: 1, name: "A"}]
+      )
+      updated = Grid.append_data(grid, [%{id: 2, name: "B"}, %{id: 3, name: "C"}])
+      assert length(updated.data) == 3
+      assert Enum.at(updated.data, 2).name == "C"
+    end
+
+    test "append_data with empty list returns unchanged" do
+      grid = Grid.new(
+        columns: [%{field: :name, label: "Name"}],
+        data: [%{id: 1, name: "A"}]
+      )
+      updated = Grid.append_data(grid, [])
+      assert updated.data == grid.data
+    end
+  end
 end

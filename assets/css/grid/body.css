@@ -9,6 +9,12 @@
   overflow-x: auto;
 }
 
+/* Auto-fit Body - 행 수에 맞춰 높이 자동 조정 */
+.lv-grid__body--autofit {
+  max-height: none;
+  overflow-y: visible;
+}
+
 /* Virtual Scroll Body - 고정 높이로 스크롤바 보장 */
 .lv-grid__body--virtual {
   height: 600px;
@@ -305,6 +311,20 @@ select.lv-grid__cell-editor {
   background: var(--lv-grid-selected);
 }
 
+/* 5.9b Frozen Right Columns */
+.lv-grid__cell--frozen-right {
+  background: var(--lv-grid-bg);
+  box-shadow: -2px 0 4px rgba(0, 0, 0, 0.08);
+}
+
+.lv-grid__row:hover .lv-grid__cell--frozen-right {
+  background: var(--lv-grid-hover);
+}
+
+.lv-grid__row--selected .lv-grid__cell--frozen-right {
+  background: var(--lv-grid-selected);
+}
+
 /* 5.8 Deleted Row Style */
 .lv-grid__row--deleted {
   opacity: 0.6;
@@ -316,4 +336,103 @@ select.lv-grid__cell-editor {
 .lv-grid__cell--numeric {
   font-variant-numeric: tabular-nums;
   text-align: right;
+}
+
+/* 5.11 Cell Merge (F-904) */
+.lv-grid__cell--merged {
+  overflow: visible;
+  z-index: 1;
+  background: var(--lv-grid-bg);
+}
+
+.lv-grid__row:hover .lv-grid__cell--merged {
+  background: var(--lv-grid-hover);
+}
+
+.lv-grid__row--selected .lv-grid__cell--merged {
+  background: var(--lv-grid-selected);
+}
+
+/* 5.12 Wordwrap (F-911) */
+.lv-grid__cell--wordwrap-char {
+  white-space: normal;
+  word-break: break-all;
+  overflow-wrap: break-word;
+  overflow: visible;
+  text-overflow: clip;
+  align-items: flex-start;
+  padding-top: 6px;
+  padding-bottom: 6px;
+}
+
+.lv-grid__cell--wordwrap-word {
+  white-space: normal;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  overflow: visible;
+  text-overflow: clip;
+  align-items: flex-start;
+  padding-top: 6px;
+  padding-bottom: 6px;
+}
+
+.lv-grid__cell-value--wordwrap {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+}
+
+/* 5.13 Row Reorder (F-930) */
+.lv-grid__row-drag-handle {
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: grab;
+  color: var(--lv-grid-text-muted);
+  font-size: 12px;
+  opacity: 0;
+  transition: opacity 0.15s;
+  user-select: none;
+  flex-shrink: 0;
+}
+
+.lv-grid__row:hover .lv-grid__row-drag-handle {
+  opacity: 1;
+}
+
+.lv-grid__row-drag-handle:hover {
+  color: var(--lv-grid-primary);
+}
+
+.lv-grid__row--dragging {
+  opacity: 0.4;
+}
+
+.lv-grid__row--ghost {
+  opacity: 0.8;
+  background: var(--lv-grid-bg);
+  border: 2px solid var(--lv-grid-primary);
+  border-radius: 4px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.lv-grid__row-drop-indicator {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--lv-grid-primary);
+  display: none;
+  z-index: 10;
+  pointer-events: none;
+}
+
+/* 5.14 Suppress (F-903, 동일값 병합) */
+.lv-grid__cell--suppressed {
+  border-top-color: transparent;
+}
+.lv-grid__cell--suppressed:empty {
+  min-height: var(--lv-grid-row-height, 40px);
 }
