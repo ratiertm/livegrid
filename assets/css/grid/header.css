@@ -211,6 +211,35 @@
   background: var(--lv-grid-danger-dark);
 }
 
+/* FA-011: Floating Filter (always visible) */
+.lv-grid__filter-row--floating {
+  background: var(--lv-grid-bg-secondary);
+  border-bottom: 2px solid var(--lv-grid-primary-light);
+}
+
+.lv-grid__filter-input--number {
+  font-variant-numeric: tabular-nums;
+}
+
+/* FA-003: Date Filter Preset */
+.lv-grid__filter-input--preset {
+  flex: 0 0 auto;
+  width: auto;
+  min-width: 80px;
+  padding: 4px 6px;
+  font-size: 11px;
+  border: 1px solid var(--lv-grid-border-input);
+  border-radius: 3px;
+  background: var(--lv-grid-bg-input);
+  color: var(--lv-grid-text);
+  cursor: pointer;
+}
+
+.lv-grid__filter-input--preset:focus {
+  outline: none;
+  border-color: var(--lv-grid-primary);
+}
+
 /* Header cells for special columns */
 .lv-grid__header-cell--status {
   justify-content: center;

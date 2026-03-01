@@ -3,7 +3,7 @@
 > Index of all PDCA feature completion reports.
 >
 > **Project**: LiveView Grid - Phoenix LiveView 기반 상용 그리드 컴포넌트
-> **Updated**: 2026-02-28
+> **Updated**: 2026-03-01
 
 ---
 
@@ -32,6 +32,76 @@
 ---
 
 ## Completed Features
+
+### Phase 5 - State Management & UX Polish (v0.14)
+
+**Status**: ✅ Complete | **Match Rate**: Pending Gap Analysis
+
+**Quick Info**:
+- Completion Date: 2026-03-01
+- Duration: 1 PDCA cycle
+- Features: 5/5 complete
+- Tests: 564/564 passing (+30 new)
+- Production Ready: Yes
+
+**What was accomplished**:
+- FA-037 Column Hover Highlight: 마우스 위치 컬럼 전체 셀 하이라이트
+- FA-016 Column State Save/Restore: 컬럼 너비/순서/숨김 상태 추출/복원 API
+- FA-002 Grid State Save/Restore: 전체 Grid 상태 JSON 직렬화/역직렬화 + localStorage
+- FA-044 Find & Highlight: Ctrl+F 검색 바 + mark 태그 하이라이트
+- FA-035 Rich Select Editor: 검색 가능 커스텀 드롭다운 에디터
+
+**Key Documents**:
+- [Completion Report](phase5-v014-state-ux.report.md)
+
+---
+
+### Phase 4 - 필터링 강화 (v0.13)
+
+**Status**: ✅ Complete | **Match Rate**: 100% (5/5 features)
+
+**Quick Info**:
+- Completion Date: 2026-03-01
+- Duration: 1 PDCA cycle
+- Features: 5/5 complete
+- Tests: 534/534 passing (+35 new)
+- Production Ready: Yes
+
+**What was accomplished**:
+- FA-011 Floating Filters: 항상 표시되는 인라인 필터 행
+- FA-003 Date Filter Enhancement: 8가지 날짜 프리셋 범위
+- FA-010 Column Menu: 헤더 hamburger 메뉴 (정렬/숨기기/자동너비)
+- FA-012 Set Filter: 체크박스 필터 UI
+- FA-019 Date Editor: 날짜 편집기
+
+**Key Documents**:
+- [Completion Report](phase4-v012-filter.report.md)
+
+---
+
+### Phase 3 - 핵심 UX 보완 (v0.11)
+
+**Status**: ✅ Complete | **Match Rate**: 100% (5/5 features)
+
+**Quick Info**:
+- Completion Date: 2026-03-01
+- Duration: 1 PDCA cycle
+- Features: 5/5 complete
+- Tests: 499/499 passing (+26 new)
+- Production Ready: Yes
+
+**What was accomplished**:
+- FA-001 Row Pinning: 상단/하단 행 고정 (context menu, 📌 아이콘)
+- FA-005 Overlay System: Loading/No Data/Error 오버레이 (spinner, backdrop blur)
+- FA-004 Status Bar: 하단 정보바 (총 행수, 선택/필터/변경/고정 수)
+- FA-020 Cell Text Selection: 셀 텍스트 드래그 선택 (user-select: text)
+- FA-022 Resize Lock: 컬럼별 리사이즈 비활성화 (resize handle 숨김)
+
+**Key Documents**:
+- [Completion Report](phase3-v011-ux.report.md)
+- [Phase Plan](../../.claude/tasks/current/phase3-v011-plan.md)
+
+---
 
 ### 1. UI/UX Improvements (v0.7)
 
@@ -656,12 +726,12 @@
 
 | Metric | Value |
 |--------|-------|
-| Total Features Completed | 9 |
+| Total Features Completed | 19 |
 | Bug Fixes Completed | 1 |
-| Total Tests Passing | 428+ |
+| Total Tests Passing | 564+ |
 | Avg Match Rate | 94.3% |
 | Avg Implementation Time | 1-2 days |
-| Production Ready Features | 9 |
+| Production Ready Features | 19 |
 | Highest Match Rate | 100% (Config Modal Checkbox Fix) |
 
 ---
@@ -793,11 +863,11 @@ For questions about specific features or PDCA process:
 
 | Item | Value |
 |------|-------|
-| Last Updated | 2026-02-28 |
-| Report Count | 9 |
-| Completed Features | 9 |
+| Last Updated | 2026-03-01 |
+| Report Count | 11 |
+| Completed Features | 19 |
 | In Progress | 0 |
-| Total PDCA Cycles | 9 |
+| Total PDCA Cycles | 11 |
 
 ---
 

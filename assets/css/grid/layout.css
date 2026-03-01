@@ -11,6 +11,7 @@
 /* 3. Container */
 .lv-grid {
   width: 100%;
+  position: relative;
 
   background: var(--lv-grid-bg);
   border: 1px solid var(--lv-grid-border);
@@ -255,4 +256,112 @@
 }
 .lv-grid__export-dropdown-item:hover {
   background: var(--lv-grid-disabled-bg);
+}
+
+/* ========================================
+   FA-005: Overlay System (Loading/No Data/Error)
+   ======================================== */
+.lv-grid__overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 20;
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(2px);
+}
+
+[data-theme="dark"] .lv-grid__overlay,
+.lv-grid--dark .lv-grid__overlay {
+  background: rgba(30, 30, 30, 0.85);
+}
+
+.lv-grid__overlay-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 24px;
+}
+
+.lv-grid__overlay-spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid var(--lv-grid-border, #ddd);
+  border-top-color: var(--lv-grid-primary, #1976d2);
+  border-radius: 50%;
+  animation: lv-grid-spin 0.8s linear infinite;
+}
+
+@keyframes lv-grid-spin {
+  to { transform: rotate(360deg); }
+}
+
+.lv-grid__overlay-icon {
+  font-size: 36px;
+  line-height: 1;
+}
+
+.lv-grid__overlay-text {
+  font-size: var(--lv-grid-font-size-md, 14px);
+  color: var(--lv-grid-text-secondary, #666);
+  text-align: center;
+}
+
+.lv-grid__overlay-content--error .lv-grid__overlay-text {
+  color: var(--lv-grid-danger, #e53935);
+}
+
+.lv-grid__overlay--loading {
+  pointer-events: none;
+}
+
+.lv-grid__overlay--error .lv-grid__overlay-icon {
+  color: var(--lv-grid-danger, #e53935);
+}
+
+/* ========================================
+   FA-004: Status Bar (하단 정보바)
+   ======================================== */
+.lv-grid__status-bar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px var(--lv-grid-space-4, 16px);
+  background: var(--lv-grid-bg-secondary, #f5f5f5);
+  border-top: 1px solid var(--lv-grid-border, #e0e0e0);
+  font-size: var(--lv-grid-font-size-xs, 11px);
+  color: var(--lv-grid-text-secondary, #666);
+  min-height: 28px;
+  flex-wrap: wrap;
+}
+
+.lv-grid__status-bar-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  white-space: nowrap;
+}
+
+.lv-grid__status-bar-item strong {
+  font-weight: 700;
+  color: var(--lv-grid-text, #333);
+}
+
+.lv-grid__status-bar-item--selected strong {
+  color: var(--lv-grid-primary, #1976d2);
+}
+
+.lv-grid__status-bar-item--filtered strong {
+  color: var(--lv-grid-warning, #ff9800);
+}
+
+.lv-grid__status-bar-item--changed strong {
+  color: var(--lv-grid-success, #4caf50);
+}
+
+.lv-grid__status-bar-separator {
+  color: var(--lv-grid-border, #e0e0e0);
+  margin: 0 2px;
 }

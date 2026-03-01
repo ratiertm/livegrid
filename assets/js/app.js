@@ -22,6 +22,9 @@ import {GridKeyboardNav} from "./hooks/keyboard-nav"
 import {ConfigSortable} from "./hooks/config-sortable"
 import {RowReorder} from "./hooks/row-reorder"
 import {ScrollSync} from "./hooks/scroll-sync"
+import DatePickerHook from "./hooks/date-picker"
+import {StatePersistence} from "./hooks/state-persistence"
+import {RichSelect} from "./hooks/rich-select"
 
 // Assemble hooks
 let Hooks = {
@@ -35,7 +38,10 @@ let Hooks = {
   GridKeyboardNav,
   ConfigSortable,
   RowReorder,
-  ScrollSync
+  ScrollSync,
+  DatePicker: DatePickerHook,
+  StatePersistence,
+  RichSelect
 }
 
 // Progress bar

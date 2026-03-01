@@ -436,3 +436,103 @@ select.lv-grid__cell-editor {
 .lv-grid__cell--suppressed:empty {
   min-height: var(--lv-grid-row-height, 40px);
 }
+
+/* ========================================
+   FA-001: Row Pinning (상단/하단 고정)
+   ======================================== */
+.lv-grid__pinned-rows {
+  position: sticky;
+  z-index: 5;
+  flex-shrink: 0;
+}
+
+.lv-grid__pinned-rows--top {
+  top: 0;
+  border-bottom: 2px solid var(--lv-grid-primary, #1976d2);
+  background: var(--lv-grid-bg, #fff);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+}
+
+.lv-grid__pinned-rows--bottom {
+  bottom: 0;
+  border-top: 2px solid var(--lv-grid-primary, #1976d2);
+  background: var(--lv-grid-bg, #fff);
+  box-shadow: 0 -2px 4px rgba(0, 0, 0, 0.08);
+}
+
+.lv-grid__row--pinned {
+  background: var(--lv-grid-primary-light, #e3f2fd);
+}
+
+.lv-grid__row--pinned:hover {
+  background: var(--lv-grid-hover);
+}
+
+.lv-grid__row--pinned .lv-grid__pin-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  font-size: 12px;
+  color: var(--lv-grid-primary, #1976d2);
+  flex-shrink: 0;
+}
+
+.lv-grid__unpin-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 10px;
+  color: var(--lv-grid-text-muted, #999);
+  border-radius: 3px;
+  opacity: 0;
+  transition: opacity 0.15s, background 0.15s;
+  flex-shrink: 0;
+}
+
+.lv-grid__row--pinned:hover .lv-grid__unpin-btn {
+  opacity: 1;
+}
+
+.lv-grid__unpin-btn:hover {
+  background: var(--lv-grid-danger-light, #fce4ec);
+  color: var(--lv-grid-danger, #e53935);
+}
+
+/* ========================================
+   FA-020: Cell Text Selection (텍스트 드래그 선택)
+   ======================================== */
+.lv-grid__cell-value--selectable {
+  user-select: text;
+  -webkit-user-select: text;
+  cursor: text;
+}
+
+.lv-grid__cell-value--selectable::selection {
+  background: var(--lv-grid-primary-light, #bbdefb);
+  color: var(--lv-grid-text, #333);
+}
+
+/* ========================================
+   FA-037: Column Hover Highlight
+   ======================================== */
+.lv-grid__cell--col-hover {
+  background: var(--lv-grid-hover) !important;
+}
+
+/* ========================================
+   FA-022: Resize Lock (리사이즈 비활성화 컬럼)
+   ======================================== */
+.lv-grid__header-cell--no-resize {
+  cursor: default;
+}
+
+.lv-grid__header-cell--no-resize .lv-grid__resize-handle {
+  display: none;
+}

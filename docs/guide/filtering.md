@@ -99,8 +99,60 @@ grid.state.advanced_filters
 - 고급 필터: "고급 필터 초기화" 버튼
 - 전체 검색: 검색 입력 비우기
 
+## Floating Filters (v0.12)
+
+헤더 바로 아래에 항상 표시되는 인라인 필터입니다. 토글 없이 바로 필터링이 가능합니다.
+
+```elixir
+grid = Grid.new(
+  data: data,
+  columns: columns,
+  options: %{floating_filter: true}
+)
+```
+
+컬럼별로 floating filter를 비활성화할 수 있습니다:
+
+```elixir
+%{field: :id, label: "ID", filterable: true, floating_filter: false}
+```
+
+자세한 내용은 [Floating Filters](./floating-filters.md) 가이드를 참고하세요.
+
+## Date Filter Presets (v0.12)
+
+Date 타입 필터에 빠른 범위 선택 프리셋이 추가되었습니다:
+
+| 프리셋 | 설명 |
+|--------|------|
+| 오늘 | 오늘 날짜만 |
+| 어제 | 어제 날짜만 |
+| 이번 주 | 현재 주 (월~일) |
+| 지난 주 | 이전 주 |
+| 이번 달 | 현재 월 |
+| 지난 달 | 이전 월 |
+| 최근 30일 | 오늘 기준 30일 |
+| 최근 90일 | 오늘 기준 90일 |
+
+## Set Filter (v0.12)
+
+Excel 스타일 체크박스 필터입니다. 고유값 목록에서 항목을 선택/해제하여 필터링합니다.
+
+```elixir
+%{field: :city, label: "도시", filterable: true, filter_type: :set}
+```
+
+자세한 내용은 [Set Filter](./set-filter.md) 가이드를 참고하세요.
+
+## Column Menu (v0.12)
+
+헤더 셀에 마우스를 올리면 표시되는 메뉴를 통해 정렬, 필터, 컬럼 숨기기 등을 수행할 수 있습니다. 자세한 내용은 [Column Menu](./column-menu.md) 가이드를 참고하세요.
+
 ## Related
 
 - [Column Definitions](./column-definitions.md) — filterable, filter_type 속성
+- [Floating Filters](./floating-filters.md) — Floating Filter 상세
+- [Set Filter](./set-filter.md) — Set Filter 상세
+- [Column Menu](./column-menu.md) — Column Menu 상세
 - [Sorting](./sorting.md) — 필터와 정렬 조합
 - [Data Sources](./data-sources.md) — 서버사이드 필터링

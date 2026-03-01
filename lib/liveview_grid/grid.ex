@@ -191,29 +191,142 @@ defmodule LiveViewGrid.Grid do
     put_in(grid.state.column_order, order)
   end
 
+  # ── FA-016: Column State Save/Restore ──
+
+  @doc """
+  컬럼 상태(너비, 순서, 숨김)를 추출합니다.
+
+  ## Returns
+
+      %{
+        column_widths: %{name: 150, email: 200},
+        column_order: [:name, :email, :id],
+        hidden_columns: [:age]
+      }
+  """
+  @spec export_column_state(grid :: t()) :: map()
+  def export_column_state(%{state: state}) do
+    %{
+      column_widths: Map.get(state, :column_widths, %{}),
+      column_order: Map.get(state, :column_order),
+      hidden_columns: Map.get(state, :hidden_columns, [])
+    }
+  end
+
+  @doc """
+  컬럼 상태를 복원합니다. 존재하는 컬럼 필드만 적용합니다.
+
+  ## Parameters
+    - grid: 대상 Grid
+    - column_state: `export_column_state/1`에서 반환된 맵
+  """
+  @spec import_column_state(grid :: t(), column_state :: map()) :: t()
+  def import_column_state(grid, column_state) when is_map(column_state) do
+    valid_fields = MapSet.new(Enum.map(grid.columns, & &1.field))
+
+    # column_widths: 존재하는 필드만
+    widths = column_state
+      |> Map.get(:column_widths, %{})
+      |> Enum.filter(fn {field, _} -> MapSet.member?(valid_fields, field) end)
+      |> Map.new()
+
+    # column_order: 존재하는 필드만
+    order = case Map.get(column_state, :column_order) do
+      nil -> nil
+      list when is_list(list) ->
+        filtered = Enum.filter(list, &MapSet.member?(valid_fields, &1))
+        if filtered == [], do: nil, else: filtered
+    end
+
+    # hidden_columns: 존재하는 필드만
+    hidden = column_state
+      |> Map.get(:hidden_columns, [])
+      |> Enum.filter(&MapSet.member?(valid_fields, &1))
+
+    grid
+    |> put_in([:state, :column_widths], widths)
+    |> put_in([:state, :column_order], order)
+    |> put_in([:state, :hidden_columns], hidden)
+  end
+
+  # ── FA-002: Grid State Save/Restore ──
+
+  @doc """
+  전체 Grid 상태를 저장 가능한 형태로 추출합니다.
+  """
+  @spec save_state(grid :: t()) :: map()
+  def save_state(grid) do
+    LiveViewGrid.StatePersistence.export_state(grid)
+  end
+
+  @doc """
+  저장된 상태를 Grid에 복원합니다.
+  """
+  @spec restore_state(grid :: t(), state_map :: map()) :: t()
+  def restore_state(grid, state_map) when is_map(state_map) do
+    LiveViewGrid.StatePersistence.import_state(grid, state_map)
+  end
+
   @doc """
   표시 순서대로 컬럼을 반환합니다.
   column_order가 nil이면 원래 순서, 설정되면 해당 순서대로 반환.
   frozen 컬럼은 항상 맨 앞에 유지합니다.
   """
   @spec display_columns(grid :: t()) :: list(map())
-  def display_columns(%{state: %{column_order: nil}, columns: columns}), do: columns
-  def display_columns(%{state: %{column_order: order}, columns: columns, options: options}) do
-    frozen_count = Map.get(options, :frozen_columns, 0)
+  def display_columns(%{state: state, columns: columns} = grid) do
+    hidden = Map.get(state, :hidden_columns, [])
 
-    # frozen 컬럼은 원래 위치 유지
-    frozen = Enum.take(columns, frozen_count)
-    frozen_fields = MapSet.new(Enum.map(frozen, & &1.field))
+    ordered = case state do
+      %{column_order: nil} -> columns
+      %{column_order: order} ->
+        frozen_count = Map.get(grid.options, :frozen_columns, 0)
+        frozen = Enum.take(columns, frozen_count)
+        frozen_fields = MapSet.new(Enum.map(frozen, & &1.field))
+        non_frozen_order = Enum.reject(order, &MapSet.member?(frozen_fields, &1))
 
-    # non-frozen만 재정렬
-    non_frozen_order = Enum.reject(order, &MapSet.member?(frozen_fields, &1))
+        reordered = Enum.map(non_frozen_order, fn field ->
+          Enum.find(columns, fn c -> c.field == field end)
+        end)
+        |> Enum.reject(&is_nil/1)
 
-    reordered = Enum.map(non_frozen_order, fn field ->
-      Enum.find(columns, fn c -> c.field == field end)
-    end)
-    |> Enum.reject(&is_nil/1)
+        frozen ++ reordered
+    end
 
-    frozen ++ reordered
+    # FA-010: hidden_columns 필터링
+    if hidden == [] do
+      ordered
+    else
+      hidden_set = MapSet.new(hidden)
+      Enum.reject(ordered, fn col -> MapSet.member?(hidden_set, col.field) end)
+    end
+  end
+
+  # ── FA-044: Find & Highlight ──
+
+  @doc """
+  모든 표시 데이터에서 검색어와 일치하는 셀 좌표를 반환합니다.
+  대소문자 무시. 빈 검색어는 빈 리스트 반환.
+
+  ## Returns
+
+      [{row_id, field}, ...]
+  """
+  @spec find_matches(grid :: t(), search_text :: String.t()) :: list({integer(), atom()})
+  def find_matches(_grid, ""), do: []
+  def find_matches(_grid, nil), do: []
+  def find_matches(grid, search_text) when is_binary(search_text) do
+    downcased = String.downcase(search_text)
+    cols = display_columns(grid)
+    data = visible_data(grid)
+
+    for row <- data,
+        col <- cols,
+        value = Map.get(row, col.field),
+        value != nil,
+        cell_text = to_string(value) |> String.downcase(),
+        String.contains?(cell_text, downcased) do
+      {Map.get(row, :id), col.field}
+    end
   end
 
   @doc """
@@ -1036,7 +1149,15 @@ defmodule LiveViewGrid.Grid do
       theme: "light",
       show_row_number: false,
       show_summary: false,
-      autofit_type: :none
+      autofit_type: :none,
+      # FA-004: Status Bar
+      show_status_bar: false,
+      # FA-011: Floating Filters (always visible filter row)
+      floating_filter: false,
+      # FA-037: Column Hover Highlight
+      column_hover_highlight: false,
+      # FA-002: Grid State Persistence (localStorage 자동 저장/복원)
+      state_persistence: false
     }
   end
 
@@ -1044,7 +1165,7 @@ defmodule LiveViewGrid.Grid do
   defp all_columns(grid) do
     cond do
       grid.state[:all_columns] -> grid.state[:all_columns]
-      grid.definition -> grid.definition.columns
+      grid.definition -> normalize_columns(grid.definition.columns)
       true -> grid.columns
     end
   end
@@ -1353,7 +1474,13 @@ defmodule LiveViewGrid.Grid do
         header_group: nil,
         nulls: :last,
         required: false,
-        summary: nil
+        summary: nil,
+        # FA-022: Resize Lock per Column
+        resizable: true,
+        # FA-020: Cell Text Selection
+        text_selectable: false,
+        # FA-011: Floating Filter (per-column control)
+        floating_filter: true
       }, col)
     end)
   end
@@ -1400,7 +1527,22 @@ defmodule LiveViewGrid.Grid do
       # F-904: Cell Merge
       merge_regions: %{},
       # Per-row Heights (extendsizetype)
-      row_heights: %{}
+      row_heights: %{},
+      # FA-001: Row Pinning (상단/하단 고정 행)
+      pinned_top_ids: [],
+      pinned_bottom_ids: [],
+      # FA-005: Overlay System
+      overlay: nil,
+      # FA-010: Column Menu
+      column_menu: nil,
+      hidden_columns: [],
+      # FA-012: Set Filter
+      set_filter_open: nil,
+      # FA-044: Find & Highlight
+      find_text: "",
+      find_matches: [],
+      find_current_index: 0,
+      show_find_bar: false
     }
   end
 
@@ -1542,5 +1684,138 @@ defmodule LiveViewGrid.Grid do
       |> Enum.with_index(start_index)
       |> Enum.map(fn {row, idx} -> Map.put(row, :_virtual_index, idx) end)
     end
+  end
+
+  # ────────────────────────────────────────────────
+  # FA-001: Row Pinning (상단/하단 행 고정)
+  # ────────────────────────────────────────────────
+
+  @doc """
+  지정된 행들을 상단 또는 하단에 고정한다.
+
+  ## Parameters
+    - `grid` - Grid 인스턴스
+    - `row_ids` - 고정할 행 ID 리스트
+    - `position` - `:top` 또는 `:bottom`
+
+  ## Examples
+
+      grid = Grid.pin_rows(grid, [1, 2], :top)
+      grid = Grid.pin_rows(grid, [5], :bottom)
+  """
+  @spec pin_rows(t(), list(any()), :top | :bottom) :: t()
+  def pin_rows(grid, row_ids, :top) do
+    current = grid.state.pinned_top_ids
+    new_ids = Enum.uniq(current ++ row_ids)
+    # 상단 고정에 추가되면 하단에서 제거
+    bottom = grid.state.pinned_bottom_ids -- row_ids
+    grid
+    |> put_in([:state, :pinned_top_ids], new_ids)
+    |> put_in([:state, :pinned_bottom_ids], bottom)
+  end
+
+  def pin_rows(grid, row_ids, :bottom) do
+    current = grid.state.pinned_bottom_ids
+    new_ids = Enum.uniq(current ++ row_ids)
+    top = grid.state.pinned_top_ids -- row_ids
+    grid
+    |> put_in([:state, :pinned_bottom_ids], new_ids)
+    |> put_in([:state, :pinned_top_ids], top)
+  end
+
+  @doc """
+  행 고정을 해제한다.
+
+  ## Parameters
+    - `grid` - Grid 인스턴스
+    - `row_ids` - 고정 해제할 행 ID 리스트
+  """
+  @spec unpin_rows(t(), list(any())) :: t()
+  def unpin_rows(grid, row_ids) do
+    grid
+    |> put_in([:state, :pinned_top_ids], grid.state.pinned_top_ids -- row_ids)
+    |> put_in([:state, :pinned_bottom_ids], grid.state.pinned_bottom_ids -- row_ids)
+  end
+
+  @doc "상단 고정 행 데이터를 반환한다."
+  @spec pinned_top_rows(t()) :: list(map())
+  def pinned_top_rows(%{state: %{pinned_top_ids: ids}}) when ids == [], do: []
+  def pinned_top_rows(%{data: data, state: %{pinned_top_ids: ids}}) do
+    Enum.filter(data, fn row -> Map.get(row, :id) in ids end)
+  end
+
+  @doc "하단 고정 행 데이터를 반환한다."
+  @spec pinned_bottom_rows(t()) :: list(map())
+  def pinned_bottom_rows(%{state: %{pinned_bottom_ids: ids}}) when ids == [], do: []
+  def pinned_bottom_rows(%{data: data, state: %{pinned_bottom_ids: ids}}) do
+    Enum.filter(data, fn row -> Map.get(row, :id) in ids end)
+  end
+
+  @doc "행이 고정 상태인지 확인한다."
+  @spec pinned?(t(), any()) :: :top | :bottom | false
+  def pinned?(grid, row_id) do
+    cond do
+      row_id in grid.state.pinned_top_ids -> :top
+      row_id in grid.state.pinned_bottom_ids -> :bottom
+      true -> false
+    end
+  end
+
+  # ────────────────────────────────────────────────
+  # FA-005: Overlay System (Loading/No Data/Error)
+  # ────────────────────────────────────────────────
+
+  @doc """
+  오버레이 상태를 설정한다.
+
+  ## Parameters
+    - `grid` - Grid 인스턴스
+    - `type` - `:loading`, `:no_data`, `:error`, 또는 `nil` (해제)
+    - `message` - 표시할 메시지 (선택)
+
+  ## Examples
+
+      grid = Grid.set_overlay(grid, :loading)
+      grid = Grid.set_overlay(grid, :error, "데이터를 불러올 수 없습니다")
+      grid = Grid.set_overlay(grid, nil)  # 해제
+  """
+  @spec set_overlay(t(), atom() | nil, String.t() | nil) :: t()
+  def set_overlay(grid, type, message \\ nil)
+  def set_overlay(grid, nil, _message) do
+    put_in(grid.state.overlay, nil)
+  end
+
+  def set_overlay(grid, type, message) when type in [:loading, :no_data, :error] do
+    put_in(grid.state.overlay, %{type: type, message: message})
+  end
+
+  @doc "오버레이를 해제한다."
+  @spec clear_overlay(t()) :: t()
+  def clear_overlay(grid), do: put_in(grid.state.overlay, nil)
+
+  # ── FA-010: Column Menu ──
+
+  @doc "컬럼을 숨긴다."
+  @spec hide_column(t(), atom()) :: t()
+  def hide_column(grid, field) when is_atom(field) do
+    hidden = grid.state[:hidden_columns] || []
+    if field in hidden do
+      grid
+    else
+      put_in(grid.state[:hidden_columns], [field | hidden])
+    end
+  end
+
+  @doc "숨겨진 컬럼을 다시 표시한다."
+  @spec show_column(t(), atom()) :: t()
+  def show_column(grid, field) when is_atom(field) do
+    hidden = grid.state[:hidden_columns] || []
+    put_in(grid.state[:hidden_columns], List.delete(hidden, field))
+  end
+
+  @doc "숨겨진 컬럼 목록을 반환한다."
+  @spec hidden_columns(t()) :: [atom()]
+  def hidden_columns(grid) do
+    grid.state[:hidden_columns] || []
   end
 end

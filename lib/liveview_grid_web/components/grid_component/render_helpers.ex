@@ -213,6 +213,18 @@ defmodule LiveviewGridWeb.GridComponent.RenderHelpers do
   end
 
   @doc """
+  필터 행 표시 여부를 판단한다.
+  floating_filter 옵션이 true이면 항상 표시, 아니면 show_filter_row 상태에 따라 토글.
+  """
+  @spec show_filter_row?(grid :: map()) :: boolean()
+  def show_filter_row?(grid) do
+    has_filterable = has_filterable_columns?(grid.columns)
+    floating = Map.get(grid.options, :floating_filter, false)
+    toggled = grid.state.show_filter_row
+    has_filterable && (floating || toggled)
+  end
+
+  @doc """
   컬럼 필터 타입에 맞는 placeholder 텍스트를 반환한다.
   """
   @spec filter_placeholder(column :: map()) :: String.t()
@@ -242,6 +254,39 @@ defmodule LiveviewGridWeb.GridComponent.RenderHelpers do
     case Enum.find(columns, fn c -> c.field == field end) do
       nil -> :text
       col -> Map.get(col, :filter_type, :text)
+    end
+  end
+
+  # ── FA-012: Set Filter Helpers ──
+
+  @doc "Set 필터 버튼의 레이블을 생성한다."
+  @spec set_filter_label(column :: map(), grid :: map()) :: String.t()
+  def set_filter_label(column, grid) do
+    case Map.get(grid.state.filters, column.field) do
+      nil -> "전체"
+      value when is_binary(value) ->
+        case Jason.decode(value) do
+          {:ok, list} when is_list(list) -> "#{length(list)}개 선택"
+          _ -> "전체"
+        end
+      _ -> "전체"
+    end
+  end
+
+  @doc "Set 필터에서 현재 선택된 값 목록을 반환한다."
+  @spec get_set_filter_values(grid :: map(), field :: atom()) :: [any()]
+  def get_set_filter_values(grid, field) do
+    case Map.get(grid.state.filters, field) do
+      nil ->
+        # 필터 없으면 모든 값 선택 상태
+        LiveViewGrid.Filter.extract_unique_values(grid.data, field)
+      value when is_binary(value) ->
+        case Jason.decode(value) do
+          {:ok, list} when is_list(list) -> list
+          _ -> LiveViewGrid.Filter.extract_unique_values(grid.data, field)
+        end
+      _ ->
+        LiveViewGrid.Filter.extract_unique_values(grid.data, field)
     end
   end
 
@@ -401,32 +446,35 @@ defmodule LiveviewGridWeb.GridComponent.RenderHelpers do
   end
 
   defp render_editor(assigns, row, column, row_edit) do
-    if column.editor_type == :select do
-      assigns = assign(assigns, row: row, column: column, row_edit: row_edit)
-      ~H"""
-      <select
-        phx-value-row-id={@row.id}
-        phx-value-field={@column.field}
-        phx-target={@myself}
-        class="lv-grid__cell-editor"
-        id={"editor-#{@row.id}-#{@column.field}"}
-        phx-hook="CellEditor"
-        data-row-edit={if @row_edit, do: "true"}
-        data-field={to_string(@column.field)}
-      >
-        <%= for {label, value} <- @column.editor_options do %>
-          <option value={value} selected={value == to_string(Map.get(@row, @column.field))}>
-            <%= label %>
-          </option>
-        <% end %>
-      </select>
-      """
-    else
-      input_type = editor_input_type(column)
+    cond do
+      column.editor_type == :rich_select ->
+        render_rich_select_editor(assigns, row, column, row_edit)
 
-      if input_type == "date" do
+      column.editor_type == :select ->
+        assigns = assign(assigns, row: row, column: column, row_edit: row_edit)
+        ~H"""
+        <select
+          phx-value-row-id={@row.id}
+          phx-value-field={@column.field}
+          phx-target={@myself}
+          class="lv-grid__cell-editor"
+          id={"editor-#{@row.id}-#{@column.field}"}
+          phx-hook="CellEditor"
+          data-row-edit={if @row_edit, do: "true"}
+          data-field={to_string(@column.field)}
+        >
+          <%= for {label, value} <- @column.editor_options do %>
+            <option value={value} selected={value == to_string(Map.get(@row, @column.field))}>
+              <%= label %>
+            </option>
+          <% end %>
+        </select>
+        """
+
+      editor_input_type(column) == "date" ->
         render_date_editor(assigns, row, column, row_edit)
-      else
+
+      true ->
         pattern_source = if column.input_pattern, do: Regex.source(column.input_pattern), else: nil
         assigns = assign(assigns, row: row, column: column, pattern_source: pattern_source, row_edit: row_edit)
         ~H"""
@@ -446,8 +494,33 @@ defmodule LiveviewGridWeb.GridComponent.RenderHelpers do
           data-field={to_string(@column.field)}
         />
         """
-      end
     end
+  end
+
+  # FA-035: Rich Select Editor
+  defp render_rich_select_editor(assigns, row, column, _row_edit) do
+    current_value = to_string(Map.get(row, column.field, ""))
+    options_json = column.editor_options
+      |> Enum.map(fn
+        {label, value} -> %{label: label, value: to_string(value)}
+        %{label: label, value: value} -> %{label: label, value: to_string(value)}
+      end)
+      |> Jason.encode!()
+
+    assigns = assign(assigns, row: row, column: column, current_value: current_value, options_json: options_json)
+    ~H"""
+    <div
+      class="lv-grid__rich-select"
+      id={"rich-select-#{@row.id}-#{@column.field}"}
+      phx-hook="RichSelect"
+      data-row-id={@row.id}
+      data-field={to_string(@column.field)}
+      data-options={@options_json}
+      data-current-value={@current_value}
+      phx-target={@myself}
+    >
+    </div>
+    """
   end
 
   defp render_date_editor(assigns, row, column, row_edit) do
@@ -457,35 +530,43 @@ defmodule LiveviewGridWeb.GridComponent.RenderHelpers do
 
     if row_edit do
       ~H"""
-      <input
-        type="date"
-        value={@date_value}
-        phx-target={@myself}
-        class="lv-grid__cell-editor"
-        id={"editor-#{@row.id}-#{@column.field}"}
-        phx-hook="CellEditor"
-        data-row-edit="true"
-        data-field={to_string(@column.field)}
-      />
+      <div id={"date-picker-#{@row.id}-#{@column.field}"} phx-hook="DatePicker" class="lv-grid__date-picker-wrapper">
+        <input
+          type="text"
+          value={@date_value}
+          phx-target={@myself}
+          class="lv-grid__cell-editor lv-grid__cell-editor--date"
+          id={"editor-#{@row.id}-#{@column.field}"}
+          phx-hook="CellEditor"
+          data-row-edit="true"
+          data-field={to_string(@column.field)}
+          placeholder="YYYY-MM-DD"
+          readonly
+        />
+      </div>
       """
     else
       ~H"""
-      <form phx-change="cell_edit_date" phx-target={@myself} style="display: contents;">
-        <input type="hidden" name="row-id" value={@row.id} />
-        <input type="hidden" name="field" value={@column.field} />
-        <input
-          type="date"
-          name="value"
-          value={@date_value}
-          phx-blur="cell_edit_save"
-          phx-value-row-id={@row.id}
-          phx-value-field={@column.field}
-          phx-target={@myself}
-          class="lv-grid__cell-editor"
-          id={"editor-#{@row.id}-#{@column.field}"}
-          phx-hook="CellEditor"
-        />
-      </form>
+      <div id={"date-picker-#{@row.id}-#{@column.field}"} phx-hook="DatePicker" class="lv-grid__date-picker-wrapper">
+        <form phx-change="cell_edit_date" phx-target={@myself} style="display: contents;">
+          <input type="hidden" name="row-id" value={@row.id} />
+          <input type="hidden" name="field" value={@column.field} />
+          <input
+            type="text"
+            name="value"
+            value={@date_value}
+            phx-blur="cell_edit_save"
+            phx-value-row-id={@row.id}
+            phx-value-field={@column.field}
+            phx-target={@myself}
+            class="lv-grid__cell-editor lv-grid__cell-editor--date"
+            id={"editor-#{@row.id}-#{@column.field}"}
+            phx-hook="CellEditor"
+            placeholder="YYYY-MM-DD"
+            readonly
+          />
+        </form>
+      </div>
       """
     end
   end
@@ -510,7 +591,7 @@ defmodule LiveviewGridWeb.GridComponent.RenderHelpers do
     ~H"""
     <div class={"lv-grid__cell-wrapper #{@cell_align} #{if @cell_error, do: "lv-grid__cell-wrapper--error"}"} style={@cell_style}>
       <span
-        class={"lv-grid__cell-value #{if @column.editable, do: "lv-grid__cell-value--editable"} #{if @cell_error, do: "lv-grid__cell-value--error"} #{if wordwrap?(@column), do: "lv-grid__cell-value--wordwrap"}"}
+        class={"lv-grid__cell-value #{if @column.editable, do: "lv-grid__cell-value--editable"} #{if @cell_error, do: "lv-grid__cell-value--error"} #{if wordwrap?(@column), do: "lv-grid__cell-value--wordwrap"} #{if Map.get(@column, :text_selectable), do: "lv-grid__cell-value--selectable"}"}
         id={if @column.editable, do: "cell-#{@row.id}-#{@column.field}"}
         phx-hook={if @column.editable, do: "CellEditable"}
         data-row-id={@row.id}
@@ -540,12 +621,31 @@ defmodule LiveviewGridWeb.GridComponent.RenderHelpers do
     formatted_value = Formatter.format(raw_value, column.formatter)
     cell_style = evaluate_style_expr(column, row)
     cell_align = align_class(column)
-    assigns = assign(assigns, row: row, column: column, cell_error: cell_error, formatted_value: formatted_value, cell_style: cell_style, cell_align: cell_align)
+
+    # FA-044: Find & Highlight
+    find_text = assigns.grid.state[:find_text] || ""
+    find_matches = assigns.grid.state[:find_matches] || []
+    find_current = assigns.grid.state[:find_current_index] || 0
+    is_match = find_text != "" && {row.id, column.field} in find_matches
+    is_current_match = is_match && Enum.at(find_matches, find_current) == {row.id, column.field}
+
+    highlighted_value = if is_match && formatted_value do
+      highlight_text(to_string(formatted_value), find_text)
+    else
+      formatted_value
+    end
+
+    assigns = assign(assigns,
+      row: row, column: column, cell_error: cell_error,
+      formatted_value: formatted_value, highlighted_value: highlighted_value,
+      cell_style: cell_style, cell_align: cell_align,
+      is_match: is_match, is_current_match: is_current_match
+    )
 
     ~H"""
     <div class={"lv-grid__cell-wrapper #{@cell_align} #{if @cell_error, do: "lv-grid__cell-wrapper--error"}"} style={@cell_style}>
       <span
-        class={"lv-grid__cell-value #{if @column.editable, do: "lv-grid__cell-value--editable"} #{if @cell_error, do: "lv-grid__cell-value--error"} #{if wordwrap?(@column), do: "lv-grid__cell-value--wordwrap"}"}
+        class={"lv-grid__cell-value #{if @column.editable, do: "lv-grid__cell-value--editable"} #{if @cell_error, do: "lv-grid__cell-value--error"} #{if wordwrap?(@column), do: "lv-grid__cell-value--wordwrap"} #{if Map.get(@column, :text_selectable), do: "lv-grid__cell-value--selectable"} #{if @is_match, do: "lv-grid__find-highlight"} #{if @is_current_match, do: "lv-grid__find-highlight--current"}"}
         id={if @column.editable, do: "cell-#{@row.id}-#{@column.field}"}
         phx-hook={if @column.editable, do: "CellEditable"}
         data-row-id={@row.id}
@@ -553,7 +653,11 @@ defmodule LiveviewGridWeb.GridComponent.RenderHelpers do
         phx-target={@myself}
         title={@cell_error}
       >
-        <%= @formatted_value %>
+        <%= if @is_match do %>
+          <%= Phoenix.HTML.raw(@highlighted_value) %>
+        <% else %>
+          <%= @formatted_value %>
+        <% end %>
         <%= if @cell_error do %>
           <span class="lv-grid__cell-error-icon">!</span>
         <% end %>
@@ -563,6 +667,18 @@ defmodule LiveviewGridWeb.GridComponent.RenderHelpers do
       <% end %>
     </div>
     """
+  end
+
+  @doc "텍스트에서 검색어를 <mark> 태그로 감싼다 (대소문자 무시)."
+  @spec highlight_text(text :: String.t(), search :: String.t()) :: String.t()
+  def highlight_text(text, ""), do: text
+  def highlight_text(text, search) do
+    escaped_search = Regex.escape(search)
+    case Regex.compile(escaped_search, "i") do
+      {:ok, regex} ->
+        Regex.replace(regex, text, fn match -> "<mark>#{Phoenix.HTML.html_escape(match) |> Phoenix.HTML.safe_to_string()}</mark>" end)
+      _ -> text
+    end
   end
 
   # ── Cell Alignment ──

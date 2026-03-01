@@ -75,10 +75,16 @@ defmodule LiveviewGridWeb.GridComponent.EventHandlers do
   def handle_column_resize(%{"field" => field, "width" => width}, socket) do
     grid = socket.assigns.grid
     field_atom = String.to_existing_atom(field)
-    width_int = String.to_integer(width)
 
-    updated_grid = Grid.resize_column(grid, field_atom, max(width_int, 50))
-    {:noreply, assign(socket, grid: updated_grid)}
+    # FA-022: Resize Lock per Column — resizable: false인 컬럼은 무시
+    col = Enum.find(grid.columns, &(&1.field == field_atom))
+    if col && Map.get(col, :resizable, true) == false do
+      {:noreply, socket}
+    else
+      width_int = String.to_integer(width)
+      updated_grid = Grid.resize_column(grid, field_atom, max(width_int, 50))
+      {:noreply, assign(socket, grid: updated_grid)}
+    end
   end
 
   @doc """
@@ -228,6 +234,118 @@ defmodule LiveviewGridWeb.GridComponent.EventHandlers do
       Map.delete(grid.state.filters, field_atom)
     else
       Map.put(grid.state.filters, field_atom, combined)
+    end
+
+    updated_grid = grid
+      |> put_in([:state, :filters], updated_filters)
+      |> put_in([:state, :pagination, :current_page], 1)
+      |> put_in([:state, :scroll_offset], 0)
+
+    {:noreply,
+      socket
+      |> assign(grid: updated_grid)
+      |> push_event("reset_virtual_scroll", %{})
+    }
+  end
+
+  # FA-003: Date Filter Preset
+  @doc """
+  날짜 프리셋 필터를 처리한다. 프리셋 선택 시 해당 날짜 범위로 필터를 설정한다.
+  """
+  @spec handle_filter_date_preset(params :: map(), socket :: Phoenix.LiveView.Socket.t()) ::
+          {:noreply, Phoenix.LiveView.Socket.t()}
+  def handle_filter_date_preset(%{"field" => field, "preset" => preset}, socket) do
+    grid = socket.assigns.grid
+    field_atom = String.to_atom(field)
+
+    updated_filters = if preset == "" do
+      Map.delete(grid.state.filters, field_atom)
+    else
+      preset_atom = String.to_atom(preset)
+      filter_value = LiveViewGrid.Filter.date_preset_to_filter(preset_atom)
+      Map.put(grid.state.filters, field_atom, filter_value)
+    end
+
+    updated_grid = grid
+      |> put_in([:state, :filters], updated_filters)
+      |> put_in([:state, :pagination, :current_page], 1)
+      |> put_in([:state, :scroll_offset], 0)
+
+    {:noreply,
+      socket
+      |> assign(grid: updated_grid)
+      |> push_event("reset_virtual_scroll", %{})
+    }
+  end
+
+  # ── FA-012: Set Filter Handlers ──
+
+  @doc "Set 필터 드롭다운을 토글한다."
+  @spec handle_toggle_set_filter(params :: map(), socket :: Phoenix.LiveView.Socket.t()) ::
+          {:noreply, Phoenix.LiveView.Socket.t()}
+  def handle_toggle_set_filter(%{"field" => field}, socket) do
+    field_atom = String.to_atom(field)
+    grid = socket.assigns.grid
+    current = grid.state[:set_filter_open]
+    new_val = if current == field_atom, do: nil, else: field_atom
+    updated_grid = put_in(grid.state[:set_filter_open], new_val)
+    {:noreply, assign(socket, grid: updated_grid)}
+  end
+
+  @doc "Set 필터 드롭다운을 닫는다."
+  @spec handle_close_set_filter(socket :: Phoenix.LiveView.Socket.t()) ::
+          {:noreply, Phoenix.LiveView.Socket.t()}
+  def handle_close_set_filter(socket) do
+    grid = put_in(socket.assigns.grid.state[:set_filter_open], nil)
+    {:noreply, assign(socket, grid: grid)}
+  end
+
+  @doc "Set 필터에서 전체 선택한다."
+  @spec handle_set_filter_select_all(params :: map(), socket :: Phoenix.LiveView.Socket.t()) ::
+          {:noreply, Phoenix.LiveView.Socket.t()}
+  def handle_set_filter_select_all(%{"field" => field}, socket) do
+    field_atom = String.to_atom(field)
+    grid = socket.assigns.grid
+    # 전체 선택 = 필터 해제
+    updated_grid = put_in(grid.state.filters, Map.delete(grid.state.filters, field_atom))
+    {:noreply, assign(socket, grid: updated_grid)}
+  end
+
+  @doc "Set 필터에서 전체 해제한다."
+  @spec handle_set_filter_deselect_all(params :: map(), socket :: Phoenix.LiveView.Socket.t()) ::
+          {:noreply, Phoenix.LiveView.Socket.t()}
+  def handle_set_filter_deselect_all(%{"field" => field}, socket) do
+    field_atom = String.to_atom(field)
+    grid = socket.assigns.grid
+    # 전체 해제 = 빈 리스트로 필터
+    updated_grid = grid
+      |> put_in([:state, :filters], Map.put(grid.state.filters, field_atom, Jason.encode!([])))
+      |> put_in([:state, :pagination, :current_page], 1)
+    {:noreply, assign(socket, grid: updated_grid)}
+  end
+
+  @doc "Set 필터에서 개별 값을 토글한다."
+  @spec handle_set_filter_toggle(params :: map(), socket :: Phoenix.LiveView.Socket.t()) ::
+          {:noreply, Phoenix.LiveView.Socket.t()}
+  def handle_set_filter_toggle(%{"field" => field, "value" => value}, socket) do
+    field_atom = String.to_atom(field)
+    grid = socket.assigns.grid
+
+    current_selected = RenderHelpers.get_set_filter_values(grid, field_atom)
+    all_values = LiveViewGrid.Filter.extract_unique_values(grid.data, field_atom)
+
+    # 문자열 비교로 토글
+    updated = if value in Enum.map(current_selected, &to_string/1) do
+      Enum.reject(current_selected, fn v -> to_string(v) == value end)
+    else
+      [value | current_selected]
+    end
+
+    updated_filters = if length(updated) >= length(all_values) do
+      # 전체 선택이면 필터 해제
+      Map.delete(grid.state.filters, field_atom)
+    else
+      Map.put(grid.state.filters, field_atom, Jason.encode!(updated))
     end
 
     updated_grid = grid
@@ -1212,6 +1330,115 @@ defmodule LiveviewGridWeb.GridComponent.EventHandlers do
     {:noreply, assign(socket, grid: updated_grid)}
   end
 
+  # ── FA-001: Row Pinning ──
+
+  @doc "행을 상단 또는 하단에 고정한다."
+  @spec handle_pin_row(params :: map(), position :: :top | :bottom, socket :: Phoenix.LiveView.Socket.t()) ::
+          {:noreply, Phoenix.LiveView.Socket.t()}
+  def handle_pin_row(%{"row-id" => row_id_str}, position, socket) do
+    grid = socket.assigns.grid
+    row_id = parse_row_id(row_id_str)
+    updated_grid = Grid.pin_rows(grid, [row_id], position)
+    {:noreply, assign(socket, grid: updated_grid)}
+  end
+
+  @doc "행 고정을 해제한다."
+  @spec handle_unpin_row(params :: map(), socket :: Phoenix.LiveView.Socket.t()) ::
+          {:noreply, Phoenix.LiveView.Socket.t()}
+  def handle_unpin_row(%{"row-id" => row_id_str}, socket) do
+    grid = socket.assigns.grid
+    row_id = parse_row_id(row_id_str)
+    updated_grid = Grid.unpin_rows(grid, [row_id])
+    {:noreply, assign(socket, grid: updated_grid)}
+  end
+
+  defp parse_row_id(row_id_str) when is_binary(row_id_str) do
+    case Integer.parse(row_id_str) do
+      {id, ""} -> id
+      _ -> row_id_str
+    end
+  end
+  defp parse_row_id(row_id), do: row_id
+
+  # ── FA-010: Column Menu ──
+
+  @doc """
+  컬럼 헤더 메뉴를 표시한다.
+  """
+  @spec handle_show_column_menu(params :: map(), socket :: Phoenix.LiveView.Socket.t()) ::
+          {:noreply, Phoenix.LiveView.Socket.t()}
+  def handle_show_column_menu(params, socket) do
+    field = String.to_atom(params["field"])
+    # 헤더 셀의 위치를 기반으로 메뉴 표시 (JS에서 좌표 전달 없으면 기본 위치 사용)
+    menu = %{
+      field: field,
+      col_idx: params["col-idx"],
+      x: params["x"] || "100",
+      y: params["y"] || "100"
+    }
+    grid = socket.assigns.grid
+    grid = put_in(grid.state[:column_menu], menu)
+    {:noreply, assign(socket, grid: grid)}
+  end
+
+  @doc """
+  컬럼 메뉴를 숨긴다.
+  """
+  @spec handle_hide_column_menu(socket :: Phoenix.LiveView.Socket.t()) ::
+          {:noreply, Phoenix.LiveView.Socket.t()}
+  def handle_hide_column_menu(socket) do
+    grid = socket.assigns.grid
+    grid = put_in(grid.state[:column_menu], nil)
+    {:noreply, assign(socket, grid: grid)}
+  end
+
+  @doc """
+  컬럼 메뉴 액션을 처리한다.
+  """
+  @spec handle_column_menu_action(params :: map(), socket :: Phoenix.LiveView.Socket.t()) ::
+          {:noreply, Phoenix.LiveView.Socket.t()}
+  def handle_column_menu_action(%{"action" => action, "field" => field_str}, socket) do
+    field = String.to_atom(field_str)
+    grid = socket.assigns.grid
+
+    updated_grid = case action do
+      "sort_asc" ->
+        grid
+        |> put_in([:state, :sort], %{field: field, direction: :asc})
+        |> put_in([:state, :scroll_offset], 0)
+
+      "sort_desc" ->
+        grid
+        |> put_in([:state, :sort], %{field: field, direction: :desc})
+        |> put_in([:state, :scroll_offset], 0)
+
+      "clear_sort" ->
+        put_in(grid.state.sort, nil)
+
+      "hide_column" ->
+        Grid.hide_column(grid, field)
+
+      "show_column" ->
+        Grid.show_column(grid, field)
+
+      "auto_size" ->
+        # 자동 너비: 컬럼 폭을 :auto로 리셋
+        put_in(grid.state[:column_widths], Map.delete(grid.state[:column_widths] || %{}, field))
+
+      _ ->
+        grid
+    end
+
+    # 메뉴 닫기
+    updated_grid = put_in(updated_grid.state[:column_menu], nil)
+
+    {:noreply,
+      socket
+      |> assign(grid: updated_grid)
+      |> push_event("reset_virtual_scroll", %{})
+    }
+  end
+
   # ── F-800: Context Menu ──
 
   @doc """
@@ -1271,6 +1498,19 @@ defmodule LiveviewGridWeb.GridComponent.EventHandlers do
 
       "delete_row" ->
         handle_ctx_delete_row(grid, row_id, socket)
+
+      # FA-001: Row Pinning context menu actions
+      "pin_row_top" ->
+        updated_grid = Grid.pin_rows(grid, [row_id], :top)
+        {:noreply, assign(socket, grid: updated_grid)}
+
+      "pin_row_bottom" ->
+        updated_grid = Grid.pin_rows(grid, [row_id], :bottom)
+        {:noreply, assign(socket, grid: updated_grid)}
+
+      "unpin_row" ->
+        updated_grid = Grid.unpin_rows(grid, [row_id])
+        {:noreply, assign(socket, grid: updated_grid)}
 
       _ ->
         {:noreply, socket}
@@ -1497,5 +1737,99 @@ defmodule LiveviewGridWeb.GridComponent.EventHandlers do
           {:noreply, socket}
         end
     end
+  end
+
+  # ── FA-044: Find & Highlight ──
+
+  @doc "Find 바 토글 (표시/숨김)"
+  @spec handle_toggle_find_bar(socket :: Phoenix.LiveView.Socket.t()) ::
+          {:noreply, Phoenix.LiveView.Socket.t()}
+  def handle_toggle_find_bar(socket) do
+    grid = socket.assigns.grid
+    show = !grid.state[:show_find_bar]
+    grid = grid
+      |> put_in([:state, :show_find_bar], show)
+      |> then(fn g -> if !show, do: reset_find_state(g), else: g end)
+    {:noreply, assign(socket, grid: grid)}
+  end
+
+  @doc "검색어 입력 시 매칭 계산"
+  @spec handle_find(params :: map(), socket :: Phoenix.LiveView.Socket.t()) ::
+          {:noreply, Phoenix.LiveView.Socket.t()}
+  def handle_find(%{"value" => text}, socket) do
+    grid = socket.assigns.grid
+    matches = Grid.find_matches(grid, text)
+    grid = grid
+      |> put_in([:state, :find_text], text)
+      |> put_in([:state, :find_matches], matches)
+      |> put_in([:state, :find_current_index], if(matches == [], do: 0, else: 0))
+    {:noreply, assign(socket, grid: grid)}
+  end
+
+  @doc "다음 매칭으로 이동 (wrap around)"
+  @spec handle_find_next(socket :: Phoenix.LiveView.Socket.t()) ::
+          {:noreply, Phoenix.LiveView.Socket.t()}
+  def handle_find_next(socket) do
+    grid = socket.assigns.grid
+    matches = grid.state[:find_matches] || []
+    current = grid.state[:find_current_index] || 0
+
+    next_idx = if matches == [], do: 0, else: rem(current + 1, length(matches))
+    grid = put_in(grid.state[:find_current_index], next_idx)
+    {:noreply, assign(socket, grid: grid)}
+  end
+
+  @doc "이전 매칭으로 이동 (wrap around)"
+  @spec handle_find_prev(socket :: Phoenix.LiveView.Socket.t()) ::
+          {:noreply, Phoenix.LiveView.Socket.t()}
+  def handle_find_prev(socket) do
+    grid = socket.assigns.grid
+    matches = grid.state[:find_matches] || []
+    current = grid.state[:find_current_index] || 0
+
+    prev_idx = if matches == [], do: 0, else: rem(current - 1 + length(matches), length(matches))
+    grid = put_in(grid.state[:find_current_index], prev_idx)
+    {:noreply, assign(socket, grid: grid)}
+  end
+
+  @doc "Find 바 닫기 및 상태 초기화"
+  @spec handle_close_find(socket :: Phoenix.LiveView.Socket.t()) ::
+          {:noreply, Phoenix.LiveView.Socket.t()}
+  def handle_close_find(socket) do
+    grid = socket.assigns.grid |> reset_find_state()
+    {:noreply, assign(socket, grid: grid)}
+  end
+
+  defp reset_find_state(grid) do
+    grid
+    |> put_in([:state, :find_text], "")
+    |> put_in([:state, :find_matches], [])
+    |> put_in([:state, :find_current_index], 0)
+    |> put_in([:state, :show_find_bar], false)
+  end
+
+  # ── FA-002: Grid State Save/Restore ──
+
+  @doc "Grid 상태를 export하여 클라이언트에 전송한다."
+  @spec handle_save_grid_state(socket :: Phoenix.LiveView.Socket.t()) ::
+          {:noreply, Phoenix.LiveView.Socket.t()}
+  def handle_save_grid_state(socket) do
+    state = Grid.save_state(socket.assigns.grid)
+    {:noreply, push_event(socket, "state_saved", %{state: state})}
+  end
+
+  @doc "클라이언트에서 수신한 상태를 Grid에 복원한다."
+  @spec handle_restore_grid_state(params :: map(), socket :: Phoenix.LiveView.Socket.t()) ::
+          {:noreply, Phoenix.LiveView.Socket.t()}
+  def handle_restore_grid_state(%{"state" => state_map}, socket) do
+    grid = Grid.restore_state(socket.assigns.grid, state_map)
+    {:noreply, assign(socket, grid: grid)}
+  end
+
+  @doc "저장된 상태를 삭제하고 클라이언트에 알린다."
+  @spec handle_clear_grid_state(socket :: Phoenix.LiveView.Socket.t()) ::
+          {:noreply, Phoenix.LiveView.Socket.t()}
+  def handle_clear_grid_state(socket) do
+    {:noreply, push_event(socket, "state_cleared", %{})}
   end
 end

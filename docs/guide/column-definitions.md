@@ -32,7 +32,7 @@ columns = [
 |----------|------|---------|-------------|
 | `sortable` | `boolean` | `false` | 헤더 클릭 시 정렬 허용 |
 | `filterable` | `boolean` | `false` | 컬럼 필터 UI 표시 |
-| `filter_type` | `:text \| :number \| :date` | `:text` | 필터 입력 유형 |
+| `filter_type` | `:text \| :number \| :date \| :set` | `:text` | 필터 입력 유형. `:set`은 체크박스 필터 |
 | `nulls` | `:first \| :last` | `:last` | null 값 정렬 위치 |
 
 ### Editing Properties
@@ -40,10 +40,18 @@ columns = [
 | Property | Type | Default | Description |
 |----------|------|---------|-------------|
 | `editable` | `boolean` | `false` | 인라인 편집 허용 |
-| `editor_type` | `:text \| :number \| :select \| :date \| :checkbox` | `:text` | 편집기 유형 |
-| `editor_options` | `list` | `[]` | select 편집기의 옵션 목록 |
+| `editor_type` | `:text \| :number \| :select \| :rich_select \| :date \| :checkbox` | `:text` | 편집기 유형 |
+| `editor_options` | `list` | `[]` | select/rich_select 편집기의 옵션 목록 |
 | `input_pattern` | `regex \| nil` | `nil` | 입력 제한 정규식 |
 | `required` | `boolean` | `false` | 필수 필드 표시 |
+
+### Layout & Behavior
+
+| Property | Type | Default | Description |
+|----------|------|---------|-------------|
+| `resizable` | `boolean` | `true` | 컬럼 너비 드래그 리사이즈 허용. `false`면 resize handle 숨김 |
+| `text_selectable` | `boolean` | `false` | 셀 텍스트 드래그 선택 허용. 이메일, URL 등 복사가 필요한 컬럼에 유용 |
+| `floating_filter` | `boolean` | `true` | 개별 컬럼의 floating filter 표시 여부. `false`면 해당 컬럼 필터 숨김 |
 
 ### Formatting & Rendering
 
@@ -112,6 +120,24 @@ columns = [
   editor_type: :select,
   editor_options: [
     {"서울", "서울"}, {"부산", "부산"}, {"대구", "대구"}
+  ]
+}
+```
+
+### Rich Select (Searchable Dropdown) Column
+
+```elixir
+%{
+  field: :department,
+  label: "부서",
+  width: 150,
+  editable: true,
+  editor_type: :rich_select,
+  editor_options: [
+    %{value: "engineering", label: "Engineering"},
+    %{value: "design", label: "Design"},
+    %{value: "marketing", label: "Marketing"},
+    %{value: "sales", label: "Sales"}
   ]
 }
 ```
@@ -185,8 +211,9 @@ columns = [
 
 ## Related
 
-- [Formatters](./formatters.md) — 16가지 내장 포맷터 상세
-- [Renderers](./renderers.md) — Badge, Link, Progress 렌더러
-- [Sorting](./sorting.md) — 정렬 동작 상세
-- [Filtering](./filtering.md) — 필터 유형별 설명
-- [Cell Editing](./cell-editing.md) — 편집기 유형별 동작
+- [Formatters](./formatters.md) -- 16가지 내장 포맷터 상세
+- [Renderers](./renderers.md) -- Badge, Link, Progress 렌더러
+- [Sorting](./sorting.md) -- 정렬 동작 상세
+- [Filtering](./filtering.md) -- 필터 유형별 설명
+- [Cell Editing](./cell-editing.md) -- 편집기 유형별 동작
+- [Rich Select Editor](./rich-select-editor.md) -- 검색 가능 드롭다운 에디터

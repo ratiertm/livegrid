@@ -90,6 +90,98 @@ defmodule LiveViewGrid.Filter do
     end
   end
 
+  # ── FA-003: Date Filter Presets ──
+
+  @doc """
+  날짜 프리셋 이름에 해당하는 날짜 범위(from~to)를 반환한다.
+
+  ## Presets
+  - :today, :yesterday, :this_week, :last_week
+  - :this_month, :last_month, :last_30_days, :last_90_days
+  """
+  @spec date_preset_range(preset :: atom()) :: {Date.t(), Date.t()}
+  def date_preset_range(preset) do
+    today = Date.utc_today()
+
+    case preset do
+      :today ->
+        {today, today}
+
+      :yesterday ->
+        yesterday = Date.add(today, -1)
+        {yesterday, yesterday}
+
+      :this_week ->
+        # 월요일 시작 (ISO 8601)
+        day_of_week = Date.day_of_week(today)
+        monday = Date.add(today, -(day_of_week - 1))
+        sunday = Date.add(monday, 6)
+        {monday, sunday}
+
+      :last_week ->
+        day_of_week = Date.day_of_week(today)
+        this_monday = Date.add(today, -(day_of_week - 1))
+        last_monday = Date.add(this_monday, -7)
+        last_sunday = Date.add(last_monday, 6)
+        {last_monday, last_sunday}
+
+      :this_month ->
+        first = %{today | day: 1}
+        last = Date.end_of_month(today)
+        {first, last}
+
+      :last_month ->
+        first_this_month = %{today | day: 1}
+        last_day_last_month = Date.add(first_this_month, -1)
+        first_last_month = %{last_day_last_month | day: 1}
+        {first_last_month, last_day_last_month}
+
+      :last_30_days ->
+        {Date.add(today, -30), today}
+
+      :last_90_days ->
+        {Date.add(today, -90), today}
+
+      _ ->
+        {today, today}
+    end
+  end
+
+  @doc """
+  날짜 프리셋을 필터 값 문자열("from~to" 형식)로 변환한다.
+  """
+  @spec date_preset_to_filter(preset :: atom()) :: String.t()
+  def date_preset_to_filter(preset) do
+    {from, to} = date_preset_range(preset)
+    "#{Date.to_iso8601(from)}~#{Date.to_iso8601(to)}"
+  end
+
+  # ── FA-012: Set Filter ──
+
+  @doc """
+  데이터에서 특정 컬럼의 고유값 목록을 추출한다.
+  """
+  @spec extract_unique_values(data :: list(map()), field :: atom()) :: list(any())
+  def extract_unique_values(data, field) when is_list(data) and is_atom(field) do
+    data
+    |> Enum.map(&Map.get(&1, field))
+    |> Enum.reject(&is_nil/1)
+    |> Enum.uniq()
+    |> Enum.sort()
+  end
+
+  @doc """
+  Set Filter 적용. 선택된 값 집합에 포함되는 행만 필터링한다.
+  """
+  @spec apply_set_filter(data :: list(map()), field :: atom(), selected_values :: list(any())) :: list(map())
+  def apply_set_filter(data, field, selected_values) when is_list(data) and is_atom(field) do
+    selected_set = MapSet.new(selected_values)
+    Enum.filter(data, fn row ->
+      value = Map.get(row, field)
+      MapSet.member?(selected_set, value)
+    end)
+  end
+
   # ── Advanced Filter (F-310) ──
 
   @doc """
@@ -251,6 +343,20 @@ defmodule LiveViewGrid.Filter do
       false
     else
       match_date_range?(cell_date, to_string(value))
+    end
+  end
+
+  # FA-012: Set Filter - value는 선택된 값 리스트 (JSON 인코딩된 문자열 또는 리스트)
+  defp match_filter?(row, field, value, :set) when is_list(value) do
+    cell_value = Map.get(row, field)
+    cell_str = if is_nil(cell_value), do: "", else: to_string(cell_value)
+    Enum.any?(value, fn v -> to_string(v) == cell_str end)
+  end
+
+  defp match_filter?(row, field, value, :set) when is_binary(value) do
+    case Jason.decode(value) do
+      {:ok, list} when is_list(list) -> match_filter?(row, field, list, :set)
+      _ -> true
     end
   end
 

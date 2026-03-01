@@ -14,6 +14,9 @@ export const ColumnReorder = {
       if (window.__gridResizing) return
       if (e.target.closest && e.target.closest(".lv-grid__resize-handle")) return
       if (e.target.classList.contains("lv-grid__resize-handle")) return
+      // FA-010: Column Menu 버튼 클릭 시 정렬/드래그 방지
+      if (e.target.closest && e.target.closest(".lv-grid__column-menu-btn")) return
+      if (e.target.classList.contains("lv-grid__column-menu-btn")) return
 
       this.startX = e.clientX
       this.startY = e.clientY

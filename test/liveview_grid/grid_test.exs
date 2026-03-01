@@ -2109,4 +2109,512 @@ defmodule LiveViewGrid.GridTest do
       assert updated.data == grid.data
     end
   end
+
+  # ========================================
+  # Phase v0.11 — 핵심 UX 보완 기능 테스트
+  # ========================================
+
+  describe "FA-001: Row Pinning" do
+    setup do
+      data = [
+        %{id: 1, name: "Alice"},
+        %{id: 2, name: "Bob"},
+        %{id: 3, name: "Charlie"}
+      ]
+
+      grid = Grid.new(data: data, columns: [%{field: :name, label: "Name"}])
+      %{grid: grid}
+    end
+
+    test "pin_rows/3 pins rows to top", %{grid: grid} do
+      updated = Grid.pin_rows(grid, [1], :top)
+      assert updated.state.pinned_top_ids == [1]
+      assert updated.state.pinned_bottom_ids == []
+    end
+
+    test "pin_rows/3 pins rows to bottom", %{grid: grid} do
+      updated = Grid.pin_rows(grid, [2], :bottom)
+      assert updated.state.pinned_bottom_ids == [2]
+      assert updated.state.pinned_top_ids == []
+    end
+
+    test "pin_rows/3 moves row from bottom to top", %{grid: grid} do
+      updated = grid
+        |> Grid.pin_rows([1], :bottom)
+        |> Grid.pin_rows([1], :top)
+      assert 1 in updated.state.pinned_top_ids
+      refute 1 in updated.state.pinned_bottom_ids
+    end
+
+    test "pin_rows/3 deduplicates ids", %{grid: grid} do
+      updated = grid
+        |> Grid.pin_rows([1], :top)
+        |> Grid.pin_rows([1], :top)
+      assert updated.state.pinned_top_ids == [1]
+    end
+
+    test "unpin_rows/2 removes pinned rows", %{grid: grid} do
+      updated = grid
+        |> Grid.pin_rows([1, 2], :top)
+        |> Grid.unpin_rows([1])
+      assert updated.state.pinned_top_ids == [2]
+    end
+
+    test "unpin_rows/2 removes from both top and bottom", %{grid: grid} do
+      updated = grid
+        |> Grid.pin_rows([1], :top)
+        |> Grid.pin_rows([2], :bottom)
+        |> Grid.unpin_rows([1, 2])
+      assert updated.state.pinned_top_ids == []
+      assert updated.state.pinned_bottom_ids == []
+    end
+
+    test "pinned_top_rows/1 returns matching rows", %{grid: grid} do
+      updated = Grid.pin_rows(grid, [1, 3], :top)
+      rows = Grid.pinned_top_rows(updated)
+      assert length(rows) == 2
+      assert Enum.any?(rows, &(&1.id == 1))
+      assert Enum.any?(rows, &(&1.id == 3))
+    end
+
+    test "pinned_bottom_rows/1 returns matching rows", %{grid: grid} do
+      updated = Grid.pin_rows(grid, [2], :bottom)
+      rows = Grid.pinned_bottom_rows(updated)
+      assert length(rows) == 1
+      assert hd(rows).id == 2
+    end
+
+    test "pinned_top_rows/1 returns [] when empty", %{grid: grid} do
+      assert Grid.pinned_top_rows(grid) == []
+    end
+
+    test "pinned_bottom_rows/1 returns [] when empty", %{grid: grid} do
+      assert Grid.pinned_bottom_rows(grid) == []
+    end
+
+    test "pinned?/2 returns :top for top-pinned row", %{grid: grid} do
+      updated = Grid.pin_rows(grid, [1], :top)
+      assert Grid.pinned?(updated, 1) == :top
+    end
+
+    test "pinned?/2 returns :bottom for bottom-pinned row", %{grid: grid} do
+      updated = Grid.pin_rows(grid, [2], :bottom)
+      assert Grid.pinned?(updated, 2) == :bottom
+    end
+
+    test "pinned?/2 returns false for unpinned row", %{grid: grid} do
+      assert Grid.pinned?(grid, 1) == false
+    end
+  end
+
+  describe "FA-005: Overlay System" do
+    setup do
+      grid = Grid.new(data: [%{id: 1, name: "A"}], columns: [%{field: :name, label: "Name"}])
+      %{grid: grid}
+    end
+
+    test "set_overlay/3 sets loading overlay", %{grid: grid} do
+      updated = Grid.set_overlay(grid, :loading)
+      assert updated.state.overlay.type == :loading
+      assert updated.state.overlay.message == nil
+    end
+
+    test "set_overlay/3 sets loading overlay with message", %{grid: grid} do
+      updated = Grid.set_overlay(grid, :loading, "불러오는 중...")
+      assert updated.state.overlay.type == :loading
+      assert updated.state.overlay.message == "불러오는 중..."
+    end
+
+    test "set_overlay/3 sets no_data overlay", %{grid: grid} do
+      updated = Grid.set_overlay(grid, :no_data, "데이터 없음")
+      assert updated.state.overlay.type == :no_data
+      assert updated.state.overlay.message == "데이터 없음"
+    end
+
+    test "set_overlay/3 sets error overlay", %{grid: grid} do
+      updated = Grid.set_overlay(grid, :error, "서버 오류")
+      assert updated.state.overlay.type == :error
+      assert updated.state.overlay.message == "서버 오류"
+    end
+
+    test "set_overlay/3 with nil clears overlay", %{grid: grid} do
+      updated = grid
+        |> Grid.set_overlay(:loading)
+        |> Grid.set_overlay(nil)
+      assert updated.state.overlay == nil
+    end
+
+    test "clear_overlay/1 clears overlay", %{grid: grid} do
+      updated = grid
+        |> Grid.set_overlay(:error, "오류")
+        |> Grid.clear_overlay()
+      assert updated.state.overlay == nil
+    end
+
+    test "initial state has nil overlay", %{grid: grid} do
+      assert grid.state.overlay == nil
+    end
+  end
+
+  describe "FA-004: Status Bar option" do
+    test "default show_status_bar is false" do
+      grid = Grid.new(data: [%{id: 1, name: "A"}], columns: [%{field: :name, label: "Name"}])
+      assert grid.options.show_status_bar == false
+    end
+
+    test "show_status_bar can be enabled" do
+      grid = Grid.new(
+        data: [%{id: 1, name: "A"}],
+        columns: [%{field: :name, label: "Name"}],
+        options: %{show_status_bar: true}
+      )
+      assert grid.options.show_status_bar == true
+    end
+  end
+
+  describe "FA-020: Cell Text Selection column option" do
+    test "default text_selectable is false" do
+      grid = Grid.new(data: [%{id: 1, name: "A"}], columns: [%{field: :name, label: "Name"}])
+      col = hd(grid.columns)
+      assert col.text_selectable == false
+    end
+
+    test "text_selectable can be enabled" do
+      grid = Grid.new(
+        data: [%{id: 1, name: "A"}],
+        columns: [%{field: :name, label: "Name", text_selectable: true}]
+      )
+      col = hd(grid.columns)
+      assert col.text_selectable == true
+    end
+  end
+
+  describe "FA-022: Resize Lock column option" do
+    test "default resizable is true" do
+      grid = Grid.new(data: [%{id: 1, name: "A"}], columns: [%{field: :name, label: "Name"}])
+      col = hd(grid.columns)
+      assert col.resizable == true
+    end
+
+    test "resizable can be disabled" do
+      grid = Grid.new(
+        data: [%{id: 1, name: "A"}],
+        columns: [%{field: :name, label: "Name", resizable: false}]
+      )
+      col = hd(grid.columns)
+      assert col.resizable == false
+    end
+  end
+
+  # ── Phase 2 (v0.12) Tests ──
+
+  describe "FA-011: Floating Filter option" do
+    test "default floating_filter is false" do
+      grid = Grid.new(data: [%{id: 1, name: "A"}], columns: [%{field: :name, label: "Name"}])
+      assert grid.options.floating_filter == false
+    end
+
+    test "floating_filter can be enabled globally" do
+      grid = Grid.new(
+        data: [%{id: 1, name: "A"}],
+        columns: [%{field: :name, label: "Name"}],
+        options: %{floating_filter: true}
+      )
+      assert grid.options.floating_filter == true
+    end
+
+    test "per-column floating_filter defaults to true" do
+      grid = Grid.new(
+        data: [%{id: 1, name: "A"}],
+        columns: [%{field: :name, label: "Name"}]
+      )
+      col = hd(grid.columns)
+      assert col.floating_filter == true
+    end
+
+    test "per-column floating_filter can be disabled" do
+      grid = Grid.new(
+        data: [%{id: 1, name: "A"}],
+        columns: [%{field: :name, label: "Name", floating_filter: false}]
+      )
+      col = hd(grid.columns)
+      assert col.floating_filter == false
+    end
+
+    test "floating_filter with filterable columns shows filter row" do
+      alias LiveviewGridWeb.GridComponent.RenderHelpers
+      grid = Grid.new(
+        data: [%{id: 1, name: "A"}],
+        columns: [%{field: :name, label: "Name", filterable: true}],
+        options: %{floating_filter: true}
+      )
+      assert RenderHelpers.show_filter_row?(grid) == true
+    end
+
+    test "floating_filter without filterable columns hides filter row" do
+      alias LiveviewGridWeb.GridComponent.RenderHelpers
+      grid = Grid.new(
+        data: [%{id: 1, name: "A"}],
+        columns: [%{field: :name, label: "Name", filterable: false}],
+        options: %{floating_filter: true}
+      )
+      assert RenderHelpers.show_filter_row?(grid) == false
+    end
+  end
+
+  describe "FA-010: Column Menu - hide/show columns" do
+    setup do
+      data = [%{id: 1, name: "Alice", age: 30, city: "서울"}]
+      columns = [
+        %{field: :name, label: "Name"},
+        %{field: :age, label: "Age"},
+        %{field: :city, label: "City"}
+      ]
+      grid = Grid.new(data: data, columns: columns)
+      %{grid: grid}
+    end
+
+    test "initial hidden_columns is empty", %{grid: grid} do
+      assert grid.state.hidden_columns == []
+    end
+
+    test "hide_column adds field to hidden_columns", %{grid: grid} do
+      grid = Grid.hide_column(grid, :age)
+      assert :age in grid.state.hidden_columns
+    end
+
+    test "hide_column does not duplicate", %{grid: grid} do
+      grid = grid |> Grid.hide_column(:age) |> Grid.hide_column(:age)
+      assert Enum.count(grid.state.hidden_columns, &(&1 == :age)) == 1
+    end
+
+    test "show_column removes field from hidden_columns", %{grid: grid} do
+      grid = grid |> Grid.hide_column(:age) |> Grid.show_column(:age)
+      assert :age not in grid.state.hidden_columns
+    end
+
+    test "display_columns excludes hidden columns", %{grid: grid} do
+      grid = Grid.hide_column(grid, :age)
+      display = Grid.display_columns(grid)
+      fields = Enum.map(display, & &1.field)
+      assert :name in fields
+      assert :age not in fields
+      assert :city in fields
+    end
+
+    test "hidden_columns/1 returns hidden field list", %{grid: grid} do
+      grid = grid |> Grid.hide_column(:name) |> Grid.hide_column(:city)
+      hidden = Grid.hidden_columns(grid)
+      assert :name in hidden
+      assert :city in hidden
+      assert :age not in hidden
+    end
+  end
+
+  describe "FA-019: Date Editor column config" do
+    test "editor_type :date is preserved in column" do
+      grid = Grid.new(
+        data: [%{id: 1, joined: ~D[2025-01-15]}],
+        columns: [%{field: :joined, label: "Joined", editor_type: :date, editable: true}]
+      )
+      col = hd(grid.columns)
+      assert col.editor_type == :date
+      assert col.editable == true
+    end
+
+    test "editor_input_type returns date for date editor" do
+      alias LiveviewGridWeb.GridComponent.RenderHelpers
+      assert RenderHelpers.editor_input_type(%{editor_type: :date}) == "date"
+    end
+
+    test "format_date_for_input with Date struct" do
+      alias LiveviewGridWeb.GridComponent.RenderHelpers
+      assert RenderHelpers.format_date_for_input(~D[2025-03-15]) == "2025-03-15"
+    end
+
+    test "parse_date_value with ISO string" do
+      alias LiveviewGridWeb.GridComponent.RenderHelpers
+      assert RenderHelpers.parse_date_value("2025-03-15") == ~D[2025-03-15]
+    end
+
+    test "parse_date_value with empty string returns nil" do
+      alias LiveviewGridWeb.GridComponent.RenderHelpers
+      assert RenderHelpers.parse_date_value("") == nil
+    end
+  end
+
+  # ========================================
+  # FA-016: Column State Save/Restore
+  # ========================================
+  describe "FA-016: export_column_state/1 and import_column_state/2" do
+    setup do
+      columns = [
+        %{field: :id, label: "ID"},
+        %{field: :name, label: "Name"},
+        %{field: :email, label: "Email"},
+        %{field: :age, label: "Age"}
+      ]
+      grid = Grid.new(data: [], columns: columns)
+      %{grid: grid}
+    end
+
+    test "export_column_state returns empty defaults", %{grid: grid} do
+      state = Grid.export_column_state(grid)
+      assert state.column_widths == %{}
+      assert state.column_order == nil
+      assert state.hidden_columns == []
+    end
+
+    test "export_column_state captures widths and order", %{grid: grid} do
+      grid = grid
+        |> Grid.resize_column(:name, 200)
+        |> Grid.resize_column(:email, 300)
+        |> Grid.reorder_columns([:email, :name, :id, :age])
+
+      state = Grid.export_column_state(grid)
+      assert state.column_widths == %{name: 200, email: 300}
+      assert state.column_order == [:email, :name, :id, :age]
+    end
+
+    test "import_column_state round-trip preserves state", %{grid: grid} do
+      grid = grid
+        |> Grid.resize_column(:name, 150)
+        |> Grid.reorder_columns([:age, :email, :name, :id])
+
+      exported = Grid.export_column_state(grid)
+      fresh_grid = Grid.new(data: [], columns: [
+        %{field: :id, label: "ID"},
+        %{field: :name, label: "Name"},
+        %{field: :email, label: "Email"},
+        %{field: :age, label: "Age"}
+      ])
+
+      restored = Grid.import_column_state(fresh_grid, exported)
+      assert restored.state.column_widths == %{name: 150}
+      assert restored.state.column_order == [:age, :email, :name, :id]
+    end
+
+    test "import_column_state filters out invalid fields", %{grid: grid} do
+      invalid_state = %{
+        column_widths: %{name: 200, nonexistent: 100},
+        column_order: [:email, :nonexistent, :name, :id, :age],
+        hidden_columns: [:age, :invalid_field]
+      }
+
+      restored = Grid.import_column_state(grid, invalid_state)
+      assert restored.state.column_widths == %{name: 200}
+      assert :nonexistent not in restored.state.column_order
+      assert restored.state.hidden_columns == [:age]
+    end
+
+    test "import_column_state handles nil column_order" do
+      grid = Grid.new(data: [], columns: [%{field: :name, label: "Name"}])
+      restored = Grid.import_column_state(grid, %{column_order: nil, column_widths: %{}, hidden_columns: []})
+      assert restored.state.column_order == nil
+    end
+  end
+
+  # ========================================
+  # FA-044: Find & Highlight
+  # ========================================
+  describe "FA-044: find_matches/2" do
+    setup do
+      data = [
+        %{id: 1, name: "Alice", email: "alice@test.com", city: "Seoul"},
+        %{id: 2, name: "Bob", email: "bob@test.com", city: "Busan"},
+        %{id: 3, name: "Charlie", email: "charlie@test.com", city: "Seoul"},
+        %{id: 4, name: "alice_lower", email: "al@test.com", city: "Daegu"}
+      ]
+      columns = [
+        %{field: :name, label: "Name", sortable: true},
+        %{field: :email, label: "Email"},
+        %{field: :city, label: "City"}
+      ]
+      grid = Grid.new(data: data, columns: columns, options: %{page_size: 100})
+      %{grid: grid}
+    end
+
+    test "empty search returns empty list", %{grid: grid} do
+      assert Grid.find_matches(grid, "") == []
+      assert Grid.find_matches(grid, nil) == []
+    end
+
+    test "finds case-insensitive matches", %{grid: grid} do
+      matches = Grid.find_matches(grid, "alice")
+      assert length(matches) >= 2
+      assert {1, :name} in matches
+      assert {4, :name} in matches
+    end
+
+    test "finds matches across multiple columns", %{grid: grid} do
+      matches = Grid.find_matches(grid, "Seoul")
+      assert {1, :city} in matches
+      assert {3, :city} in matches
+    end
+
+    test "no matches for non-existent text", %{grid: grid} do
+      assert Grid.find_matches(grid, "zzzznonexistent") == []
+    end
+
+    test "partial text match works", %{grid: grid} do
+      matches = Grid.find_matches(grid, "bob")
+      assert {2, :name} in matches
+      assert {2, :email} in matches
+    end
+
+    test "find state defaults in initial_state" do
+      grid = Grid.new(data: [], columns: [%{field: :name, label: "Name"}])
+      assert grid.state[:find_text] == ""
+      assert grid.state[:find_matches] == []
+      assert grid.state[:find_current_index] == 0
+      assert grid.state[:show_find_bar] == false
+    end
+  end
+
+  # ========================================
+  # FA-037: Column Hover Highlight
+  # ========================================
+  describe "FA-037: column_hover_highlight option" do
+    test "column_hover_highlight defaults to false" do
+      grid = Grid.new(data: [], columns: [%{field: :name, label: "Name"}])
+      assert grid.options[:column_hover_highlight] == false
+    end
+
+    test "column_hover_highlight can be enabled" do
+      grid = Grid.new(
+        data: [],
+        columns: [%{field: :name, label: "Name"}],
+        options: %{column_hover_highlight: true}
+      )
+      assert grid.options[:column_hover_highlight] == true
+    end
+  end
+
+  # ========================================
+  # FA-035: Rich Select Editor
+  # ========================================
+  describe "FA-035: rich_select editor_type" do
+    test "column with editor_type :rich_select is normalized" do
+      columns = [
+        %{field: :status, label: "Status", editable: true,
+          editor_type: :rich_select,
+          editor_options: [{"Active", "active"}, {"Inactive", "inactive"}]}
+      ]
+      grid = Grid.new(data: [%{id: 1, status: "active"}], columns: columns)
+      [col] = grid.columns
+      assert col.editor_type == :rich_select
+      assert col.editor_options == [{"Active", "active"}, {"Inactive", "inactive"}]
+    end
+
+    test "default editor_type is :text" do
+      grid = Grid.new(data: [], columns: [%{field: :name, label: "Name"}])
+      [col] = grid.columns
+      assert col.editor_type == :text
+    end
+
+    test "state_persistence defaults to false" do
+      grid = Grid.new(data: [], columns: [%{field: :name, label: "Name"}])
+      assert grid.options[:state_persistence] == false
+    end
+  end
 end

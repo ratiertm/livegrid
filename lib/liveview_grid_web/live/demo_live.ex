@@ -754,13 +754,13 @@ defmodule LiveviewGridWeb.DemoLive do
           id="users-grid"
           data={if @virtual_scroll, do: @filtered_users, else: @visible_users}
           columns={[
-            %{field: :id, label: "ID", width: 80, sortable: true},
+            %{field: :id, label: "ID", width: 80, sortable: true, resizable: false},
             %{field: :name, label: "이름", width: 150, sortable: true, filterable: true, filter_type: :text, editable: true,
               header_group: "인적 정보",
               # input_pattern 제거: 국제 문자(한글, 중국어, 일본어, 이모지 등) 모두 허용
               validators: [{:required, "이름은 필수입니다"}]},
             %{field: :email, label: "이메일", width: 250, sortable: true, filterable: true, filter_type: :text, editable: true,
-              header_group: "인적 정보", wordwrap: :word,
+              header_group: "인적 정보", wordwrap: :word, text_selectable: true,
               validators: [{:required, "이메일은 필수입니다"}, {:pattern, ~r/@/, "이메일 형식이 올바르지 않습니다"}],
               renderer: LiveViewGrid.Renderers.link(prefix: "mailto:")},
             %{field: :age, label: "나이", width: 100, sortable: true, filterable: true, filter_type: :number, editable: true, editor_type: :number,
@@ -777,16 +777,16 @@ defmodule LiveviewGridWeb.DemoLive do
                 end
               end},
             %{field: :active, label: "활성", width: 70, editable: true, editor_type: :checkbox, header_group: "부가 정보", summary: :count},
-            %{field: :city, label: "도시", width: 120, sortable: true, filterable: true, filter_type: :text, editable: true, editor_type: :select,
+            %{field: :city, label: "도시", width: 120, sortable: true, filterable: true, filter_type: :set, editable: true, editor_type: :rich_select,
               header_group: "부가 정보", suppress: true,
               renderer: LiveViewGrid.Renderers.badge(
                 colors: %{"서울" => "blue", "부산" => "green", "대구" => "red",
                           "인천" => "purple", "광주" => "yellow", "대전" => "gray",
                           "울산" => "blue", "수원" => "green", "창원" => "red", "고양" => "purple"}),
               editor_options: [
-                {"서울", "서울"}, {"부산", "부산"}, {"대구", "대구"},
-                {"인천", "인천"}, {"광주", "광주"}, {"대전", "대전"},
-                {"울산", "울산"}, {"수원", "수원"}, {"창원", "창원"}, {"고양", "고양"}
+                %{value: "서울", label: "서울"}, %{value: "부산", label: "부산"}, %{value: "대구", label: "대구"},
+                %{value: "인천", label: "인천"}, %{value: "광주", label: "광주"}, %{value: "대전", label: "대전"},
+                %{value: "울산", label: "울산"}, %{value: "수원", label: "수원"}, %{value: "창원", label: "창원"}, %{value: "고양", label: "고양"}
               ]},
             %{field: :created_at, label: "가입일", width: 160, sortable: true, filterable: true, filter_type: :date, editable: true, editor_type: :date, formatter: :date, header_group: "부가 정보"}
           ]}
@@ -801,7 +801,11 @@ defmodule LiveviewGridWeb.DemoLive do
             debug: Mix.env() == :dev,
             theme: @theme,
             custom_css_vars: @custom_css_vars,
+            show_status_bar: true,
+            floating_filter: true,
             row_reorder: true,
+            column_hover_highlight: true,
+            state_persistence: true,
             merge_regions: [
               %{row_id: 1, col_field: :name, colspan: 2},
               %{row_id: 3, col_field: :age, rowspan: 2}

@@ -358,4 +358,146 @@ defmodule LiveViewGrid.FilterTest do
       assert hd(result).name == "Bob"
     end
   end
+
+  # ── FA-003: Date Filter Enhancement (Date Preset) ──
+
+  describe "FA-003: date_preset_range/1" do
+    test ":today returns today's date range" do
+      {from, to} = Filter.date_preset_range(:today)
+      today = Date.utc_today()
+      assert from == today
+      assert to == today
+    end
+
+    test ":yesterday returns yesterday" do
+      {from, to} = Filter.date_preset_range(:yesterday)
+      yesterday = Date.add(Date.utc_today(), -1)
+      assert from == yesterday
+      assert to == yesterday
+    end
+
+    test ":this_week returns current week range" do
+      {from, to} = Filter.date_preset_range(:this_week)
+      today = Date.utc_today()
+      assert Date.compare(from, today) in [:lt, :eq]
+      assert Date.compare(to, today) in [:gt, :eq]
+    end
+
+    test ":last_week returns previous week range" do
+      {from, to} = Filter.date_preset_range(:last_week)
+      today = Date.utc_today()
+      assert Date.compare(to, today) == :lt
+      assert Date.diff(to, from) == 6
+    end
+
+    test ":this_month returns current month range" do
+      {from, to} = Filter.date_preset_range(:this_month)
+      today = Date.utc_today()
+      assert from.day == 1
+      assert from.month == today.month
+      assert to.month == today.month
+    end
+
+    test ":last_month returns previous month range" do
+      {from, to} = Filter.date_preset_range(:last_month)
+      today = Date.utc_today()
+      assert from.day == 1
+      assert Date.compare(to, today) == :lt
+    end
+
+    test ":last_30_days returns 30-day range" do
+      {from, to} = Filter.date_preset_range(:last_30_days)
+      today = Date.utc_today()
+      assert to == today
+      assert Date.diff(to, from) == 30
+    end
+
+    test ":last_90_days returns 90-day range" do
+      {from, to} = Filter.date_preset_range(:last_90_days)
+      today = Date.utc_today()
+      assert to == today
+      assert Date.diff(to, from) == 90
+    end
+  end
+
+  describe "FA-003: date_preset_to_filter/1" do
+    test "returns ISO8601 date range string" do
+      result = Filter.date_preset_to_filter(:today)
+      today = Date.utc_today() |> Date.to_iso8601()
+      assert result == "#{today}~#{today}"
+    end
+
+    test "range string format is from~to" do
+      result = Filter.date_preset_to_filter(:last_30_days)
+      assert String.contains?(result, "~")
+      [from_str, to_str] = String.split(result, "~")
+      {:ok, _} = Date.from_iso8601(from_str)
+      {:ok, _} = Date.from_iso8601(to_str)
+    end
+  end
+
+  # ── FA-012: Set Filter ──
+
+  describe "FA-012: extract_unique_values/2" do
+    test "extracts unique values from data" do
+      values = Filter.extract_unique_values(@data, :city)
+      assert Enum.sort(values) == Enum.sort(["서울", "부산", "대전", "인천"])
+    end
+
+    test "returns unique values without duplicates" do
+      values = Filter.extract_unique_values(@data, :city)
+      assert length(values) == length(Enum.uniq(values))
+    end
+
+    test "handles empty data" do
+      values = Filter.extract_unique_values([], :city)
+      assert values == []
+    end
+  end
+
+  describe "FA-012: set filter matching" do
+    @set_columns [
+      %{field: :name, filter_type: :text},
+      %{field: :city, filter_type: :set}
+    ]
+
+    test "set filter with list matches selected values" do
+      # JSON-encoded list of selected values
+      filter_val = Jason.encode!(["서울", "부산"])
+      result = Filter.apply(@data, %{city: filter_val}, @set_columns)
+      assert length(result) == 3
+      assert Enum.all?(result, fn r -> r.city in ["서울", "부산"] end)
+    end
+
+    test "set filter with single value" do
+      filter_val = Jason.encode!(["대전"])
+      result = Filter.apply(@data, %{city: filter_val}, @set_columns)
+      assert length(result) == 1
+      assert hd(result).city == "대전"
+    end
+
+    test "set filter with all values returns all data" do
+      all_cities = Filter.extract_unique_values(@data, :city)
+      filter_val = Jason.encode!(all_cities)
+      result = Filter.apply(@data, %{city: filter_val}, @set_columns)
+      assert length(result) == length(@data)
+    end
+
+    test "set filter with empty list returns no data" do
+      filter_val = Jason.encode!([])
+      result = Filter.apply(@data, %{city: filter_val}, @set_columns)
+      assert result == []
+    end
+
+    test "set filter combined with text filter" do
+      set_columns = [
+        %{field: :name, filter_type: :text},
+        %{field: :city, filter_type: :set}
+      ]
+      filter_val = Jason.encode!(["서울"])
+      result = Filter.apply(@data, %{city: filter_val, name: "alice"}, set_columns)
+      assert length(result) == 1
+      assert hd(result).name == "Alice Kim"
+    end
+  end
 end

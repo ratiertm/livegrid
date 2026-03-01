@@ -4,7 +4,159 @@
 >
 > **Project**: LiveView Grid - Phoenix LiveView 기반 상용 그리드 컴포넌트
 > **Created**: 2026-02-21
-> **Last Updated**: 2026-02-28
+> **Last Updated**: 2026-03-01
+
+---
+
+## [0.14.0] - 2026-03-01
+
+### Phase 5 - State Management & UX Polish (AG Grid Feature Gap #15/41)
+
+**Status**: Complete (PASS - 95% design match rate, 5/5 features)
+
+**Added**:
+- **FA-037 Column Hover Highlight** (★☆☆): 마우스 위치 컬럼 전체 셀 하이라이트
+  - `column_hover_highlight: true` 옵션, Pure CSS/JS (서버 비관여)
+  - Event delegation via `mouseenter` + `data-col-index` class toggle
+  - `.lv-grid__cell--col-hover` 스타일 적용
+
+- **FA-016 Column State Save/Restore** (★★☆): 컬럼 상태 추출/복원 API
+  - `Grid.export_column_state/1`, `Grid.import_column_state/2`
+  - Returns: `%{column_widths, column_order, hidden_columns}`
+  - MapSet validation for column safety
+  - Note: Event handlers intentionally omitted (superseded by FA-002)
+
+- **FA-002 Grid State Save/Restore** (★★★ P0): 전체 Grid 상태 JSON 직렬화
+  - `StatePersistence` 모듈: 14개 persistable keys
+  - `Grid.save_state/1`, `Grid.restore_state/2` public API
+  - `state-persistence.js` Hook: localStorage 자동 저장/복원 (Grid ID 기반 키)
+  - `state_persistence: true` 옵션으로 활성화
+  - Persistable Keys: sort, filters, global_search, show_filter_row, advanced_filters, column_widths, column_order, hidden_columns, group_by, group_aggregates, pinned_top_ids, pinned_bottom_ids, show_status_column, pagination
+
+- **FA-044 Find & Highlight (Ctrl+F)** (★★★): 그리드 내 검색 + 하이라이트
+  - `Grid.find_matches/2`: 대소문자 무시 전체 데이터 검색
+  - Find Bar UI: 입력 필드 + N/M 카운터 + ↑↓ 네비게이션 + X 닫기
+  - `<mark>` 태그 하이라이트: 일반 매칭(#fff3b0), 현재 매칭(#ff9632)
+  - Ctrl+F 토글, wrap-around navigation
+  - Note: Find Bar keyboard shortcuts via UI buttons (↑↓✕) - primary UX
+
+- **FA-035 Rich Select Editor** (★★☆): 검색 가능한 커스텀 드롭다운 에디터
+  - `editor_type: :rich_select`, `editor_options: [%{value, label}]` 컬럼 속성
+  - `RichSelect` JS Hook: 검색 입력 + 스크롤 옵션 목록
+  - ArrowUp/Down 키보드 탐색, Enter 선택, Escape 취소, Tab 선택/취소
+  - 실시간 옵션 필터링, HTML escape XSS 방지
+  - Direct JS→`cell_edit_save` integration (no intermediate handler)
+
+**Metrics**:
+- **Duration**: 1 PDCA cycle (~12 hours)
+- **Features**: 5/5 (100%)
+- **Match Rate**: 95% (exceeds 90% threshold)
+- **Tests**: 564/564 passing (534 existing + 30 new, 0 failures)
+- **Compile Warnings**: 0
+- **Backwards Compatibility**: 100%
+- **Files Created**: 5 (state_persistence.ex, state-persistence.js, rich-select.js, find-bar.css, rich-select.css)
+- **Files Modified**: 7 (grid.ex, grid_component.ex, event_handlers.ex, render_helpers.ex, keyboard-nav.js, app.js, body.css)
+- **Browser Verified**: 15/15 scenarios passing
+- **Production Ready**: Yes
+
+**Gap Analysis Summary**:
+- FA-037 (93%): 1 cosmetic CSS class gap, functionally complete
+- FA-016 (80%): Event handlers intentionally omitted (superseded by FA-002)
+- FA-002 (100%): Perfect implementation
+- FA-044 (92%): Find Bar shortcuts via UI buttons (minor UX gap)
+- FA-035 (93%): Better architecture than design (direct JS integration)
+- Weighted Score: **95%** (functional match higher due to intentional improvements)
+
+**PDCA Details**:
+- Plan: [optimized-shimmying-trinket.md](~/.claude/plans/optimized-shimmying-trinket.md)
+- Analysis: [phase5-v014-state-ux.analysis.md](../03-analysis/phase5-v014-state-ux.analysis.md)
+- Report: [phase5-v014-state-ux.report.md](features/phase5-v014-state-ux.report.md)
+
+**Key Technical Decisions**:
+1. State Persistence: 14 specific keys vs full state (prevents transient data persistence)
+2. Find vs Global Search: Independent features (Find is overlay, search filters)
+3. Rich Select Events: Direct JS→cell_edit_save (cleaner than intermediate handler)
+4. Column Hover: Event delegation via mouseenter (O(1) vs O(n) listeners)
+5. Atom↔String Conversion: Explicit to prevent silent data loss
+
+**Deployment Notes**:
+- No database migrations required
+- localStorage capacity: ~5-10MB per origin (typical grid: ~5KB)
+- Features are opt-in (sensible defaults)
+- All existing functionality preserved (100% backwards compatible)
+
+---
+
+## [0.13.0] - 2026-03-01
+
+### Phase 4 - 필터링 강화 (AG Grid Feature Gap Analysis)
+
+**Status**: Complete (100% - 5/5 features)
+
+**Added**:
+- **FA-011 Floating Filters**: 헤더 아래 항상 표시되는 인라인 필터 행
+  - `floating_filter: true` 글로벌 옵션, 컬럼별 `floating_filter: false` 제어
+  - 컬럼 타입별 자동 UI: text/number/date/set
+- **FA-003 Date Filter Enhancement**: Date 필터 프리셋 범위 드롭다운
+  - 8가지 프리셋: 오늘/어제/이번 주/지난 주/이번 달/지난 달/최근 30일/최근 90일
+  - `Filter.date_preset_range/1`, `Filter.date_preset_to_filter/1`
+- **FA-010 Column Menu**: 헤더 셀 hover 시 hamburger 메뉴
+  - 정렬 (오름/내림/초기화), 컬럼 숨기기/표시, 자동 너비 맞춤
+  - `Grid.hide_column/2`, `Grid.show_column/2`, `Grid.hidden_columns/1`
+- **FA-012 Set Filter**: Excel 스타일 체크박스 필터
+  - 고유값 자동 추출, 전체 선택/해제, 개별 토글
+  - `Filter.extract_unique_values/2`, `Filter.apply_set_filter/3`
+- **FA-019 Date Editor (Calendar Picker)**: Date 셀 편집 시 커스텀 캘린더 UI
+  - 월 네비게이션, 날짜 선택, 오늘/초기화 버튼, ESC/외부 클릭 닫기
+  - `DatePickerHook` JS Hook (순수 JS, 외부 라이브러리 없음)
+
+**Metrics**:
+- Duration: 1 PDCA cycle
+- Features: 5/5 (100%)
+- Tests: 534/534 passing (+35 new)
+- Compile Warnings: 0
+- Files Created: 4 (JS: date-picker.js, CSS: date-picker.css, set-filter.css, column-menu.css)
+- Files Modified: 8
+
+**PDCA Details**:
+- Report: [phase4-v012-filter.report.md](features/phase4-v012-filter.report.md)
+
+---
+
+## [0.11.0] - 2026-03-01
+
+### Phase 3 - 핵심 UX 보완 (AG Grid Feature Gap Analysis)
+
+**Status**: Complete (100% - 5/5 features)
+
+**Added**:
+- **FA-001 Row Pinning**: 상단/하단 행 고정 (context menu + 📌 아이콘 + ✕ 해제 버튼)
+  - `Grid.pin_rows/3`, `Grid.unpin_rows/2`, `Grid.pinned?/2`
+  - Pinned rows 영역 렌더링 (파란 보더 구분선, 스크롤 시 고정)
+- **FA-005 Overlay System**: Loading/No Data/Error 오버레이
+  - `Grid.set_overlay/3`, `Grid.clear_overlay/1`
+  - Loading spinner, 📭 No Data, ⚠ Error 표시 (반투명 배경 + backdrop blur)
+- **FA-004 Status Bar**: 하단 정보바 (`show_status_bar: true`)
+  - 총 행수, 선택/필터/변경/고정 수 실시간 표시
+- **FA-020 Cell Text Selection**: 셀 텍스트 드래그 선택 (`text_selectable: true`)
+  - 이메일, URL 등 복사가 필요한 컬럼용
+- **FA-022 Resize Lock**: 컬럼별 리사이즈 비활성화 (`resizable: false`)
+  - Resize handle 숨김 + 서버사이드 가드
+
+**Fixed**:
+- `apply_config_changes` 함수에서 definition columns 정규화 누락 수정 (새 컬럼 속성 유실 방지)
+
+**PDCA Details**:
+- Plan: [phase3-v011-plan.md](../.claude/tasks/current/phase3-v011-plan.md)
+- Report: [phase3-v011-ux.report.md](features/phase3-v011-ux.report.md)
+
+**Metrics**:
+- Duration: 1 PDCA cycle
+- Features: 5/5 (100%)
+- Tests: 499/499 passing (+26 new)
+- Compile Warnings: 0
+- Console Errors: 0
+- Files Modified: 8
 
 ---
 

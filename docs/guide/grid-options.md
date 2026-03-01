@@ -33,6 +33,14 @@ Grid 생성 시 `options` 맵으로 전체 동작을 제어합니다.
 | `show_footer` | `boolean` | `true` | Footer(페이지네이션) 표시 |
 | `show_row_number` | `boolean` | `false` | 행번호 컬럼 표시 |
 | `show_summary` | `boolean` | `false` | Summary Row 표시 |
+| `show_status_bar` | `boolean` | `false` | 하단 Status Bar 표시 (총 행수, 선택/필터/변경/고정 수) |
+| `column_hover_highlight` | `boolean` | `false` | 마우스 위치 컬럼 전체 하이라이트 |
+
+### State Persistence
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `state_persistence` | `boolean` | `false` | Grid 상태 localStorage 자동 저장/복원 |
 
 ### Layout
 
@@ -79,6 +87,8 @@ v0.7에서 추가된 Grid 설정 모달:
 
 ## Related
 
-- [Getting Started](./getting-started.md) — 기본 설정
-- [Pagination](./pagination.md) — page_size, virtual_scroll 상세
-- [Themes](./themes.md) — 테마 커스터마이징
+- [Getting Started](./getting-started.md) -- 기본 설정
+- [Pagination](./pagination.md) -- page_size, virtual_scroll 상세
+- [Themes](./themes.md) -- 테마 커스터마이징
+- [State Persistence](./state-persistence.md) -- 상태 저장/복원 상세
+- [Find & Highlight](./find-and-highlight.md) -- 검색 하이라이트

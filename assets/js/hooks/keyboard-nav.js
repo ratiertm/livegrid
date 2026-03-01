@@ -89,6 +89,12 @@ export const GridKeyboardNav = {
           this.pushEvent("grid_redo", {})
           return
         }
+        // FA-044: Ctrl+F → Find & Highlight 바 토글
+        if ((e.ctrlKey || e.metaKey) && e.key === "f") {
+          e.preventDefault()
+          this.pushEventTo(this.el, "toggle_find_bar", {})
+          return
+        }
         // F-940: Ctrl+C → JS에서 직접 DOM 읽기 + 클립보드 쓰기
         if ((e.ctrlKey || e.metaKey) && e.key === "c") {
           e.preventDefault()
@@ -114,6 +120,25 @@ export const GridKeyboardNav = {
         cellValue.removeAttribute("title")
       }
     }, true)
+
+    // FA-037: Column Hover Highlight
+    this._hoveredColIdx = null
+    this.el.addEventListener("mouseenter", (e) => {
+      if (!this.el.dataset.columnHoverHighlight) return
+      const cell = e.target.closest(".lv-grid__cell[data-col-index], .lv-grid__header-cell[data-col-index]")
+      if (!cell) return
+      const colIdx = cell.dataset.colIndex
+      if (colIdx === this._hoveredColIdx) return
+      this._clearColumnHover()
+      this._hoveredColIdx = colIdx
+      this.el.querySelectorAll(`.lv-grid__cell[data-col-index="${colIdx}"], .lv-grid__header-cell[data-col-index="${colIdx}"]`).forEach(el => {
+        el.classList.add("lv-grid__cell--col-hover")
+      })
+    }, true)
+
+    this.el.addEventListener("mouseleave", () => {
+      this._clearColumnHover()
+    })
 
     // F-932: 클립보드 붙여넣기
     this.el.addEventListener("paste", (e) => {
@@ -685,10 +710,21 @@ export const GridKeyboardNav = {
     document.body.removeChild(textarea)
   },
 
+  // FA-037: Column Hover Highlight
+  _clearColumnHover() {
+    if (this._hoveredColIdx !== null) {
+      this.el.querySelectorAll(".lv-grid__cell--col-hover").forEach(el => {
+        el.classList.remove("lv-grid__cell--col-hover")
+      })
+      this._hoveredColIdx = null
+    }
+  },
+
   destroyed() {
     // DOM에서 제거될 때는 서버 이벤트 발송 없이 로컬 정리만 수행
     this.clearFocusVisual()
     this.clearCellRange()
+    this._clearColumnHover()
     this.focusedRowId = null
     this.focusedColIdx = null
     if (this._onMouseUp) {

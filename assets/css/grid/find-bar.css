@@ -1,0 +1,109 @@
+/* ========================================
+   FA-044: Find & Highlight
+   ======================================== */
+
+/* Find Bar (floating at grid top) */
+.lv-grid__find-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  background: var(--lv-grid-bg, #fff);
+  border-bottom: 1px solid var(--lv-grid-border, #e0e0e0);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+}
+
+.lv-grid__find-icon {
+  font-size: 14px;
+  color: var(--lv-grid-text-muted, #999);
+}
+
+.lv-grid__find-input {
+  flex: 1;
+  min-width: 120px;
+  max-width: 250px;
+  padding: 4px 8px;
+  border: 1px solid var(--lv-grid-border, #e0e0e0);
+  border-radius: 4px;
+  font-size: 13px;
+  font-family: var(--lv-grid-font-family, inherit);
+  color: var(--lv-grid-text, #333);
+  background: var(--lv-grid-bg-input, #fff);
+  outline: none;
+}
+
+.lv-grid__find-input:focus {
+  border-color: var(--lv-grid-primary, #1976d2);
+  box-shadow: 0 0 0 2px rgba(25, 118, 210, 0.2);
+}
+
+.lv-grid__find-count {
+  font-size: 12px;
+  color: var(--lv-grid-text-muted, #999);
+  min-width: 36px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.lv-grid__find-nav-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: 1px solid var(--lv-grid-border, #e0e0e0);
+  background: transparent;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 10px;
+  color: var(--lv-grid-text-muted, #666);
+  transition: all 0.15s ease;
+}
+
+.lv-grid__find-nav-btn:hover {
+  background: var(--lv-grid-hover, #f5f5f5);
+  border-color: var(--lv-grid-primary, #1976d2);
+  color: var(--lv-grid-primary, #1976d2);
+}
+
+.lv-grid__find-close-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: none;
+  background: transparent;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 14px;
+  color: var(--lv-grid-text-muted, #999);
+  transition: all 0.15s ease;
+}
+
+.lv-grid__find-close-btn:hover {
+  background: var(--lv-grid-danger-light, #fce4ec);
+  color: var(--lv-grid-danger, #e53935);
+}
+
+/* Highlight styles */
+.lv-grid__find-highlight {
+  background: #fff3b0 !important;
+}
+
+.lv-grid__find-highlight--current {
+  background: #ff9632 !important;
+  color: #fff !important;
+}
+
+.lv-grid__find-highlight mark {
+  background: #fff3b0;
+  color: inherit;
+  padding: 0 1px;
+  border-radius: 2px;
+}
+
+.lv-grid__find-highlight--current mark {
+  background: #ff9632;
+  color: #fff;
+}

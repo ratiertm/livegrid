@@ -52,18 +52,12 @@ defmodule LiveviewGridWeb.GridComponentTest do
       assert html =~ "grid_row_select"
     end
 
-    test "filter row hidden by default, shown after toggle", %{conn: conn} do
-      {:ok, view, html} = live(conn, "/demo")
+    test "filter row shown with floating_filter option", %{conn: conn} do
+      {:ok, _view, html} = live(conn, "/demo")
 
-      # 초기 상태: 필터 행 숨김
-      refute html =~ "lv-grid__filter-row"
-
-      # 필터 토글 버튼 클릭
-      view |> element("[phx-click=\"grid_toggle_filter\"]") |> render_click()
-      html = render(view)
-
-      # 필터 행이 표시됨
+      # FA-011: floating_filter: true이면 초기부터 필터 행 표시
       assert html =~ "lv-grid__filter-row"
+      assert html =~ "lv-grid__filter-row--floating"
       assert html =~ "lv-grid__filter-input"
       assert html =~ "grid_filter"
     end
@@ -82,15 +76,15 @@ defmodule LiveviewGridWeb.GridComponentTest do
     test "filter toggle hides row and clears filters", %{conn: conn} do
       {:ok, view, _html} = live(conn, "/demo")
 
-      # 필터 열기
+      # FA-011: floating_filter: true이면 필터 행이 항상 표시됨
+      html = render(view)
+      assert html =~ "lv-grid__filter-row"
+      assert html =~ "lv-grid__filter-row--floating"
+
+      # 토글 클릭해도 floating_filter이면 필터 행 유지
       view |> element("[phx-click=\"grid_toggle_filter\"]") |> render_click()
       html = render(view)
       assert html =~ "lv-grid__filter-row"
-
-      # 필터 닫기
-      view |> element("[phx-click=\"grid_toggle_filter\"]") |> render_click()
-      html = render(view)
-      refute html =~ "lv-grid__filter-row"
     end
 
     test "search bar renders", %{conn: conn} do

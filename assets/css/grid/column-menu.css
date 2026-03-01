@@ -1,0 +1,79 @@
+/* ========================================
+   FA-010: Column Menu
+   ======================================== */
+
+/* Menu trigger button (visible on header hover) */
+.lv-grid__column-menu-btn {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 20px;
+  height: 20px;
+  border: none;
+  background: transparent;
+  color: var(--lv-grid-text-muted);
+  font-size: 14px;
+  cursor: pointer;
+  padding: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  border-radius: 3px;
+  transition: all 0.15s ease;
+  z-index: 4;
+}
+
+.lv-grid__header-cell:hover .lv-grid__column-menu-btn {
+  display: flex;
+}
+
+.lv-grid__column-menu-btn:hover {
+  background: var(--lv-grid-primary-light);
+  color: var(--lv-grid-primary);
+}
+
+/* Dropdown menu */
+.lv-grid__column-menu {
+  background: var(--lv-grid-bg);
+  border: 1px solid var(--lv-grid-border);
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  min-width: 180px;
+  padding: 4px 0;
+  z-index: 9999;
+}
+
+.lv-grid__column-menu-item {
+  padding: 8px 16px;
+  font-size: 13px;
+  color: var(--lv-grid-text);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: background 0.15s ease;
+}
+
+.lv-grid__column-menu-item:hover {
+  background: var(--lv-grid-hover);
+}
+
+.lv-grid__column-menu-item--restore {
+  color: var(--lv-grid-primary);
+  font-size: 12px;
+}
+
+.lv-grid__column-menu-divider {
+  height: 1px;
+  background: var(--lv-grid-border);
+  margin: 4px 0;
+}
+
+.lv-grid__column-menu-sub {
+  padding: 4px 16px;
+  font-size: 11px;
+  color: var(--lv-grid-text-muted);
+  font-weight: 600;
+  text-transform: uppercase;
+}
