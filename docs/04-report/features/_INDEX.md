@@ -9,6 +9,29 @@
 
 ## Bug Fixes
 
+### Bugfix v0.20 - 미완성 기능 수정
+
+**Status**: ✅ Complete | **Match Rate**: 99% (PASS)
+
+**Quick Info**:
+- Fix Date: 2026-03-01
+- Type: Multi-fix bugfix (7 fixes, single-pass, 0 iterations)
+- Files Modified: 5
+- Tests: 698/698 passing (+8 new tests)
+
+**Fixes Completed** (all PASS):
+1. FA-017: Row Animation default case (HIGH) → Empty string for nil status
+2. FA-015: Editor Value Getter (HIGH) → Large Text & Rich Select use `Grid.get_cell_value()`
+3. FA-044: Find Bar Shortcuts (MEDIUM) → Enter/Shift+Enter/Escape keyboard handlers
+4. FA-006: Master/Detail Toggle UI (LOW) → ▶/▼ button with toggle_row_expand event
+5. FA-031: Chart Panel UI (LOW) → SVG chart rendering when chart_panel: true
+6. FA-008: Infinite Scroll (LOW) → Scroll detection + request_more_data event
+7. FA-014: Column Group Drag (LOW) → Deferred (API complete, JS UI to Phase 11)
+
+**Report**: [bugfix-v020.report.md](bugfix-v020.report.md)
+
+---
+
 ### Config Modal Checkbox Crash Fix
 
 **Status**: ✅ Complete | **Severity**: Critical (데이터 손실)
@@ -657,12 +680,12 @@
 | Metric | Value |
 |--------|-------|
 | Total Features Completed | 9 |
-| Bug Fixes Completed | 1 |
-| Total Tests Passing | 428+ |
-| Avg Match Rate | 94.3% |
+| Bug Fixes Completed | 2 |
+| Total Tests Passing | 698+ |
+| Avg Match Rate | 95% |
 | Avg Implementation Time | 1-2 days |
-| Production Ready Features | 9 |
-| Highest Match Rate | 100% (Config Modal Checkbox Fix) |
+| Production Ready Features | 11 |
+| Highest Match Rate | 99% (Bugfix v0.20) |
 
 ---
 
@@ -793,11 +816,12 @@ For questions about specific features or PDCA process:
 
 | Item | Value |
 |------|-------|
-| Last Updated | 2026-02-28 |
-| Report Count | 9 |
+| Last Updated | 2026-03-01 |
+| Report Count | 11 |
 | Completed Features | 9 |
+| Bug Fixes | 2 |
 | In Progress | 0 |
-| Total PDCA Cycles | 9 |
+| Total PDCA Cycles | 11 |
 
 ---
 

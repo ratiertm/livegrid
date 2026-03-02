@@ -96,27 +96,69 @@ HEEx 템플릿에 `GridComponent`를 배치합니다:
 
 ## What's Next
 
-기능별 상세 가이드를 참고하세요:
+기능별 상세 가이드를 참고하세요.
+
+### Core
 
 | Guide | Description |
 |-------|-------------|
 | [Row Data](./row-data.md) | 데이터 제공 방식과 Row ID |
 | [Column Definitions](./column-definitions.md) | 컬럼 속성 전체 레퍼런스 |
+| [Grid Options](./grid-options.md) | 전체 옵션 레퍼런스 |
+| [Themes](./themes.md) | 라이트/다크 모드, 커스텀 테마 |
+| [Keyboard Navigation](./keyboard-navigation.md) | 단축키 안내 |
+
+### Data & Sorting
+
+| Guide | Description |
+|-------|-------------|
 | [Sorting](./sorting.md) | 단일/다중 정렬, null 처리 |
 | [Filtering](./filtering.md) | 컬럼 필터, 전체 검색, 고급 필터 |
 | [Pagination](./pagination.md) | 페이지네이션과 가상 스크롤 |
+| [Data Sources](./data-sources.md) | InMemory, Ecto(DB), REST API |
+| [Append Data](./append-data.md) | 데이터 병합 (무한 스크롤, 외부 데이터) |
+
+### Editing & CRUD
+
+| Guide | Description |
+|-------|-------------|
 | [Cell Editing](./cell-editing.md) | 인라인 편집, 검증, Undo/Redo |
 | [Row Editing](./row-editing.md) | 행 단위 편집 모드 |
 | [CRUD Operations](./crud-operations.md) | 행 추가/수정/삭제/저장 |
-| [Data Sources](./data-sources.md) | InMemory, Ecto(DB), REST API |
+| [Selection](./selection.md) | 행 선택, 셀 범위 선택 |
+
+### Layout & Sizing
+
+| Guide | Description |
+|-------|-------------|
+| [Frozen Columns](./frozen-columns.md) | 좌우 고정 컬럼, 동적 고정 |
+| [Column Sizing](./column-sizing.md) | 드래그 리사이즈, 더블클릭 Auto-fit |
+| [Row Height](./row-height.md) | 행 높이 제어, Auto-fit, Per-row Height |
+| [Row Reorder](./row-reorder.md) | 드래그 앤 드롭 행 순서 변경 |
+
+### Cell Display
+
+| Guide | Description |
+|-------|-------------|
 | [Formatters](./formatters.md) | 16가지 내장 포맷터 |
 | [Renderers](./renderers.md) | Badge, Link, Progress 렌더러 |
-| [Selection](./selection.md) | 행 선택, 셀 범위 선택 |
+| [Wordwrap](./wordwrap.md) | 셀 텍스트 줄바꿈 (word/char) |
+| [Cell Merge](./cell-merge.md) | 셀 병합 (rowspan/colspan) |
+| [Suppress](./suppress.md) | 중복 값 숨김 |
+| [Header Wrap](./header-wrap.md) | 헤더 텍스트 줄바꿈 |
+| [Summary Row](./summary-row.md) | 하단 집계 행 |
+
+### Advanced
+
+| Guide | Description |
+|-------|-------------|
 | [Grouping](./grouping.md) | 다중 레벨 그룹핑 + 집계 |
 | [Tree Grid](./tree-grid.md) | 계층 데이터 트리 뷰 |
 | [Pivot Table](./pivot-table.md) | 피벗 테이블 변환 |
 | [Export](./export.md) | Excel/CSV 내보내기 |
-| [Themes](./themes.md) | 라이트/다크 모드, 커스텀 테마 |
-| [Grid Options](./grid-options.md) | 전체 옵션 레퍼런스 |
-| [Keyboard Navigation](./keyboard-navigation.md) | 단축키 안내 |
-| [Summary Row](./summary-row.md) | 하단 집계 행 |
+
+### Integration
+
+| Guide | Description |
+|-------|-------------|
+| [Scroll Sync](./scroll-sync.md) | 두 Grid 스크롤 동기화 |
