@@ -49,7 +49,7 @@ mix docs
 open doc/index.html
 ```
 
-## ✨ 구현된 기능 (v0.1 ~ v0.7)
+## ✨ 구현된 기능 (v0.1.0 ~ v0.11.0)
 
 ### v0.1 - 핵심 그리드
 - [x] 테이블 렌더링 (LiveComponent 기반)
@@ -115,7 +115,7 @@ open doc/index.html
 - [x] 행 단위 편집 모드 (행 전체 셀 동시 편집)
 - [x] Undo/Redo (Ctrl+Z/Y 편집 히스토리, 최대 50건 스택)
 
-### v0.7 - Grid 설정 & 아키텍처 (현재)
+### v0.7.0 - Grid 설정 & 아키텍처
 - [x] Grid 설정 모달 (컬럼 표시/순서/너비, 고정 컬럼, 포맷터, 검증기)
 - [x] Grid 설정 탭 (페이지 크기, 가상 스크롤, 테마, 행 높이)
 - [x] Grid Builder (동적 그리드 생성, 컬럼 정의 UI)
@@ -132,28 +132,72 @@ open doc/index.html
 - [x] GridComponent 리팩토링 (EventHandlers + RenderHelpers 추출)
 - [x] ExDoc 문서화 (전체 공개 모듈 @doc/@spec)
 
+> **참고**: v0.8.0~v0.9.0은 v0.6~v0.7의 기능을 PDCA 방법론으로 재정리하며 IME 지원, Grid Config 3-Layer 아키텍처, UI/UX 개선(다크모드 CSS 변수화) 등을 추가했습니다.
+
+### v0.10.0 - 넥사크로 참조 기능
+- [x] Suppress (세로 방향 동일값 숨김)
+- [x] 셀 병합 (rowspan/colspan)
+- [x] 자동 줄바꿈 (word/char wrap 모드)
+- [x] 행 고정 (상단 N행 고정)
+- [x] 컬럼 자동 너비 (더블클릭 Auto-fit)
+- [x] 헤더 여러 줄 (header_wrap: true)
+- [x] 행 드래그 이동 (RowReorder Hook)
+- [x] 높이 자동 조정 (autofit_type: :row)
+- [x] Grid 스크롤 동기화 (ScrollSync Hook)
+- [x] Summary Row (합계행)
+- [x] Right Freeze (우측 컬럼 고정)
+- [x] Dynamic Freeze (동적 틀 고정)
+
+### v0.11.0 - AG Grid 참조 + 버그수정 (현재)
+- [x] Row Animation nil status 수정
+- [x] Value Getter/Setter 편집기 연동
+- [x] Find Bar 단축키 (Enter/Shift+Enter/Escape)
+- [x] Master/Detail 토글 UI
+- [x] Chart Panel UI (SVG 차트)
+- [x] Infinite Scroll 감지 개선
+
 ## 📊 구현 현황
 
 | 항목 | 수치 |
 |------|------|
-| 전체 기능 | 62개 |
-| 구현 완료 | 62개 (100%) |
-| 구현 버전 | v0.1 ~ v0.7 |
-| 테스트 | 428개 통과 |
+| 전체 기능 | 118개 (구현 73 + 미구현 45) |
+| 구현 완료 | 73개 (62%) |
+| 구현 버전 | v0.1.0 ~ v0.11.0 |
+| 테스트 | 698개 통과 |
+| 기능 출처 | 자체 로드맵 + 넥사크로 + AG Grid v35 |
 
-## 🗺️ 로드맵 (미구현)
+## 🗺️ 로드맵
 
-### v0.8 - 엔터프라이즈 데이터
-- [ ] 멀티 DB 드라이버 - PostgreSQL (`postgrex`), MySQL/MariaDB (`myxql`)
-- [ ] 멀티 DB 드라이버 - MSSQL (`tds_ecto`), Oracle (`ecto_oracle`)
-- [ ] 대용량 데이터 스트리밍 (`Repo.stream` 메모리 효율 처리)
-- [ ] 커서 기반 페이지네이션 (오프셋 외 추가)
-- [ ] GraphQL 데이터 소스 지원
+### v0.12.0 - 핵심 UX 보완
+- [ ] Row Pinning (합계행 등 상단/하단 고정)
+- [ ] Overlay System (Loading/No Data/Error 메시지)
+- [ ] Status Bar (행수, 선택합계, 필터상태)
+- [ ] Cell Text Selection (셀 내 텍스트 드래그 선택)
+- [ ] 컬럼 리사이즈 제한 (특정 컬럼 리사이즈 비활성화)
 
-### v0.9 - 협업 & UX
-- [ ] 셀 잠금 (동시 편집 충돌 방지)
-- [ ] Date Picker UI 컴포넌트 (날짜 컬럼용 캘린더 팝업)
-- [ ] 컬럼 고정 UI (컨텍스트 메뉴에서 좌/우 고정)
+### v0.13.0 - 필터링 강화
+- [ ] Date Filter + Date Editor (캘린더 팝업)
+- [ ] Floating Filters (헤더 아래 인라인 필터)
+- [ ] Set Filter (고유값 체크박스 필터, Excel 스타일)
+- [ ] Column Menu (헤더 드롭다운 메뉴)
+
+### v0.14.0 - 상태 관리 + 편의
+- [ ] Grid State Save/Restore (localStorage/DB 저장)
+- [ ] Column State Save/Restore
+- [ ] Value Getters/Setters (계산 컬럼)
+- [ ] Row Animation (행 삽입/삭제 애니메이션)
+- [ ] Localization (다국어 지원)
+
+### v0.15.0 - 엔터프라이즈
+- [ ] Cell Fill Handle (Excel 자동채움)
+- [ ] Master-Detail (확장 가능한 상세 그리드)
+- [ ] Printing (인쇄 최적화)
+- [ ] Accessibility (WCAG 2.1 AA 접근성)
+
+### v1.0.0 - 정식 릴리즈
+- [ ] Side Bar, Sparklines, Integrated Charts, Formulas
+- [ ] 멀티 DB 드라이버 (PostgreSQL, MySQL, MSSQL, Oracle)
+- [ ] 기타 P2 기능들
 
 ## 📁 프로젝트 구조
 

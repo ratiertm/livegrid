@@ -62,6 +62,17 @@ test_scroll.html
 .claude/agents.md
 .claude/hooks/
 
+# PDCA methodology artifacts (development process docs, local only)
+docs/.pdca-status.json
+docs/.pdca-snapshots/
+docs/.bkit-memory.json
+docs/01-plan/
+docs/02-design/
+docs/03-analysis/
+docs/04-implementation/
+docs/04-report/
+docs/archive/
+
 # Korean specification docs (local only)
 API명세서.md
 기능목록및기능정의서.md

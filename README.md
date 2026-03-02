@@ -49,7 +49,7 @@ mix docs
 open doc/index.html
 ```
 
-## ✨ Implemented Features (v0.1 ~ v0.7)
+## ✨ Implemented Features (v0.1.0 ~ v0.11.0)
 
 ### v0.1 - Core Grid
 - [x] Table rendering (LiveComponent-based)
@@ -115,7 +115,7 @@ open doc/index.html
 - [x] Row edit mode (edit all cells in a row simultaneously)
 - [x] Undo/Redo (Ctrl+Z/Y edit history with 50-action stack)
 
-### v0.7 - Grid Config & Architecture (Current)
+### v0.7.0 - Grid Config & Architecture
 - [x] Grid Configuration Modal (column visibility, order, width, frozen columns, formatters, validators)
 - [x] Grid Settings tab (page size, virtual scroll, theme, row height)
 - [x] Grid Builder (dynamic grid creation with column definition UI)
@@ -132,28 +132,72 @@ open doc/index.html
 - [x] GridComponent refactoring (EventHandlers + RenderHelpers extraction)
 - [x] ExDoc documentation (@doc/@spec across all public modules)
 
+> **Note**: v0.8.0–v0.9.0 reorganized features from v0.6–v0.7 using PDCA methodology, adding IME support, Grid Config 3-layer architecture, and UI/UX improvements (dark mode CSS variables).
+
+### v0.10.0 - Nexacro Reference Features
+- [x] Suppress (hide identical consecutive values vertically)
+- [x] Cell merge (rowspan/colspan)
+- [x] Wordwrap (word/char wrap modes)
+- [x] Frozen Row (fix top N rows)
+- [x] Column auto-fit (double-click header to auto-size)
+- [x] Multi-line header (header_wrap: true)
+- [x] Row drag reorder (RowReorder Hook)
+- [x] Auto row height (autofit_type: :row)
+- [x] Scroll sync (ScrollSync Hook)
+- [x] Summary Row (aggregate footer)
+- [x] Right Freeze (freeze rightmost columns)
+- [x] Dynamic Freeze (toggle column freeze at runtime)
+
+### v0.11.0 - AG Grid Reference + Bugfix (Current)
+- [x] Row Animation nil status fix
+- [x] Value Getter/Setter editor integration
+- [x] Find Bar keyboard shortcuts (Enter/Shift+Enter/Escape)
+- [x] Master/Detail toggle UI
+- [x] Chart Panel UI (SVG charts)
+- [x] Infinite Scroll detection improvement
+
 ## 📊 Implementation Status
 
 | Item | Count |
 |------|-------|
-| Total Features | 62 |
-| Completed | 62 (100%) |
-| Versions Shipped | v0.1 ~ v0.7 |
-| Tests | 428 passing |
+| Total Features | 118 (73 implemented + 45 planned) |
+| Completed | 73 (62%) |
+| Versions Shipped | v0.1.0 ~ v0.11.0 |
+| Tests | 698 passing |
+| Feature Sources | Original roadmap + Nexacro + AG Grid v35 |
 
-## 🗺️ Roadmap (Not Yet Implemented)
+## 🗺️ Roadmap
 
-### v0.8 - Enterprise Data
-- [ ] Multi-DB drivers - PostgreSQL (`postgrex`), MySQL/MariaDB (`myxql`)
-- [ ] Multi-DB drivers - MSSQL (`tds_ecto`), Oracle (`ecto_oracle`)
-- [ ] Large dataset streaming (`Repo.stream` for memory-efficient processing)
-- [ ] Cursor-based pagination (in addition to offset)
-- [ ] GraphQL data source support
+### v0.12.0 - Core UX Enhancement
+- [ ] Row Pinning (pin rows to top/bottom for summary rows)
+- [ ] Overlay System (Loading/No Data/Error messages)
+- [ ] Status Bar (row count, selection summary, filter status)
+- [ ] Cell Text Selection (allow text drag-select in cells)
+- [ ] Column resize restriction (disable resize per column)
 
-### v0.9 - Collaboration & UX
-- [ ] Cell locking (concurrent edit conflict prevention)
-- [ ] Date Picker UI component (calendar popup for date columns)
-- [ ] Column pinning UI (pin left/right via context menu)
+### v0.13.0 - Filter Enhancement
+- [ ] Date Filter + Date Editor (calendar picker UI)
+- [ ] Floating Filters (inline filter inputs below header)
+- [ ] Set Filter (unique value checkbox filter, Excel-style)
+- [ ] Column Menu (header dropdown: sort/filter/hide/pin)
+
+### v0.14.0 - State Management
+- [ ] Grid State Save/Restore (persist to localStorage/DB)
+- [ ] Column State Save/Restore
+- [ ] Value Getters/Setters (computed columns)
+- [ ] Row Animation (insert/delete animations)
+- [ ] Localization (i18n support)
+
+### v0.15.0 - Enterprise
+- [ ] Cell Fill Handle (Excel-style auto-fill)
+- [ ] Master-Detail (expandable sub-grids)
+- [ ] Printing (@media print optimization)
+- [ ] Accessibility (WCAG 2.1 AA)
+
+### v1.0.0 - Official Release
+- [ ] Side Bar, Sparklines, Integrated Charts, Formulas
+- [ ] Multi-DB drivers (PostgreSQL, MySQL, MSSQL, Oracle)
+- [ ] Remaining P2 features
 
 ## 📁 Project Structure
 
