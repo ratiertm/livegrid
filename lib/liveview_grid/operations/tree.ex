@@ -80,4 +80,47 @@ defmodule LiveViewGrid.Tree do
     child_ids = Enum.map(children, & &1.id)
     child_ids ++ Enum.flat_map(child_ids, &collect_descendants(&1, children_map))
   end
+
+  # ── F-961: Batch Expand ──
+
+  @doc "자식이 있는 모든 노드의 ID를 반환합니다."
+  @spec all_node_ids(list(map()), atom()) :: list(any())
+  def all_node_ids(data, parent_field \\ :parent_id) do
+    children_map = Enum.group_by(data, &Map.get(&1, parent_field))
+    data
+    |> Enum.filter(fn row ->
+      Map.get(children_map, row.id, []) != []
+    end)
+    |> Enum.map(& &1.id)
+  end
+
+  @doc """
+  특정 depth까지 펼치는 expanded 맵을 반환합니다.
+  depth 0 = 모두 접힘, depth 1 = root만 펼침.
+  """
+  @spec expand_to_level_map(list(map()), atom(), non_neg_integer()) :: map()
+  def expand_to_level_map(data, parent_field, level) do
+    children_map = Enum.group_by(data, &Map.get(&1, parent_field))
+    roots = Map.get(children_map, nil, [])
+    build_level_map(roots, children_map, 0, level)
+  end
+
+  defp build_level_map(nodes, children_map, current_depth, max_depth) do
+    Enum.reduce(nodes, %{}, fn node, acc ->
+      children = Map.get(children_map, node.id, [])
+      has_children = children != []
+
+      if has_children do
+        expanded = current_depth < max_depth
+        acc = Map.put(acc, node.id, expanded)
+        if expanded do
+          Map.merge(acc, build_level_map(children, children_map, current_depth + 1, max_depth))
+        else
+          acc
+        end
+      else
+        acc
+      end
+    end)
+  end
 end

@@ -22,9 +22,20 @@ export const GridKeyboardNav = {
       // 체크박스, 버튼 등은 무시
       if (e.target.closest("input, button, select")) return
 
+      // FA-020: 텍스트 선택 모드일 때 셀 드래그 범위 선택 비활성화
+      const textSelectable = this.el.dataset.textSelectable === "true"
+
       const cell = e.target.closest(".lv-grid__cell[data-col-index]")
       const row = e.target.closest(".lv-grid__row[data-row-id]")
       if (!cell || !row) return
+
+      // FA-020: 텍스트 선택 모드에서는 셀 포커스만 설정, 드래그 범위 선택 안 함
+      if (textSelectable) {
+        const rowId = parseInt(row.dataset.rowId)
+        const colIdx = parseInt(cell.dataset.colIndex)
+        this.setFocus(rowId, colIdx)
+        return
+      }
 
       const rowId = parseInt(row.dataset.rowId)
       const colIdx = parseInt(cell.dataset.colIndex)

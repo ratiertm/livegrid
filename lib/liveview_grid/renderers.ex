@@ -96,4 +96,39 @@ defmodule LiveViewGrid.Renderers do
       """
     end
   end
+
+  @doc """
+  F-906: Render value as a radio button group.
+
+  ## Options
+    - options: list of {value, label} tuples
+    - name: radio group name (default: column field)
+
+  ## Example
+
+      %{field: :priority, renderer: LiveViewGrid.Renderers.radio(
+        options: [{"high", "High"}, {"medium", "Med"}, {"low", "Low"}]
+      )}
+  """
+  @spec radio(opts :: keyword()) :: function()
+  def radio(opts \\ []) do
+    radio_options = Keyword.get(opts, :options, [])
+
+    fn row, column, _assigns ->
+      value = Map.get(row, column.field)
+      name = "radio_#{row.id}_#{column.field}"
+      assigns = %{value: value, radio_options: radio_options, name: name, row_id: row.id, field: column.field}
+
+      ~H"""
+      <div class="lv-grid__radio-group">
+        <%= for {opt_val, opt_label} <- @radio_options do %>
+          <label class="lv-grid__radio-label">
+            <input type="radio" name={@name} value={opt_val} checked={to_string(@value) == to_string(opt_val)} class="lv-grid__radio-input" />
+            <span><%= opt_label %></span>
+          </label>
+        <% end %>
+      </div>
+      """
+    end
+  end
 end

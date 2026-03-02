@@ -174,6 +174,98 @@ defmodule LiveviewGridWeb.GridComponent do
   def handle_event("grid_clear_filters", params, socket),
     do: EventHandlers.handle_clear_filters(params, socket)
 
+  def handle_event("grid_date_filter_preset", params, socket),
+    do: EventHandlers.handle_date_filter_preset(params, socket)
+
+  def handle_event("grid_clear_column_filter", params, socket),
+    do: EventHandlers.handle_clear_column_filter(params, socket)
+
+  # FA-012: Set Filter
+  def handle_event("grid_toggle_set_filter", params, socket),
+    do: EventHandlers.handle_toggle_set_filter(params, socket)
+
+  def handle_event("grid_set_filter_search", params, socket),
+    do: EventHandlers.handle_set_filter_search(params, socket)
+
+  def handle_event("grid_set_filter_select_all", params, socket),
+    do: EventHandlers.handle_set_filter_select_all(params, socket)
+
+  def handle_event("grid_set_filter_deselect_all", params, socket),
+    do: EventHandlers.handle_set_filter_deselect_all(params, socket)
+
+  def handle_event("grid_set_filter_toggle_value", params, socket),
+    do: EventHandlers.handle_set_filter_toggle_value(params, socket)
+
+  # FA-010: Column Menu
+  def handle_event("grid_toggle_column_menu", params, socket),
+    do: EventHandlers.handle_toggle_column_menu(params, socket)
+
+  def handle_event("grid_column_menu_action", params, socket),
+    do: EventHandlers.handle_column_menu_action(params, socket)
+
+  # FA-002: Grid State Save/Restore
+  def handle_event("grid_save_state", params, socket),
+    do: EventHandlers.handle_save_state(params, socket)
+
+  def handle_event("grid_restore_state", params, socket),
+    do: EventHandlers.handle_restore_state(params, socket)
+
+  # FA-013: Cell Fill Handle
+  @impl true
+  def handle_event("grid_fill_cells", params, socket),
+    do: EventHandlers.handle_fill_cells(params, socket)
+
+  # FA-014: Master-Detail
+  @impl true
+  def handle_event("grid_toggle_detail", params, socket),
+    do: EventHandlers.handle_toggle_detail(params, socket)
+
+  # F-961: Tree Batch Expand
+  @impl true
+  def handle_event("grid_expand_all", params, socket),
+    do: EventHandlers.handle_expand_all(params, socket)
+  @impl true
+  def handle_event("grid_collapse_all", params, socket),
+    do: EventHandlers.handle_collapse_all(params, socket)
+  @impl true
+  def handle_event("grid_expand_to_level", params, socket),
+    do: EventHandlers.handle_expand_to_level(params, socket)
+
+  # Phase 5 (v1.0+) Event Dispatchers
+  @impl true
+  def handle_event("grid_toggle_sidebar", params, socket),
+    do: EventHandlers.handle_toggle_sidebar(params, socket)
+  @impl true
+  def handle_event("grid_sidebar_tab", params, socket),
+    do: EventHandlers.handle_sidebar_tab(params, socket)
+  @impl true
+  def handle_event("grid_toggle_column_visibility", params, socket),
+    do: EventHandlers.handle_toggle_column_visibility(params, socket)
+  @impl true
+  def handle_event("grid_batch_edit", params, socket),
+    do: EventHandlers.handle_batch_edit(params, socket)
+  @impl true
+  def handle_event("grid_toggle_find", params, socket),
+    do: EventHandlers.handle_toggle_find(params, socket)
+  @impl true
+  def handle_event("grid_find", params, socket),
+    do: EventHandlers.handle_find(params, socket)
+  @impl true
+  def handle_event("grid_find_next", params, socket),
+    do: EventHandlers.handle_find_next(params, socket)
+  @impl true
+  def handle_event("grid_find_prev", params, socket),
+    do: EventHandlers.handle_find_prev(params, socket)
+  @impl true
+  def handle_event("grid_large_text_open", params, socket),
+    do: EventHandlers.handle_large_text_open(params, socket)
+  @impl true
+  def handle_event("grid_large_text_save", params, socket),
+    do: EventHandlers.handle_large_text_save(params, socket)
+  @impl true
+  def handle_event("grid_large_text_cancel", params, socket),
+    do: EventHandlers.handle_large_text_cancel(params, socket)
+
   @impl true
   def handle_event("grid_global_search", params, socket),
     do: EventHandlers.handle_global_search(params, socket)
@@ -422,7 +514,9 @@ defmodule LiveviewGridWeb.GridComponent do
   @doc "Grid 컴포넌트의 전체 UI를 렌더링한다. 툴바, 헤더, 바디, 푸터, Config Modal을 포함한다."
   def render(assigns) do
     ~H"""
-    <div class="lv-grid" id={"#{@grid.id}-keyboard-nav"} phx-hook="GridKeyboardNav" tabindex="0" data-theme={@grid.options[:theme] || "light"} style={build_custom_css_vars(@grid.options[:custom_css_vars])}>
+    <div class={"lv-grid#{if @grid.options[:enable_cell_text_selection], do: " lv-grid--text-selectable", else: ""}#{if @grid.options[:animate_rows], do: " lv-grid--animate-rows", else: ""}"} id={"#{@grid.id}-keyboard-nav"} phx-hook="GridKeyboardNav" tabindex="0" data-theme={@grid.options[:theme] || "light"} data-text-selectable={to_string(@grid.options[:enable_cell_text_selection] == true)} style={build_custom_css_vars(@grid.options[:custom_css_vars])} role="grid" aria-label={@grid.options[:aria_label] || "Data Grid"}>
+      <!-- FA-002: Grid State Persist Hook -->
+      <div id={"#{@grid.id}-state-persist"} phx-hook="GridStatePersist" data-grid-id={@grid.id} style="display: none;" phx-target={@myself}></div>
       <!-- Toolbar: Search + Save -->
       <div class="lv-grid__toolbar">
         <div class="lv-grid__search-bar">
@@ -494,7 +588,34 @@ defmodule LiveviewGridWeb.GridComponent do
               삭제 (<%= length(@grid.state.selection.selected_ids) %>)
             </button>
           <% end %>
+          <%!-- F-961: Tree Expand/Collapse Buttons --%>
+          <%= if @grid.options[:tree_mode] do %>
+            <button class="lv-grid__btn" phx-click="grid_expand_all" phx-target={@myself} title={grid_t(@grid, :expand_all)}>
+              &#9660; <%= grid_t(@grid, :expand_all) %>
+            </button>
+            <button class="lv-grid__btn" phx-click="grid_collapse_all" phx-target={@myself} title={grid_t(@grid, :collapse_all)}>
+              &#9654; <%= grid_t(@grid, :collapse_all) %>
+            </button>
+          <% end %>
+          <%!-- FA-030: Sidebar Toggle --%>
+          <%= if @grid.options[:enable_sidebar] do %>
+            <button class={"lv-grid__btn #{if @grid.state.sidebar_open, do: "lv-grid__btn--active"}"} phx-click="grid_toggle_sidebar" phx-target={@myself} title={grid_t(@grid, :sidebar)}>
+              &#9776; <%= grid_t(@grid, :sidebar) %>
+            </button>
+          <% end %>
+          <%!-- FA-044: Find Toggle --%>
+          <%= if @grid.options[:enable_find] do %>
+            <button class={"lv-grid__btn #{if @grid.state.find_bar_open, do: "lv-grid__btn--active"}"} phx-click="grid_toggle_find" phx-target={@myself} title={grid_t(@grid, :find)}>
+              &#128269; <%= grid_t(@grid, :find) %>
+            </button>
+          <% end %>
         </div>
+
+        <%= if @grid.options[:enable_print] do %>
+          <button class="lv-grid__btn lv-grid__btn--print" onclick="window.print()" title={grid_t(@grid, :print)}>
+            &#128424; <%= grid_t(@grid, :print) %>
+          </button>
+        <% end %>
 
         <span class="lv-grid__toolbar-separator"></span>
 
@@ -610,6 +731,9 @@ defmodule LiveviewGridWeb.GridComponent do
               data-frozen={if(col_idx < (@grid.options[:frozen_columns] || 0), do: "true", else: "false")}
               id={"header-#{column.field}"}
               phx-hook="ColumnReorder"
+              role="columnheader"
+              aria-colindex={col_idx + 1}
+              aria-sort={aria_sort_value(@grid.state.sort, column.field)}
             >
               <%= column.label %>
               <%= if column.sortable && sort_active?(@grid.state.sort, column.field) do %>
@@ -617,13 +741,143 @@ defmodule LiveviewGridWeb.GridComponent do
                   <%= sort_icon(@grid.state.sort.direction) %>
                 </span>
               <% end %>
-              <span
-                class="lv-grid__resize-handle"
-                phx-hook="ColumnResize"
-                id={"resize-#{column.field}"}
-                data-col-index={col_idx}
-                data-field={column.field}
-              ></span>
+              <%= if column_menu_enabled?(column, @grid) do %>
+                <div style="position: relative; display: inline-flex;">
+                  <button
+                    class="lv-grid__column-menu-btn"
+                    phx-click="grid_toggle_column_menu"
+                    phx-value-field={column.field}
+                    phx-target={@myself}
+                  >&#9776;</button>
+                  <%= if @grid.state.column_menu_open == column.field do %>
+                    <div class="lv-grid__column-menu">
+                      <button class="lv-grid__column-menu-item" phx-click="grid_column_menu_action" phx-value-field={column.field} phx-value-action="sort_asc" phx-target={@myself}>
+                        &#9650; 오름차순 정렬
+                      </button>
+                      <button class="lv-grid__column-menu-item" phx-click="grid_column_menu_action" phx-value-field={column.field} phx-value-action="sort_desc" phx-target={@myself}>
+                        &#9660; 내림차순 정렬
+                      </button>
+                      <div class="lv-grid__column-menu-separator"></div>
+                      <button class="lv-grid__column-menu-item" phx-click="grid_column_menu_action" phx-value-field={column.field} phx-value-action="hide_column" phx-target={@myself}>
+                        &#128065; 컬럼 숨기기
+                      </button>
+                      <button class="lv-grid__column-menu-item" phx-click="grid_column_menu_action" phx-value-field={column.field} phx-value-action="autofit" phx-target={@myself}>
+                        &#8596; 자동 너비 맞춤
+                      </button>
+                      <div class="lv-grid__column-menu-separator"></div>
+                      <button class="lv-grid__column-menu-item" phx-click="grid_column_menu_action" phx-value-field={column.field} phx-value-action="clear_filter" phx-target={@myself}>
+                        &#128473; 필터 초기화
+                      </button>
+                    </div>
+                  <% end %>
+                </div>
+              <% end %>
+              <%= if Map.get(column, :resizable, true) do %>
+                <span
+                  class="lv-grid__resize-handle"
+                  phx-hook="ColumnResize"
+                  id={"resize-#{column.field}"}
+                  data-col-index={col_idx}
+                  data-field={column.field}
+                ></span>
+              <% end %>
+            </div>
+          <% end %>
+        </div>
+      <% end %>
+
+      <!-- FA-011: Floating Filter Row (항상 표시) -->
+      <%= if @grid.options[:floating_filter] && has_filterable_columns?(@grid.columns) do %>
+        <div class="lv-grid__floating-filter-row">
+          <div class="lv-grid__filter-cell" style="width: 90px; flex: 0 0 90px;">
+          </div>
+
+          <%= if @grid.options.show_row_number do %>
+            <div class="lv-grid__filter-cell" style="width: 50px; flex: 0 0 50px;">
+            </div>
+          <% end %>
+
+          <%= if @grid.state.show_status_column do %>
+            <div class="lv-grid__filter-cell" style="width: 60px; flex: 0 0 60px;">
+            </div>
+          <% end %>
+
+          <%= for {column, col_idx} <- Enum.with_index(Grid.display_columns(@grid)) do %>
+            <div class={"lv-grid__filter-cell #{frozen_class(col_idx, @grid)}"} style={"#{column_width_style(column, @grid)}; #{frozen_style(col_idx, @grid)}"} data-col-index={col_idx}>
+              <%= if column.filterable && floating_filter_enabled?(column, @grid) do %>
+                <%= cond do %>
+                  <% column.filter_type == :set -> %>
+                    <div class="lv-grid__set-filter-trigger" style="position: relative; width: 100%;">
+                      <button
+                        class={"lv-grid__set-filter-btn#{if set_filter_active?(@grid, column.field), do: " lv-grid__set-filter-btn--active"}"}
+                        phx-click="grid_toggle_set_filter"
+                        phx-value-field={column.field}
+                        phx-target={@myself}
+                      >
+                        <%= set_filter_summary(@grid, column.field) %>
+                      </button>
+                      <%= if @grid.state.set_filter_open == column.field do %>
+                        <div class="lv-grid__set-filter-panel">
+                          <div class="lv-grid__set-filter-search">
+                            <input
+                              type="text"
+                              placeholder="검색..."
+                              value={Map.get(@grid.state.set_filter_search, column.field, "")}
+                              phx-keyup="grid_set_filter_search"
+                              phx-value-field={column.field}
+                              phx-debounce="200"
+                              phx-target={@myself}
+                            />
+                          </div>
+                          <div class="lv-grid__set-filter-actions">
+                            <button phx-click="grid_set_filter_select_all" phx-value-field={column.field} phx-target={@myself}>전체 선택</button>
+                            <button phx-click="grid_set_filter_deselect_all" phx-value-field={column.field} phx-target={@myself}>전체 해제</button>
+                          </div>
+                          <div class="lv-grid__set-filter-values">
+                            <%= for val <- unique_column_values(@grid, column.field) do %>
+                              <% search_term = Map.get(@grid.state.set_filter_search, column.field, "") %>
+                              <%= if search_term == "" || String.contains?(String.downcase(to_string(val)), String.downcase(search_term)) do %>
+                                <label class="lv-grid__set-filter-item">
+                                  <input
+                                    type="checkbox"
+                                    checked={set_filter_value_checked?(@grid, column.field, val)}
+                                    phx-click="grid_set_filter_toggle_value"
+                                    phx-value-field={column.field}
+                                    phx-value-val={val}
+                                    phx-target={@myself}
+                                  />
+                                  <span><%= val %></span>
+                                </label>
+                              <% end %>
+                            <% end %>
+                          </div>
+                        </div>
+                      <% end %>
+                    </div>
+                  <% column.filter_type == :date -> %>
+                    <input
+                      type="date"
+                      class="lv-grid__filter-input lv-grid__filter-input--floating"
+                      value={parse_date_part(Map.get(@grid.state.filters, column.field, ""), :from)}
+                      phx-change="grid_filter_date"
+                      phx-target={@myself}
+                      name="value"
+                      data-field={column.field}
+                      data-part="from"
+                    />
+                  <% true -> %>
+                    <input
+                      type="text"
+                      class="lv-grid__filter-input lv-grid__filter-input--floating"
+                      placeholder={"#{column.label} 필터..."}
+                      value={Map.get(@grid.state.filters, column.field, "")}
+                      phx-keyup="grid_filter"
+                      phx-value-field={column.field}
+                      phx-debounce="300"
+                      phx-target={@myself}
+                    />
+                <% end %>
+              <% end %>
             </div>
           <% end %>
         </div>
@@ -671,6 +925,28 @@ defmodule LiveviewGridWeb.GridComponent do
                         value={parse_date_part(Map.get(@grid.state.filters, column.field, ""), :to)}
                       />
                     </form>
+                    <div class="lv-grid__date-filter-actions">
+                      <form phx-change="grid_date_filter_preset" phx-target={@myself} style="display: contents;">
+                        <input type="hidden" name="field" value={column.field} />
+                        <select class="lv-grid__date-preset-select" name="preset">
+                          <option value="">빠른 선택</option>
+                          <option value="today">오늘</option>
+                          <option value="last_7_days">최근 7일</option>
+                          <option value="this_month">이번 달</option>
+                          <option value="last_month">지난 달</option>
+                          <option value="this_year">올해</option>
+                        </select>
+                      </form>
+                      <%= if Map.has_key?(@grid.state.filters, column.field) do %>
+                        <button
+                          class="lv-grid__date-filter-clear"
+                          phx-click="grid_clear_column_filter"
+                          phx-value-field={column.field}
+                          phx-target={@myself}
+                          title="날짜 필터 초기화"
+                        >✕</button>
+                      <% end %>
+                    </div>
                   </div>
                 <% else %>
                   <input
@@ -833,6 +1109,32 @@ defmodule LiveviewGridWeb.GridComponent do
         </div>
       <% end %>
 
+      <%!-- FA-001: Pinned Top Rows --%>
+      <%= if length(Map.get(@grid.state, :pinned_top, [])) > 0 do %>
+        <div class="lv-grid__pinned-top">
+          <%= for row <- Grid.pinned_rows(@grid, :top) do %>
+            <div class="lv-grid__row lv-grid__row--pinned" data-row-id={row.id}>
+              <div class="lv-grid__cell lv-grid__cell--checkbox" style="width: 40px; flex: 0 0 40px;">
+                <input type="checkbox" phx-click="toggle_select" phx-value-id={row.id} phx-target={@myself}
+                  checked={row.id in @grid.state.selection.selected_ids} />
+              </div>
+              <%= if @grid.options.show_row_number do %>
+                <div class="lv-grid__cell lv-grid__cell--row-number" style="width: 50px; flex: 0 0 50px;">
+                  <span class="lv-grid__pin-icon">&#x1F4CC;</span>
+                </div>
+              <% end %>
+              <div class="lv-grid__cell lv-grid__cell--status" style="width: 40px; flex: 0 0 40px;"></div>
+              <%= for {column, _col_idx} <- Enum.with_index(@grid.columns) do %>
+                <% col_width = Map.get(@grid.state.column_widths, column.field) || column.width %>
+                <div class="lv-grid__cell" style={"width: #{if col_width == :auto, do: "150px", else: "#{col_width}px"}; flex: 0 0 #{if col_width == :auto, do: "150px", else: "#{col_width}px"};"}>
+                  <%= render_cell(assigns, row, column) %>
+                </div>
+              <% end %>
+            </div>
+          <% end %>
+        </div>
+      <% end %>
+
       <!-- Body -->
       <%= if @grid.options.virtual_scroll do %>
         <!-- Virtual Scroll Body -->
@@ -917,6 +1219,37 @@ defmodule LiveviewGridWeb.GridComponent do
           <% merge_regions = @grid.state.merge_regions %>
           <% suppress_map = build_suppress_map(p_data, @grid.columns) %>
           <%= for {row, row_num} <- with_row_numbers(p_data, row_number_offset(@grid)) do %>
+            <%= if Map.get(row, :_row_type) == :full_width do %>
+              <%!-- FA-036: Full-Width Row --%>
+              <div class="lv-grid__row lv-grid__row--full-width">
+                <div class="lv-grid__cell lv-grid__cell--full-width">
+                  <%= Map.get(row, :_full_width_content, "") %>
+                </div>
+              </div>
+            <% else %>
+            <%= if Map.get(row, :_row_type) == :subtotal do %>
+              <!-- F-963: Subtotal Row -->
+              <div class={"lv-grid__row lv-grid__row--subtotal lv-grid__row--group-depth-#{row._group_depth}"}>
+                <div class="lv-grid__cell" style="width: 90px; flex: 0 0 90px;"></div>
+                <%= if @grid.options.show_row_number do %>
+                  <div class="lv-grid__cell" style="width: 50px; flex: 0 0 50px;"></div>
+                <% end %>
+                <%= if @grid.state.show_status_column do %>
+                  <div class="lv-grid__cell" style="width: 60px; flex: 0 0 60px;"></div>
+                <% end %>
+                <%= for {column, _col_idx} <- Enum.with_index(Grid.display_columns(@grid)) do %>
+                  <div class="lv-grid__cell" style={column_width_style(column, @grid)}>
+                    <%= if Map.has_key?(row._subtotal_aggregates, column.field) do %>
+                      <span class="lv-grid__subtotal-value"><%= format_subtotal_value(Map.get(row._subtotal_aggregates, column.field), column) %></span>
+                    <% else %>
+                      <%= if column.field == Map.get(row, :_group_field) do %>
+                        <span class="lv-grid__subtotal-label"><%= row._group_value %> <%= grid_t(@grid, :subtotal) %></span>
+                      <% end %>
+                    <% end %>
+                  </div>
+                <% end %>
+              </div>
+            <% else %>
             <%= if Map.get(row, :_row_type) == :group_header do %>
               <!-- Group Header Row -->
               <div class={"lv-grid__row lv-grid__row--group-header lv-grid__row--group-depth-#{row._group_depth}"}>
@@ -954,6 +1287,9 @@ defmodule LiveviewGridWeb.GridComponent do
                 id={if Map.get(@grid.options, :row_reorder), do: "row-reorder-#{Map.get(row, :id)}"}
                 phx-hook={if Map.get(@grid.options, :row_reorder), do: "RowReorder"}
                 phx-target={if Map.get(@grid.options, :row_reorder), do: @myself}
+                role="row"
+                aria-rowindex={row_num}
+                aria-selected={to_string(Map.get(row, :id) in @grid.state.selection.selected_ids)}
               >
                 <%= if @grid.state.editing_row == row.id do %>
                   <div class="lv-grid__cell lv-grid__cell--row-actions" style="width: 90px; flex: 0 0 90px; justify-content: center; gap: 4px;">
@@ -975,6 +1311,16 @@ defmodule LiveviewGridWeb.GridComponent do
                   </div>
                 <% else %>
                   <div class="lv-grid__cell" style="width: 90px; flex: 0 0 90px; justify-content: center; gap: 4px;">
+                    <%= if @grid.options.enable_master_detail do %>
+                      <button
+                        class="lv-grid__detail-toggle"
+                        phx-click="grid_toggle_detail"
+                        phx-value-row-id={row.id}
+                        phx-target={@myself}
+                        title={if MapSet.member?(@grid.state.expanded_details, row.id), do: "상세 닫기", else: "상세 열기"}
+                        aria-expanded={MapSet.member?(@grid.state.expanded_details, row.id)}
+                      ><%= if MapSet.member?(@grid.state.expanded_details, row.id), do: "▼", else: "▶" %></button>
+                    <% end %>
                     <input
                       type="checkbox"
                       phx-click="grid_row_select"
@@ -1014,7 +1360,7 @@ defmodule LiveviewGridWeb.GridComponent do
                     <% m_width = if cs > 1, do: merged_width_style(@grid, column.field, cs), else: column_width_style(column, @grid) %>
                     <% m_height = if rs > 1, do: merged_height_style(@grid, rs), else: nil %>
                     <% is_suppressed = suppressed?(suppress_map, row.id, column.field) %>
-                    <div class={"lv-grid__cell #{frozen_class(col_idx, @grid)} #{wordwrap_class(column)} #{if cell_in_range?(@grid.state.cell_range, row.id, col_idx, p_row_id_to_pos), do: "lv-grid__cell--in-range"} #{if Map.get(column, :filter_type) == :number, do: "lv-grid__cell--numeric"} #{if span, do: "lv-grid__cell--merged"} #{if is_suppressed, do: "lv-grid__cell--suppressed"}"} style={"#{m_width}; #{frozen_style(col_idx, @grid)}; #{tree_indent_style(row, col_idx)}; #{m_height || ""}"} data-col-index={col_idx}>
+                    <div class={"lv-grid__cell #{frozen_class(col_idx, @grid)} #{wordwrap_class(column)} #{if cell_in_range?(@grid.state.cell_range, row.id, col_idx, p_row_id_to_pos), do: "lv-grid__cell--in-range"} #{if Map.get(column, :filter_type) == :number, do: "lv-grid__cell--numeric"} #{if span, do: "lv-grid__cell--merged"} #{if is_suppressed, do: "lv-grid__cell--suppressed"}"} style={"#{m_width}; #{frozen_style(col_idx, @grid)}; #{tree_indent_style(row, col_idx)}; #{m_height || ""}"} data-col-index={col_idx} role="gridcell" aria-colindex={col_idx + 1}>
                       <%= if col_idx == 0 && Map.has_key?(row, :_tree_has_children) do %>
                         <%= if row._tree_has_children do %>
                           <button
@@ -1034,8 +1380,86 @@ defmodule LiveviewGridWeb.GridComponent do
                   <% end %>
                 <% end %>
               </div>
+              <%!-- FA-014: Master-Detail Row --%>
+              <%= if @grid.options.enable_master_detail && MapSet.member?(@grid.state.expanded_details, Map.get(row, :id)) do %>
+                <div class="lv-grid__detail-row">
+                  <div class="lv-grid__detail-content">
+                    <%= if detail_renderer = Map.get(@grid.options, :detail_renderer) do %>
+                      <%= detail_renderer.(row) %>
+                    <% else %>
+                      <div class="lv-grid__detail-default">
+                        <%= for {key, val} <- Map.drop(row, [:id, :_tree_depth, :_tree_has_children, :_tree_expanded, :_virtual_index, :_row_type]) do %>
+                          <div class="lv-grid__detail-field">
+                            <strong><%= key %>:</strong> <%= val %>
+                          </div>
+                        <% end %>
+                      </div>
+                    <% end %>
+                  </div>
+                </div>
+              <% end %>
+            <% end %>
+            <% end %> <%!-- /if subtotal --%>
+            <% end %> <%!-- /if full_width --%>
+          <% end %>
+          <%!-- F-909: Empty Area Fill --%>
+          <%= if @grid.options[:fill_empty_area] do %>
+            <% empty_count = empty_rows_count(length(p_data), @grid.options[:empty_area_rows] || 5) %>
+            <%= for _i <- 1..max(empty_count, 0)//1 do %>
+              <div class="lv-grid__row lv-grid__row--empty">
+                <div class="lv-grid__cell" style="width: 90px; flex: 0 0 90px;"></div>
+                <%= for {column, _col_idx} <- Enum.with_index(Grid.display_columns(@grid)) do %>
+                  <div class="lv-grid__cell" style={column_width_style(column, @grid)}></div>
+                <% end %>
+              </div>
             <% end %>
           <% end %>
+        </div>
+      <% end %>
+
+      <%!-- FA-001: Pinned Bottom Rows --%>
+      <%= if length(Map.get(@grid.state, :pinned_bottom, [])) > 0 do %>
+        <div class="lv-grid__pinned-bottom">
+          <%= for row <- Grid.pinned_rows(@grid, :bottom) do %>
+            <div class="lv-grid__row lv-grid__row--pinned" data-row-id={row.id}>
+              <div class="lv-grid__cell lv-grid__cell--checkbox" style="width: 40px; flex: 0 0 40px;">
+                <input type="checkbox" phx-click="toggle_select" phx-value-id={row.id} phx-target={@myself}
+                  checked={row.id in @grid.state.selection.selected_ids} />
+              </div>
+              <%= if @grid.options.show_row_number do %>
+                <div class="lv-grid__cell lv-grid__cell--row-number" style="width: 50px; flex: 0 0 50px;">
+                  <span class="lv-grid__pin-icon">&#x1F4CC;</span>
+                </div>
+              <% end %>
+              <div class="lv-grid__cell lv-grid__cell--status" style="width: 40px; flex: 0 0 40px;"></div>
+              <%= for {column, _col_idx} <- Enum.with_index(@grid.columns) do %>
+                <% col_width = Map.get(@grid.state.column_widths, column.field) || column.width %>
+                <div class="lv-grid__cell" style={"width: #{if col_width == :auto, do: "150px", else: "#{col_width}px"}; flex: 0 0 #{if col_width == :auto, do: "150px", else: "#{col_width}px"};"}>
+                  <%= render_cell(assigns, row, column) %>
+                </div>
+              <% end %>
+            </div>
+          <% end %>
+        </div>
+      <% end %>
+
+      <%!-- FA-005: Overlay --%>
+      <%= if @grid.state.overlay do %>
+        <div class={"lv-grid__overlay lv-grid__overlay--#{@grid.state.overlay}"}>
+          <div class="lv-grid__overlay-inner">
+            <%= case @grid.state.overlay do %>
+              <% :loading -> %>
+                <div class="lv-grid__overlay-spinner"></div>
+                <span class="lv-grid__overlay-text"><%= @grid.state.overlay_message || "데이터를 불러오는 중..." %></span>
+              <% :no_data -> %>
+                <span class="lv-grid__overlay-icon">&#x1F4ED;</span>
+                <span class="lv-grid__overlay-text"><%= @grid.state.overlay_message || "표시할 데이터가 없습니다" %></span>
+              <% :error -> %>
+                <span class="lv-grid__overlay-icon lv-grid__overlay-icon--error">&#x26A0;</span>
+                <span class="lv-grid__overlay-text"><%= @grid.state.overlay_message || "데이터를 불러올 수 없습니다" %></span>
+              <% _ -> %>
+            <% end %>
+          </div>
         </div>
       <% end %>
 
@@ -1254,6 +1678,35 @@ defmodule LiveviewGridWeb.GridComponent do
           </div>
         </div>
       <% end %>
+      <%!-- FA-004: Status Bar --%>
+      <%= if @grid.options[:show_status_bar] do %>
+        <% sb = Grid.status_bar_data(@grid) %>
+        <div class="lv-grid__status-bar">
+          <div class="lv-grid__status-bar-left">
+            <span class="lv-grid__status-bar-item">
+              전체 <strong><%= sb.total_rows %></strong>건
+            </span>
+            <%= if sb.filtered_rows != sb.total_rows do %>
+              <span class="lv-grid__status-bar-item">
+                필터 <strong><%= sb.filtered_rows %></strong>건
+              </span>
+            <% end %>
+          </div>
+          <div class="lv-grid__status-bar-right">
+            <%= if sb.selected_count > 0 do %>
+              <span class="lv-grid__status-bar-item">
+                선택 <strong><%= sb.selected_count %></strong>건
+              </span>
+            <% end %>
+            <%= if sb.editing do %>
+              <span class="lv-grid__status-bar-item lv-grid__status-bar-item--editing">
+                편집 중
+              </span>
+            <% end %>
+          </div>
+        </div>
+      <% end %>
+
       <%!-- F-800: Context Menu --%>
       <%= if @context_menu do %>
         <div
@@ -1279,6 +1732,24 @@ defmodule LiveviewGridWeb.GridComponent do
             <span>⧉</span> 행 복제
           </div>
           <div class="lv-grid__context-menu-divider"></div>
+          <%!-- FA-001: Row Pinning --%>
+          <% row_id = @context_menu.row_id
+             is_pinned_top = row_id in Map.get(@grid.state, :pinned_top, [])
+             is_pinned_bottom = row_id in Map.get(@grid.state, :pinned_bottom, [])
+             is_pinned = is_pinned_top || is_pinned_bottom %>
+          <%= if is_pinned do %>
+            <div class="lv-grid__context-menu-item" phx-click="context_menu_action" phx-value-action="unpin_row" phx-value-row-id={@context_menu.row_id} phx-target={@myself}>
+              <span>&#x1F4CC;</span> 고정 해제
+            </div>
+          <% else %>
+            <div class="lv-grid__context-menu-item" phx-click="context_menu_action" phx-value-action="pin_row_top" phx-value-row-id={@context_menu.row_id} phx-target={@myself}>
+              <span>&#x2B06;</span> 상단 고정
+            </div>
+            <div class="lv-grid__context-menu-item" phx-click="context_menu_action" phx-value-action="pin_row_bottom" phx-value-row-id={@context_menu.row_id} phx-target={@myself}>
+              <span>&#x2B07;</span> 하단 고정
+            </div>
+          <% end %>
+          <div class="lv-grid__context-menu-divider"></div>
           <div class="lv-grid__context-menu-item lv-grid__context-menu-item--danger" phx-click="context_menu_action" phx-value-action="delete_row" phx-value-row-id={@context_menu.row_id} phx-target={@myself}>
             <span>🗑</span> 행 삭제
           </div>
@@ -1293,6 +1764,70 @@ defmodule LiveviewGridWeb.GridComponent do
           grid={@grid}
           parent_target={@myself}
         />
+      <% end %>
+
+      <%!-- FA-030: Side Bar --%>
+      <%= if @grid.options[:enable_sidebar] && @grid.state.sidebar_open do %>
+        <div class="lv-grid__sidebar">
+          <div class="lv-grid__sidebar-header">
+            <button class={"lv-grid__sidebar-tab #{if @grid.state.sidebar_tab == :columns, do: "lv-grid__sidebar-tab--active"}"} phx-click="grid_sidebar_tab" phx-value-tab="columns" phx-target={@myself}>
+              컬럼
+            </button>
+            <button class={"lv-grid__sidebar-tab #{if @grid.state.sidebar_tab == :filters, do: "lv-grid__sidebar-tab--active"}"} phx-click="grid_sidebar_tab" phx-value-tab="filters" phx-target={@myself}>
+              필터
+            </button>
+            <button class="lv-grid__sidebar-close" phx-click="grid_toggle_sidebar" phx-target={@myself}>&#10005;</button>
+          </div>
+          <div class="lv-grid__sidebar-body">
+            <%= if @grid.state.sidebar_tab == :columns do %>
+              <%= for col <- all_columns_for_sidebar(@grid) do %>
+                <label class="lv-grid__sidebar-item">
+                  <input type="checkbox" checked={col.field not in (@grid.state[:hidden_columns] || [])} phx-click="grid_toggle_column_visibility" phx-value-field={col.field} phx-target={@myself} />
+                  <span><%= col.label %></span>
+                </label>
+              <% end %>
+            <% else %>
+              <div class="lv-grid__sidebar-filters">
+                <%= for col <- Enum.filter(@grid.columns, & &1.filterable) do %>
+                  <div class="lv-grid__sidebar-filter-item">
+                    <label><%= col.label %></label>
+                    <input type="text" value={Map.get(@grid.state.filters, col.field, "")} phx-keyup="grid_filter" phx-value-field={col.field} phx-debounce="300" phx-target={@myself} placeholder={"#{col.label} 필터..."} />
+                  </div>
+                <% end %>
+              </div>
+            <% end %>
+          </div>
+        </div>
+      <% end %>
+
+      <%!-- FA-044: Find & Highlight Bar --%>
+      <%= if @grid.options[:enable_find] && @grid.state.find_bar_open do %>
+        <div class="lv-grid__find-bar">
+          <form phx-change="grid_find" phx-target={@myself}>
+            <input type="text" name="text" class="lv-grid__find-input" value={@grid.state.find_text} placeholder={grid_t(@grid, :find_placeholder)} phx-debounce="200" />
+          </form>
+          <span class="lv-grid__find-count"><%= @grid.state.find_current_index %>/<%= length(@grid.state.find_matches) %></span>
+          <button class="lv-grid__find-btn" phx-click="grid_find_prev" phx-target={@myself}>&#9650;</button>
+          <button class="lv-grid__find-btn" phx-click="grid_find_next" phx-target={@myself}>&#9660;</button>
+          <button class="lv-grid__find-btn" phx-click="grid_toggle_find" phx-target={@myself}>&#10005;</button>
+        </div>
+      <% end %>
+
+      <%!-- FA-045: Large Text Editor Modal --%>
+      <%= if @grid.state.large_text_editing do %>
+        <div class="lv-grid__large-text-overlay">
+          <div class="lv-grid__large-text-modal">
+            <div class="lv-grid__large-text-header">
+              <span><%= @grid.state.large_text_editing.field %></span>
+              <button phx-click="grid_large_text_cancel" phx-target={@myself}>&#10005;</button>
+            </div>
+            <textarea class="lv-grid__large-text-area" id={"#{@grid.id}-large-text"} rows="10"><%= @grid.state.large_text_editing.value %></textarea>
+            <div class="lv-grid__large-text-footer">
+              <button class="lv-grid__btn" phx-click="grid_large_text_cancel" phx-target={@myself}>취소</button>
+              <button class="lv-grid__btn lv-grid__btn--primary" phx-click="grid_large_text_save" phx-value-value="" phx-target={@myself}>저장</button>
+            </div>
+          </div>
+        </div>
       <% end %>
     </div>
     """

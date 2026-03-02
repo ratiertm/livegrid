@@ -237,11 +237,18 @@ defmodule LiveViewGrid.Grid do
     # v0.7: Grouping / Tree 적용 (pagination 전에)
     structured = apply_data_structuring(sorted, state)
 
+    # F-963: 소계 행 삽입
+    with_subtotals = if options[:show_subtotals] && length(state.group_by) > 0 do
+      Grouping.insert_subtotals(structured, state.group_aggregates, options[:subtotal_position] || :bottom)
+    else
+      structured
+    end
+
     # Virtual Scrolling 사용 시
     if options.virtual_scroll do
-      apply_virtual_scroll(structured, state.scroll_offset, options)
+      apply_virtual_scroll(with_subtotals, state.scroll_offset, options)
     else
-      apply_pagination(structured, state.pagination, options.page_size)
+      apply_pagination(with_subtotals, state.pagination, options.page_size)
     end
   end
 
@@ -518,6 +525,35 @@ defmodule LiveViewGrid.Grid do
     |> put_in([:state, :row_statuses], updated_statuses)
   end
 
+  # ── FA-013: Cell Fill Handle ──
+
+  @doc """
+  소스 셀의 값을 타겟 행들에 복사합니다 (Excel 자동채움).
+  editable: false인 컬럼은 무시합니다.
+
+  ## Parameters
+  - grid: Grid 맵
+  - source_row_id: 소스 행 ID
+  - field: 필드 atom
+  - target_row_ids: 타겟 행 ID 리스트
+  """
+  @spec fill_cells(grid :: t(), source_row_id :: any(), field :: atom(), target_row_ids :: list(any())) :: t()
+  def fill_cells(grid, _source_row_id, _field, []), do: grid
+  def fill_cells(grid, source_row_id, field, target_row_ids) do
+    column = Enum.find(grid.columns, &(&1.field == field))
+
+    if column && column.editable do
+      source_row = Enum.find(grid.data, &(&1.id == source_row_id))
+      value = if source_row, do: Map.get(source_row, field), else: nil
+
+      Enum.reduce(target_row_ids, grid, fn row_id, acc ->
+        update_cell(acc, row_id, field, value)
+      end)
+    else
+      grid
+    end
+  end
+
   @doc "특정 행의 상태를 조회합니다."
   @spec row_status(grid :: t(), row_id :: any()) :: :normal | :new | :updated | :deleted
   def row_status(grid, row_id) do
@@ -625,6 +661,212 @@ defmodule LiveViewGrid.Grid do
   def toggle_tree_node(grid, node_id) do
     updated = Tree.toggle_node(grid.state.tree_expanded, node_id)
     put_in(grid.state.tree_expanded, updated)
+  end
+
+  # ── F-961: Tree Batch Expand ──
+
+  @doc "모든 트리 노드를 펼칩니다."
+  @spec expand_all_nodes(grid :: t()) :: t()
+  def expand_all_nodes(grid) do
+    all_ids = Tree.all_node_ids(grid.data, grid.state.tree_parent_field)
+    expanded = Map.new(all_ids, &{&1, true})
+    put_in(grid.state.tree_expanded, expanded)
+  end
+
+  @doc "모든 트리 노드를 접습니다."
+  @spec collapse_all_nodes(grid :: t()) :: t()
+  def collapse_all_nodes(grid) do
+    all_ids = Tree.all_node_ids(grid.data, grid.state.tree_parent_field)
+    expanded = Map.new(all_ids, &{&1, false})
+    put_in(grid.state.tree_expanded, expanded)
+  end
+
+  @doc "특정 depth까지 트리 노드를 펼칩니다. depth 0 = root만 표시."
+  @spec expand_to_level(grid :: t(), level :: non_neg_integer()) :: t()
+  def expand_to_level(grid, level) do
+    expanded = Tree.expand_to_level_map(grid.data, grid.state.tree_parent_field, level)
+    put_in(grid.state.tree_expanded, expanded)
+  end
+
+  # ── FA-014: Master-Detail ──
+
+  @doc "행의 상세 패널을 토글합니다."
+  @spec toggle_detail(grid :: t(), row_id :: any()) :: t()
+  def toggle_detail(grid, row_id) do
+    expanded = grid.state.expanded_details
+    new_expanded = if MapSet.member?(expanded, row_id) do
+      MapSet.delete(expanded, row_id)
+    else
+      MapSet.put(expanded, row_id)
+    end
+    put_in(grid.state.expanded_details, new_expanded)
+  end
+
+  # ── FA-018: Printing ──
+
+  @doc "인쇄용 전체 데이터를 반환합니다 (페이징 해제, 정렬/필터만 적용)."
+  @spec print_data(grid :: t()) :: list(map())
+  def print_data(%{data: data, columns: columns, state: state}) do
+    data
+    |> apply_global_search(state.global_search, columns)
+    |> apply_filters(state.filters, columns)
+    |> apply_advanced_filters(state.advanced_filters, columns)
+    |> apply_sort(state.sort, columns)
+  end
+
+  # ── Phase 5 (v1.0+) APIs ──
+
+  @doc """
+  FA-030: 사이드바를 열거나 닫는다.
+  """
+  @spec toggle_sidebar(grid :: t()) :: t()
+  def toggle_sidebar(grid) do
+    put_in(grid.state.sidebar_open, !grid.state.sidebar_open)
+  end
+
+  @doc """
+  FA-030: 사이드바 탭을 전환한다. (:columns | :filters)
+  """
+  @spec set_sidebar_tab(grid :: t(), tab :: atom()) :: t()
+  def set_sidebar_tab(grid, tab) when tab in [:columns, :filters] do
+    grid
+    |> put_in([:state, :sidebar_tab], tab)
+    |> put_in([:state, :sidebar_open], true)
+  end
+
+  @doc """
+  FA-034: 선택된 셀 범위에 일괄 값을 적용한다.
+  cell_range의 모든 행/컬럼에 동일 값을 설정한다.
+  """
+  @spec batch_update_cells(grid :: t(), field :: atom(), value :: any()) :: t()
+  def batch_update_cells(grid, field, value) do
+    case grid.state.cell_range do
+      nil -> grid
+      %{row_ids: row_ids} ->
+        column = Enum.find(grid.columns, &(&1.field == field))
+        if column && column.editable do
+          Enum.reduce(row_ids, grid, fn row_id, acc ->
+            update_cell(acc, row_id, field, value)
+          end)
+        else
+          grid
+        end
+    end
+  end
+
+  @doc "FA-044: 찾기 바 토글"
+  @spec toggle_find_bar(grid :: t()) :: t()
+  def toggle_find_bar(grid) do
+    open = !grid.state.find_bar_open
+    grid = put_in(grid, [:state, :find_bar_open], open)
+    if !open, do: find_in_grid(grid, ""), else: grid
+  end
+
+  @doc """
+  FA-044: 검색 텍스트를 설정하고 매칭 셀을 찾는다.
+  """
+  @spec find_in_grid(grid :: t(), search_text :: String.t()) :: t()
+  def find_in_grid(grid, "") do
+    grid
+    |> put_in([:state, :find_text], "")
+    |> put_in([:state, :find_matches], [])
+    |> put_in([:state, :find_current_index], 0)
+  end
+  def find_in_grid(grid, search_text) do
+    search_lower = String.downcase(search_text)
+
+    matches =
+      grid.data
+      |> Enum.flat_map(fn row ->
+        grid.columns
+        |> Enum.filter(fn col ->
+          val = Map.get(row, col.field)
+          val != nil && val |> to_string() |> String.downcase() |> String.contains?(search_lower)
+        end)
+        |> Enum.map(fn col -> %{row_id: row.id, field: col.field} end)
+      end)
+
+    grid
+    |> put_in([:state, :find_text], search_text)
+    |> put_in([:state, :find_matches], matches)
+    |> put_in([:state, :find_current_index], if(matches == [], do: 0, else: 1))
+  end
+
+  @doc """
+  FA-044: 다음/이전 검색 결과로 이동한다.
+  """
+  @spec find_next(grid :: t()) :: t()
+  def find_next(grid) do
+    matches = grid.state.find_matches
+    current = grid.state.find_current_index
+    total = length(matches)
+
+    if total == 0 do
+      grid
+    else
+      new_index = if current >= total, do: 1, else: current + 1
+      put_in(grid.state.find_current_index, new_index)
+    end
+  end
+
+  @spec find_prev(grid :: t()) :: t()
+  def find_prev(grid) do
+    matches = grid.state.find_matches
+    current = grid.state.find_current_index
+    total = length(matches)
+
+    if total == 0 do
+      grid
+    else
+      new_index = if current <= 1, do: total, else: current - 1
+      put_in(grid.state.find_current_index, new_index)
+    end
+  end
+
+  @doc """
+  FA-045: 대형 텍스트 편집 모드를 시작한다.
+  """
+  @spec start_large_text_edit(grid :: t(), row_id :: any(), field :: atom()) :: t()
+  def start_large_text_edit(grid, row_id, field) do
+    row = Enum.find(grid.data, &(&1.id == row_id))
+    value = if row, do: Map.get(row, field), else: nil
+    put_in(grid.state.large_text_editing, %{row_id: row_id, field: field, value: to_string(value || "")})
+  end
+
+  @doc """
+  FA-045: 대형 텍스트 편집을 저장한다.
+  """
+  @spec save_large_text_edit(grid :: t(), value :: String.t()) :: t()
+  def save_large_text_edit(grid, value) do
+    case grid.state.large_text_editing do
+      %{row_id: row_id, field: field} ->
+        grid
+        |> update_cell(row_id, field, value)
+        |> put_in([:state, :large_text_editing], nil)
+      _ -> grid
+    end
+  end
+
+  @doc """
+  FA-045: 대형 텍스트 편집을 취소한다.
+  """
+  @spec cancel_large_text_edit(grid :: t()) :: t()
+  def cancel_large_text_edit(grid) do
+    put_in(grid.state.large_text_editing, nil)
+  end
+
+  @doc """
+  FA-036: Full-Width Row를 추가한다.
+  """
+  @spec add_full_width_row(grid :: t(), content :: String.t(), position :: non_neg_integer()) :: t()
+  def add_full_width_row(grid, content, position \\ 0) do
+    full_width_row = %{
+      id: "fw_#{System.unique_integer([:positive])}",
+      _row_type: :full_width,
+      _full_width_content: content,
+      _position: position
+    }
+    %{grid | data: [full_width_row | grid.data]}
   end
 
   # ── v0.7: Pivot Table API ──
@@ -1036,7 +1278,26 @@ defmodule LiveViewGrid.Grid do
       theme: "light",
       show_row_number: false,
       show_summary: false,
-      autofit_type: :none
+      autofit_type: :none,
+      enable_cell_text_selection: false,
+      show_status_bar: false,
+      floating_filter: false,
+      show_column_menu: false,
+      animate_rows: false,
+      locale: :ko,
+      locale_texts: %{},
+      enable_fill_handle: false,
+      enable_master_detail: false,
+      enable_print: false,
+      show_subtotals: false,
+      subtotal_position: :bottom,
+      # Phase 5 (v1.0+)
+      enable_sidebar: false,
+      enable_batch_edit: false,
+      fill_empty_area: false,
+      empty_area_rows: 5,
+      enable_find: false,
+      enable_large_text_editor: false
     }
   end
 
@@ -1044,7 +1305,7 @@ defmodule LiveViewGrid.Grid do
   defp all_columns(grid) do
     cond do
       grid.state[:all_columns] -> grid.state[:all_columns]
-      grid.definition -> grid.definition.columns
+      grid.definition -> normalize_columns(grid.definition.columns)
       true -> grid.columns
     end
   end
@@ -1326,11 +1587,298 @@ defmodule LiveViewGrid.Grid do
     end
   end
 
+  # ── FA-005: Overlay ──
+
+  # ── FA-001: Row Pinning ──
+
+  @doc "행을 상단 또는 하단에 고정한다. position은 :top 또는 :bottom."
+  @spec pin_row(t(), any(), :top | :bottom) :: t()
+  def pin_row(grid, row_id, position \\ :top) when position in [:top, :bottom] do
+    # 이미 다른 위치에 고정되어 있으면 먼저 해제
+    grid = unpin_row(grid, row_id)
+
+    key = if position == :top, do: :pinned_top, else: :pinned_bottom
+    current = Map.get(grid.state, key, [])
+
+    unless row_id in current do
+      %{grid | state: Map.put(grid.state, key, current ++ [row_id])}
+    else
+      grid
+    end
+  end
+
+  @doc "행의 고정을 해제한다."
+  @spec unpin_row(t(), any()) :: t()
+  def unpin_row(grid, row_id) do
+    %{grid | state:
+      grid.state
+      |> Map.update(:pinned_top, [], &List.delete(&1, row_id))
+      |> Map.update(:pinned_bottom, [], &List.delete(&1, row_id))
+    }
+  end
+
+  @doc "고정된 행의 데이터를 반환한다."
+  @spec pinned_rows(t(), :top | :bottom) :: [map()]
+  def pinned_rows(grid, position) when position in [:top, :bottom] do
+    key = if position == :top, do: :pinned_top, else: :pinned_bottom
+    pinned_ids = Map.get(grid.state, key, [])
+
+    pinned_ids
+    |> Enum.map(fn id -> Enum.find(grid.data, &(Map.get(&1, :id) == id)) end)
+    |> Enum.reject(&is_nil/1)
+  end
+
+  # ── FA-004: Status Bar ──
+
+  @doc "Grid 상태 바에 표시할 데이터를 반환한다."
+  @spec status_bar_data(t()) :: map()
+  def status_bar_data(grid) do
+    total_rows = length(grid.data)
+    visible = visible_data(grid)
+    filtered_rows = length(visible)
+    selected_count = length(grid.state.selection.selected_ids)
+    editing = grid.state.editing
+
+    %{
+      total_rows: total_rows,
+      filtered_rows: filtered_rows,
+      selected_count: selected_count,
+      editing: editing
+    }
+  end
+
+  @doc "Grid에 오버레이를 설정한다. type은 :loading, :no_data, :error 중 하나."
+  @spec set_overlay(t(), atom(), String.t() | nil) :: t()
+  def set_overlay(grid, type, message \\ nil) when type in [:loading, :no_data, :error] do
+    %{grid | state: grid.state |> Map.put(:overlay, type) |> Map.put(:overlay_message, message)}
+  end
+
+  @doc "Grid의 오버레이를 해제한다."
+  @spec clear_overlay(t()) :: t()
+  def clear_overlay(grid) do
+    %{grid | state: grid.state |> Map.put(:overlay, nil) |> Map.put(:overlay_message, nil)}
+  end
+
+  # ── FA-002: Grid State Save/Restore ──
+
+  @doc """
+  현재 그리드 상태를 직렬화 가능한 맵으로 반환한다.
+
+  ## 포함 필드
+  sort, filters, global_search, show_filter_row, column_order,
+  hidden_columns, pagination.current_page, group_by, group_expanded
+
+  ## Examples
+
+      iex> state_map = Grid.get_state(grid)
+      iex> is_map(state_map)
+      true
+  """
+  @spec get_state(grid :: t()) :: map()
+  def get_state(grid) do
+    s = grid.state
+
+    sort_map = case s.sort do
+      %{field: field, direction: dir} -> %{field: to_string(field), direction: to_string(dir)}
+      _ -> nil
+    end
+
+    filters_map = Enum.into(s.filters, %{}, fn
+      {k, {:set, values}} -> {to_string(k), %{type: "set", values: Enum.map(values, &to_string/1)}}
+      {k, v} -> {to_string(k), v}
+    end)
+
+    %{
+      sort: sort_map,
+      filters: filters_map,
+      global_search: s.global_search,
+      show_filter_row: s.show_filter_row,
+      column_order: if(s.column_order, do: Enum.map(s.column_order, &to_string/1)),
+      hidden_columns: Map.get(s, :hidden_columns, []) |> Enum.map(&to_string/1),
+      current_page: s.pagination.current_page,
+      group_by: Enum.map(s.group_by, &to_string/1),
+      column_widths: Enum.into(s.column_widths, %{}, fn {k, v} -> {to_string(k), v} end)
+    }
+  end
+
+  @doc """
+  직렬화된 맵으로 그리드 상태를 복원한다. 부분 복원을 지원한다.
+
+  ## Examples
+
+      iex> state_map = Grid.get_state(grid)
+      iex> restored = Grid.restore_state(grid, state_map)
+      iex> restored.state.sort
+  """
+  @spec restore_state(grid :: t(), state_map :: map()) :: t()
+  def restore_state(grid, state_map) when is_map(state_map) do
+    state = grid.state
+
+    state = case Map.get(state_map, "sort") || Map.get(state_map, :sort) do
+      %{"field" => f, "direction" => d} ->
+        %{state | sort: %{field: String.to_atom(f), direction: String.to_atom(d)}}
+      %{field: f, direction: d} when is_atom(f) ->
+        %{state | sort: %{field: f, direction: d}}
+      nil -> state
+      _ -> state
+    end
+
+    state = case Map.get(state_map, "filters") || Map.get(state_map, :filters) do
+      filters when is_map(filters) and map_size(filters) > 0 ->
+        restored = Enum.into(filters, %{}, fn
+          {k, %{"type" => "set", "values" => vals}} ->
+            {to_atom(k), {:set, Enum.map(vals, &to_string/1)}}
+          {k, %{type: "set", values: vals}} ->
+            {to_atom(k), {:set, Enum.map(vals, &to_string/1)}}
+          {k, v} ->
+            {to_atom(k), v}
+        end)
+        %{state | filters: restored}
+      _ -> state
+    end
+
+    state = case Map.get(state_map, "global_search") || Map.get(state_map, :global_search) do
+      gs when is_binary(gs) -> %{state | global_search: gs}
+      _ -> state
+    end
+
+    state = case Map.get(state_map, "show_filter_row") || Map.get(state_map, :show_filter_row) do
+      sfr when is_boolean(sfr) -> %{state | show_filter_row: sfr}
+      _ -> state
+    end
+
+    state = case Map.get(state_map, "column_order") || Map.get(state_map, :column_order) do
+      order when is_list(order) ->
+        %{state | column_order: Enum.map(order, &to_atom/1)}
+      _ -> state
+    end
+
+    state = case Map.get(state_map, "hidden_columns") || Map.get(state_map, :hidden_columns) do
+      hidden when is_list(hidden) and length(hidden) > 0 ->
+        Map.put(state, :hidden_columns, Enum.map(hidden, &to_atom/1))
+      _ -> state
+    end
+
+    state = case Map.get(state_map, "current_page") || Map.get(state_map, :current_page) do
+      page when is_integer(page) and page > 0 ->
+        put_in(state.pagination.current_page, page)
+      _ -> state
+    end
+
+    state = case Map.get(state_map, "group_by") || Map.get(state_map, :group_by) do
+      groups when is_list(groups) ->
+        %{state | group_by: Enum.map(groups, &to_atom/1)}
+      _ -> state
+    end
+
+    state = case Map.get(state_map, "column_widths") || Map.get(state_map, :column_widths) do
+      widths when is_map(widths) and map_size(widths) > 0 ->
+        restored = Enum.into(widths, %{}, fn {k, v} -> {to_atom(k), v} end)
+        %{state | column_widths: restored}
+      _ -> state
+    end
+
+    %{grid | state: state}
+  end
+
+  # ── FA-016: Column State Save/Restore ──
+
+  @doc """
+  컬럼별 상태(field, width, visible, sort, order_index)를 맵 리스트로 반환한다.
+  """
+  @spec get_column_state(grid :: t()) :: list(map())
+  def get_column_state(grid) do
+    hidden = Map.get(grid.state, :hidden_columns, [])
+    all_cols = Map.get(grid.state, :all_columns, grid.columns)
+    order = grid.state.column_order
+
+    all_cols
+    |> Enum.with_index()
+    |> Enum.map(fn {col, idx} ->
+      order_idx = if order do
+        Enum.find_index(order, &(&1 == col.field)) || idx
+      else
+        idx
+      end
+
+      width = Map.get(grid.state.column_widths, col.field, col.width)
+
+      %{
+        field: to_string(col.field),
+        width: width,
+        visible: col.field not in hidden,
+        sort: if(grid.state.sort && grid.state.sort.field == col.field,
+          do: to_string(grid.state.sort.direction),
+          else: nil),
+        order_index: order_idx
+      }
+    end)
+  end
+
+  @doc """
+  컬럼 상태 리스트로 컬럼 상태를 복원한다.
+  """
+  @spec apply_column_state(grid :: t(), col_states :: list(map())) :: t()
+  def apply_column_state(grid, col_states) when is_list(col_states) do
+    state = grid.state
+
+    # 컬럼 순서 복원
+    ordered_fields = col_states
+      |> Enum.sort_by(fn cs -> Map.get(cs, "order_index") || Map.get(cs, :order_index, 0) end)
+      |> Enum.map(fn cs ->
+        f = Map.get(cs, "field") || Map.get(cs, :field)
+        to_atom(f)
+      end)
+    state = %{state | column_order: ordered_fields}
+
+    # hidden_columns 복원
+    hidden = col_states
+      |> Enum.reject(fn cs ->
+        Map.get(cs, "visible", Map.get(cs, :visible, true))
+      end)
+      |> Enum.map(fn cs ->
+        f = Map.get(cs, "field") || Map.get(cs, :field)
+        to_atom(f)
+      end)
+    state = Map.put(state, :hidden_columns, hidden)
+
+    # 컬럼 너비 복원
+    widths = col_states
+      |> Enum.reduce(%{}, fn cs, acc ->
+        f = Map.get(cs, "field") || Map.get(cs, :field)
+        w = Map.get(cs, "width") || Map.get(cs, :width)
+        if w && w != :auto, do: Map.put(acc, to_atom(f), w), else: acc
+      end)
+    state = %{state | column_widths: Map.merge(state.column_widths, widths)}
+
+    # 정렬 복원 (첫 번째 정렬 상태만)
+    sort_state = Enum.find(col_states, fn cs ->
+      s = Map.get(cs, "sort") || Map.get(cs, :sort)
+      s != nil
+    end)
+    state = if sort_state do
+      f = Map.get(sort_state, "field") || Map.get(sort_state, :field)
+      d = Map.get(sort_state, "sort") || Map.get(sort_state, :sort)
+      %{state | sort: %{field: to_atom(f), direction: to_atom(d)}}
+    else
+      state
+    end
+
+    # visible 컬럼만 grid.columns에 반영
+    all_cols = Map.get(grid.state, :all_columns, grid.columns)
+    visible_columns = Enum.reject(all_cols, fn col -> col.field in hidden end)
+
+    %{grid | state: state, columns: visible_columns}
+  end
+
   # Private functions
 
   defp generate_id do
     "grid_" <> (:crypto.strong_rand_bytes(4) |> Base.encode16(case: :lower))
   end
+
+  defp to_atom(value) when is_atom(value), do: value
+  defp to_atom(value) when is_binary(value), do: String.to_atom(value)
 
   defp normalize_columns(columns) do
     Enum.map(columns, fn col ->
@@ -1353,9 +1901,26 @@ defmodule LiveViewGrid.Grid do
         header_group: nil,
         nulls: :last,
         required: false,
-        summary: nil
+        summary: nil,
+        resizable: true,
+        floating_filter: nil,
+        menu: true,
+        value_getter: nil,
+        value_setter: nil
       }, col)
     end)
+  end
+
+  @doc """
+  FA-015: 컬럼의 value_getter를 사용하여 셀 값을 가져온다.
+  value_getter가 없으면 row에서 직접 field 값을 가져온다.
+  """
+  @spec get_cell_value(row :: map(), column :: map()) :: any()
+  def get_cell_value(row, %{value_getter: getter} = _column) when is_function(getter, 1) do
+    getter.(row)
+  end
+  def get_cell_value(row, %{field: field}) do
+    Map.get(row, field)
   end
 
   defp initial_state do
@@ -1400,7 +1965,30 @@ defmodule LiveViewGrid.Grid do
       # F-904: Cell Merge
       merge_regions: %{},
       # Per-row Heights (extendsizetype)
-      row_heights: %{}
+      row_heights: %{},
+      # FA-005: Overlay
+      overlay: nil,
+      overlay_message: nil,
+      # FA-001: Row Pinning
+      pinned_top: [],
+      pinned_bottom: [],
+      # FA-010: Column Menu
+      column_menu_open: nil,
+      # FA-012: Set Filter
+      set_filter_open: nil,
+      set_filter_search: %{},
+      # FA-014: Master-Detail
+      expanded_details: MapSet.new(),
+      # FA-030: Side Bar
+      sidebar_open: false,
+      sidebar_tab: :columns,
+      # FA-044: Find & Highlight
+      find_bar_open: false,
+      find_text: "",
+      find_matches: [],
+      find_current_index: 0,
+      # FA-045: Large Text Editor
+      large_text_editing: nil
     }
   end
 

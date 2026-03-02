@@ -9,7 +9,7 @@
   border-bottom: 2px solid var(--lv-grid-border);
   position: sticky;
   top: 0;
-  z-index: 10;
+  z-index: var(--lv-grid-z-header);
 }
 
 .lv-grid__header-cell {
@@ -89,7 +89,7 @@
   width: 6px;
   cursor: col-resize;
   background: transparent;
-  z-index: 5;
+  z-index: var(--lv-grid-z-resize);
   transition: background 0.15s ease;
 }
 
@@ -138,7 +138,7 @@
 }
 
 .lv-grid__filter-cell {
-  padding: 4px 8px;
+  padding: var(--lv-grid-space-2) var(--lv-grid-space-4);
   height: 40px;
   display: flex;
   align-items: center;
@@ -167,12 +167,42 @@
   font-size: 12px;
 }
 
-/* Date Filter (F-062) */
+/* FA-011: Floating Filter Row */
+.lv-grid__floating-filter-row {
+  display: flex;
+  background: var(--lv-grid-bg-secondary);
+  border-bottom: 1px solid var(--lv-grid-border);
+}
+
+.lv-grid__filter-input--floating {
+  width: 100%;
+  padding: 3px 6px;
+  border: 1px solid var(--lv-grid-border-input);
+  border-radius: 3px;
+  font-size: 11px;
+  font-family: var(--lv-grid-font-family);
+  color: var(--lv-grid-text);
+  background: var(--lv-grid-bg-input);
+}
+
+.lv-grid__filter-input--floating:focus {
+  outline: none;
+  border-color: var(--lv-grid-primary);
+  box-shadow: 0 0 0 1px rgba(33, 150, 243, 0.15);
+}
+
+.lv-grid__filter-input--floating::placeholder {
+  color: var(--lv-grid-text-disabled);
+  font-size: 11px;
+}
+
+/* Date Filter (F-062 + FA-003) */
 .lv-grid__date-filter {
   display: flex;
   align-items: center;
   gap: 4px;
   width: 100%;
+  flex-wrap: wrap;
 }
 
 .lv-grid__filter-input--date {
@@ -186,6 +216,52 @@
   color: var(--lv-grid-text-secondary);
   font-size: 12px;
   flex-shrink: 0;
+}
+
+/* FA-003: Date Filter Actions (Preset + Clear) */
+.lv-grid__date-filter-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+}
+
+.lv-grid__date-preset-select {
+  flex: 1;
+  min-width: 0;
+  padding: 2px 4px;
+  font-size: 10px;
+  border: 1px solid var(--lv-grid-border);
+  border-radius: 3px;
+  background: var(--lv-grid-bg);
+  color: var(--lv-grid-text);
+  cursor: pointer;
+}
+
+.lv-grid__date-preset-select:focus {
+  outline: none;
+  border-color: var(--lv-grid-primary);
+}
+
+.lv-grid__date-filter-clear {
+  width: 18px;
+  height: 18px;
+  border: none;
+  background: var(--lv-grid-danger, #f44336);
+  color: white;
+  border-radius: 50%;
+  font-size: 10px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  line-height: 1;
+  padding: 0;
+}
+
+.lv-grid__date-filter-clear:hover {
+  background: var(--lv-grid-danger-dark, #d32f2f);
 }
 
 .lv-grid__filter-clear {
@@ -223,4 +299,165 @@
   font-size: 12px;
   color: var(--lv-grid-text-placeholder);
   font-weight: 700;
+}
+
+/* FA-012: Set Filter */
+.lv-grid__set-filter-btn {
+  width: 100%;
+  padding: 3px 6px;
+  font-size: 11px;
+  border: 1px solid var(--lv-grid-border-input);
+  border-radius: 3px;
+  background: var(--lv-grid-bg-input);
+  color: var(--lv-grid-text-secondary);
+  cursor: pointer;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.lv-grid__set-filter-btn--active {
+  border-color: var(--lv-grid-primary);
+  color: var(--lv-grid-primary);
+  font-weight: 600;
+}
+
+.lv-grid__set-filter-panel {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: var(--lv-grid-z-dropdown);
+  min-width: 180px;
+  max-height: 300px;
+  background: var(--lv-grid-bg);
+  border: 1px solid var(--lv-grid-border);
+  border-radius: 4px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  display: flex;
+  flex-direction: column;
+}
+
+.lv-grid__set-filter-search {
+  padding: 8px;
+  border-bottom: 1px solid var(--lv-grid-border);
+}
+
+.lv-grid__set-filter-search input {
+  width: 100%;
+  padding: 4px 8px;
+  font-size: 12px;
+  border: 1px solid var(--lv-grid-border-input);
+  border-radius: 3px;
+  background: var(--lv-grid-bg-input);
+  color: var(--lv-grid-text);
+}
+
+.lv-grid__set-filter-actions {
+  display: flex;
+  gap: 4px;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--lv-grid-border);
+}
+
+.lv-grid__set-filter-actions button {
+  flex: 1;
+  padding: 3px 6px;
+  font-size: 10px;
+  border: 1px solid var(--lv-grid-border);
+  border-radius: 3px;
+  background: var(--lv-grid-bg);
+  color: var(--lv-grid-text);
+  cursor: pointer;
+}
+
+.lv-grid__set-filter-actions button:hover {
+  background: var(--lv-grid-hover);
+}
+
+.lv-grid__set-filter-values {
+  overflow-y: auto;
+  max-height: 200px;
+  padding: 4px 0;
+}
+
+.lv-grid__set-filter-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.lv-grid__set-filter-item:hover {
+  background: var(--lv-grid-hover);
+}
+
+.lv-grid__set-filter-item input[type="checkbox"] {
+  margin: 0;
+}
+
+/* FA-010: Column Menu */
+.lv-grid__column-menu-btn {
+  display: none;
+  width: 20px;
+  height: 20px;
+  border: none;
+  background: transparent;
+  color: var(--lv-grid-text-secondary);
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  padding: 0;
+  flex-shrink: 0;
+  border-radius: 3px;
+  align-items: center;
+  justify-content: center;
+}
+
+.lv-grid__header-cell:hover .lv-grid__column-menu-btn {
+  display: flex;
+}
+
+.lv-grid__column-menu-btn:hover {
+  background: var(--lv-grid-hover);
+  color: var(--lv-grid-text);
+}
+
+.lv-grid__column-menu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  z-index: var(--lv-grid-z-dropdown);
+  min-width: 180px;
+  background: var(--lv-grid-bg);
+  border: 1px solid var(--lv-grid-border);
+  border-radius: 4px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  padding: 4px 0;
+}
+
+.lv-grid__column-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 12px;
+  font-size: 12px;
+  border: none;
+  background: transparent;
+  color: var(--lv-grid-text);
+  cursor: pointer;
+  text-align: left;
+}
+
+.lv-grid__column-menu-item:hover {
+  background: var(--lv-grid-hover);
+}
+
+.lv-grid__column-menu-separator {
+  height: 1px;
+  background: var(--lv-grid-border);
+  margin: 4px 0;
 }

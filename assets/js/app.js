@@ -22,6 +22,8 @@ import {GridKeyboardNav} from "./hooks/keyboard-nav"
 import {ConfigSortable} from "./hooks/config-sortable"
 import {RowReorder} from "./hooks/row-reorder"
 import {ScrollSync} from "./hooks/scroll-sync"
+import {GridStatePersist} from "./hooks/grid-state-persist"
+import {JsonImport} from "./hooks/json-import"
 
 // Assemble hooks
 let Hooks = {
@@ -35,7 +37,9 @@ let Hooks = {
   GridKeyboardNav,
   ConfigSortable,
   RowReorder,
-  ScrollSync
+  ScrollSync,
+  GridStatePersist,
+  JsonImport
 }
 
 // Progress bar

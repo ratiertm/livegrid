@@ -8,7 +8,17 @@ defmodule LiveviewGridWeb.GridComponent.RenderHelpers do
 
   use Phoenix.Component
 
-  alias LiveViewGrid.{Grid, Formatter, Pagination}
+  alias LiveViewGrid.{Grid, Formatter, Pagination, Locale}
+
+  # ── FA-021: Localization Helper ──
+
+  @doc "그리드 옵션에서 locale과 locale_texts를 사용하여 번역 텍스트 반환"
+  @spec grid_t(grid :: map(), key :: atom()) :: String.t()
+  def grid_t(grid, key) do
+    locale = grid.options[:locale] || :ko
+    overrides = grid.options[:locale_texts] || %{}
+    Locale.t(key, locale, overrides)
+  end
 
   # ── Column Width / Style ──
 
@@ -213,6 +223,73 @@ defmodule LiveviewGridWeb.GridComponent.RenderHelpers do
   end
 
   @doc """
+  컬럼의 Floating Filter 활성화 여부를 판단한다.
+  컬럼별 floating_filter 설정이 nil이면 grid 옵션을 따르고, 명시적으로 false면 비활성화.
+  """
+  @spec floating_filter_enabled?(column :: map(), grid :: map()) :: boolean()
+  def floating_filter_enabled?(column, grid) do
+    col_setting = Map.get(column, :floating_filter)
+    case col_setting do
+      nil -> grid.options[:floating_filter] == true
+      false -> false
+      true -> true
+      _ -> grid.options[:floating_filter] == true
+    end
+  end
+
+  # ── FA-010: Column Menu Helper ──
+
+  @doc "컬럼 메뉴가 활성화되어 있는지 확인"
+  @spec column_menu_enabled?(column :: map(), grid :: map()) :: boolean()
+  def column_menu_enabled?(column, grid) do
+    col_menu = Map.get(column, :menu)
+    case col_menu do
+      false -> false
+      _ -> grid.options[:show_column_menu] == true
+    end
+  end
+
+  # ── FA-012: Set Filter Helpers ──
+
+  @doc "Set Filter가 활성화되어 있는지 확인 (선택된 값이 있는지)"
+  def set_filter_active?(grid, field) do
+    case Map.get(grid.state.filters, field) do
+      {:set, values} when is_list(values) and values != [] -> true
+      _ -> false
+    end
+  end
+
+  @doc "Set Filter 요약 텍스트 (선택 개수 또는 '전체')"
+  def set_filter_summary(grid, field) do
+    case Map.get(grid.state.filters, field) do
+      {:set, values} when is_list(values) and values != [] ->
+        "#{length(values)}개 선택"
+      _ ->
+        "전체"
+    end
+  end
+
+  @doc "특정 값이 Set Filter에서 체크되어 있는지"
+  def set_filter_value_checked?(grid, field, value) do
+    case Map.get(grid.state.filters, field) do
+      {:set, values} when is_list(values) ->
+        to_string(value) in Enum.map(values, &to_string/1)
+      _ ->
+        true
+    end
+  end
+
+  @doc "컬럼의 고유값 목록을 반환"
+  def unique_column_values(grid, field) do
+    grid.data
+    |> Enum.map(&Map.get(&1, field))
+    |> Enum.reject(&is_nil/1)
+    |> Enum.map(&to_string/1)
+    |> Enum.uniq()
+    |> Enum.sort()
+  end
+
+  @doc """
   컬럼 필터 타입에 맞는 placeholder 텍스트를 반환한다.
   """
   @spec filter_placeholder(column :: map()) :: String.t()
@@ -265,6 +342,21 @@ defmodule LiveviewGridWeb.GridComponent.RenderHelpers do
   def format_agg_value(nil), do: "-"
   def format_agg_value(value) when is_number(value), do: Formatter.format(value, :number)
   def format_agg_value(value), do: to_string(value)
+
+  @doc """
+  소계 행의 집계값을 컬럼 formatter로 포맷한다.
+  컬럼에 formatter가 지정되어 있으면 해당 formatter를 사용하고, 아니면 기본 format_agg_value를 사용한다.
+  """
+  @spec format_subtotal_value(value :: any(), column :: map()) :: String.t()
+  def format_subtotal_value(nil, _column), do: "-"
+  def format_subtotal_value(value, column) do
+    case Map.get(column, :formatter) do
+      nil -> format_agg_value(value)
+      formatter when is_atom(formatter) -> Formatter.format(value, formatter)
+      formatter when is_function(formatter, 1) -> formatter.(value)
+      _ -> format_agg_value(value)
+    end
+  end
 
   # ── Editing State ──
 
@@ -536,7 +628,7 @@ defmodule LiveviewGridWeb.GridComponent.RenderHelpers do
   @spec render_plain(assigns :: map(), row :: map(), column :: map(), cell_error :: String.t() | nil) ::
           Phoenix.LiveView.Rendered.t()
   def render_plain(assigns, row, column, cell_error) do
-    raw_value = Map.get(row, column.field)
+    raw_value = Grid.get_cell_value(row, column)
     formatted_value = Formatter.format(raw_value, column.formatter)
     cell_style = evaluate_style_expr(column, row)
     cell_align = align_class(column)
@@ -812,5 +904,54 @@ defmodule LiveviewGridWeb.GridComponent.RenderHelpers do
     else
       _ -> false
     end
+  end
+
+  # ── FA-006: Accessibility ──
+
+  @doc "ARIA sort 속성 값 반환"
+  @spec aria_sort_value(sort :: map() | nil, field :: atom()) :: String.t()
+  def aria_sort_value(nil, _field), do: "none"
+  def aria_sort_value(%{field: sort_field, direction: :asc}, field) when sort_field == field, do: "ascending"
+  def aria_sort_value(%{field: sort_field, direction: :desc}, field) when sort_field == field, do: "descending"
+  def aria_sort_value(_sort, _field), do: "none"
+
+  # ── Phase 5 Helpers ──
+
+  @doc """
+  FA-030: 사이드바용 전체 컬럼 목록 (숨김 포함)
+  """
+  @spec all_columns_for_sidebar(grid :: map()) :: list(map())
+  def all_columns_for_sidebar(grid) do
+    case grid do
+      %{definition: %{columns: cols}} when is_list(cols) -> normalize_sidebar_cols(cols)
+      %{state: %{all_columns: cols}} when is_list(cols) -> cols
+      _ -> grid.columns
+    end
+  end
+
+  defp normalize_sidebar_cols(cols) do
+    Enum.map(cols, fn col ->
+      col
+      |> Map.put_new(:field, nil)
+      |> Map.put_new(:label, "")
+    end)
+  end
+
+  @doc """
+  FA-044: 셀 값이 Find 검색 결과에 해당하는지 확인
+  """
+  @spec cell_matches_find?(find_matches :: list(map()), row_id :: any(), field :: atom()) :: boolean()
+  def cell_matches_find?([], _row_id, _field), do: false
+  def cell_matches_find?(matches, row_id, field) do
+    Enum.any?(matches, fn m -> m.row_id == row_id && m.field == field end)
+  end
+
+  @doc """
+  F-909: 빈 영역 채우기 위한 빈 행 수 계산
+  """
+  @spec empty_rows_count(data_count :: non_neg_integer(), empty_area_rows :: non_neg_integer()) :: non_neg_integer()
+  def empty_rows_count(data_count, empty_area_rows) do
+    remaining = empty_area_rows - data_count
+    if remaining > 0, do: remaining, else: 0
   end
 end

@@ -217,6 +217,12 @@
 }
 
 /* ── Responsive ── */
+@media (max-width: 768px) {
+  .lv-grid__sidebar {
+    width: 200px;
+  }
+}
+
 @media (max-width: 640px) {
   .grid-settings-tab {
     max-height: none;

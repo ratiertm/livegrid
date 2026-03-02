@@ -173,8 +173,27 @@ defmodule LiveViewGridWeb.Components.GridBuilder.BuilderModal do
 
         <%!-- Footer --%>
         <div class="flex items-center justify-between px-6 py-4 border-t border-gray-200 bg-gray-50">
-          <div class="text-sm text-gray-500">
-            컬럼 <%= length(@columns) %>개 정의됨
+          <div class="flex items-center gap-3">
+            <span class="text-sm text-gray-500">
+              컬럼 <%= length(@columns) %>개 정의됨
+            </span>
+            <button
+              phx-click="export_grid_json"
+              phx-target={@myself}
+              class="px-3 py-1.5 text-xs text-gray-600 bg-white border border-gray-300 rounded-md hover:bg-gray-50 flex items-center gap-1"
+              title="그리드 설정을 JSON 파일로 저장"
+            >
+              Export
+            </button>
+            <div
+              id="builder-json-import"
+              phx-hook="JsonImport"
+              phx-target={@myself}
+              class="px-3 py-1.5 text-xs text-gray-600 bg-white border border-gray-300 rounded-md hover:bg-gray-50 flex items-center gap-1 cursor-pointer"
+              title="JSON 파일에서 그리드 설정 불러오기"
+            >
+              Import
+            </div>
           </div>
           <div class="flex gap-3">
             <button
@@ -359,234 +378,284 @@ defmodule LiveViewGridWeb.Components.GridBuilder.BuilderModal do
         </button>
       </div>
 
-      <%!-- 컬럼 목록 --%>
-      <div
-        id="builder-sortable-list"
-        phx-hook="ConfigSortable"
-        phx-target={@myself}
-        class="space-y-2"
-      >
-        <%= if @columns == [] do %>
-          <div class="text-center py-8 text-gray-400 border-2 border-dashed border-gray-200 rounded-lg">
-            <p class="text-lg mb-2">컬럼이 없습니다</p>
-            <p class="text-sm">위의 [+ 컬럼 추가] 버튼으로 시작하세요</p>
-          </div>
-        <% else %>
-          <%= for col <- @columns do %>
-            <div
-              data-sortable-item
-              data-field={col.temp_id}
-              class={[
-                "border rounded-lg transition-all",
-                if @selected_column_id == col.temp_id do
-                  "border-blue-400 bg-blue-50 shadow-sm"
-                else
-                  "border-gray-200 bg-white hover:border-gray-300"
-                end
-              ]}
-            >
-              <%!-- 컬럼 요약 행 --%>
-              <div class="flex items-center gap-2 p-3">
-                <span class="text-gray-400 cursor-grab active:cursor-grabbing select-none">::</span>
+      <%!-- 컬럼 테이블 뷰 --%>
+      <%= if @columns == [] do %>
+        <div class="text-center py-8 text-gray-400 border-2 border-dashed border-gray-200 rounded-lg">
+          <p class="text-lg mb-2">컬럼이 없습니다</p>
+          <p class="text-sm">위의 [+ 컬럼 추가] 버튼으로 시작하세요</p>
+        </div>
+      <% else %>
+        <div class="border border-gray-200 rounded-lg overflow-hidden">
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <%!-- 테이블 헤더 --%>
+              <thead>
+                <tr class="bg-gray-50 border-b border-gray-200">
+                  <th class="px-1 py-2 text-center text-xs font-medium text-gray-500 w-8"></th>
+                  <th class="px-2 py-2 text-left text-xs font-medium text-gray-500">Field</th>
+                  <th class="px-2 py-2 text-left text-xs font-medium text-gray-500">Label</th>
+                  <th class="px-2 py-2 text-left text-xs font-medium text-gray-500">Type</th>
+                  <th class="px-2 py-2 text-center text-xs font-medium text-gray-500">Width</th>
+                  <th class="px-1 py-2 text-center text-xs font-medium text-gray-500">Sort</th>
+                  <th class="px-1 py-2 text-center text-xs font-medium text-gray-500">Filter</th>
+                  <th class="px-1 py-2 text-center text-xs font-medium text-gray-500">Edit</th>
+                  <th class="px-2 py-2 text-left text-xs font-medium text-gray-500">Align</th>
+                  <th class="px-2 py-2 text-left text-xs font-medium text-gray-500">Editor</th>
+                  <th class="px-2 py-2 text-left text-xs font-medium text-gray-500">Formatter</th>
+                  <th class="px-2 py-2 text-left text-xs font-medium text-gray-500">Renderer</th>
+                  <th class="px-1 py-2 text-center text-xs font-medium text-gray-500">Valid.</th>
+                  <th class="px-1 py-2 text-center text-xs font-medium text-gray-500 w-8"></th>
+                </tr>
+              </thead>
 
-                <%!-- Field Name --%>
-                <input
-                  type="text"
-                  value={col.field}
-                  phx-blur="update_column_field"
-                  phx-target={@myself}
-                  phx-value-id={col.temp_id}
-                  placeholder="field_name"
-                  class="w-28 px-2 py-1 text-sm border border-gray-300 rounded font-mono"
-                />
-
-                <%!-- Label --%>
-                <input
-                  type="text"
-                  value={col.label}
-                  phx-blur="update_column_label"
-                  phx-target={@myself}
-                  phx-value-id={col.temp_id}
-                  placeholder="표시명"
-                  class="w-24 px-2 py-1 text-sm border border-gray-300 rounded"
-                />
-
-                <%!-- Type --%>
-                <form phx-change="update_column_type" phx-target={@myself}>
-                  <input type="hidden" name="col_id" value={col.temp_id} />
-                  <select
-                    name="value"
-                    class="w-24 px-2 py-1 text-sm border border-gray-300 rounded"
+              <%!-- 테이블 바디 --%>
+              <tbody id="builder-sortable-list" phx-hook="ConfigSortable" phx-target={@myself}>
+                <%= for col <- @columns do %>
+                  <%!-- 메인 행 --%>
+                  <tr
+                    data-sortable-item
+                    data-field={col.temp_id}
+                    class={[
+                      "border-b border-gray-100 transition-colors",
+                      if @selected_column_id == col.temp_id do
+                        "bg-blue-50"
+                      else
+                        "bg-white hover:bg-gray-50"
+                      end
+                    ]}
                   >
-                    <%= for {label, val} <- @type_options do %>
-                      <option value={val} selected={to_string(col.type) == val}><%= label %></option>
-                    <% end %>
-                  </select>
-                </form>
+                    <%!-- Drag Handle --%>
+                    <td class="px-1 py-1.5 text-center">
+                      <span class="text-gray-400 cursor-grab active:cursor-grabbing select-none text-xs">::</span>
+                    </td>
 
-                <%!-- Width --%>
-                <input
-                  type="number"
-                  value={if col.width == :auto, do: "", else: col.width}
-                  phx-blur="update_column_width"
-                  phx-target={@myself}
-                  phx-value-id={col.temp_id}
-                  placeholder="auto"
-                  min="40"
-                  max="600"
-                  class="w-16 px-2 py-1 text-sm border border-gray-300 rounded"
-                />
+                    <%!-- Field --%>
+                    <td class="px-1 py-1.5">
+                      <input
+                        type="text"
+                        value={col.field}
+                        phx-blur="update_column_field"
+                        phx-target={@myself}
+                        phx-value-id={col.temp_id}
+                        placeholder="field"
+                        class="w-full min-w-[80px] px-1.5 py-1 text-xs border border-gray-200 rounded font-mono focus:border-blue-400 focus:ring-1 focus:ring-blue-200"
+                      />
+                    </td>
 
-                <%!-- Quick toggles --%>
-                <label class="flex items-center gap-1 text-xs text-gray-500" title="Sortable">
-                  <input
-                    type="checkbox"
-                    checked={col.sortable}
-                    phx-click="toggle_column_attr"
-                    phx-value-id={col.temp_id}
-                    phx-value-key="sortable"
-                    phx-target={@myself}
-                    class="w-3.5 h-3.5"
-                  />
-                  Sort
-                </label>
+                    <%!-- Label --%>
+                    <td class="px-1 py-1.5">
+                      <input
+                        type="text"
+                        value={col.label}
+                        phx-blur="update_column_label"
+                        phx-target={@myself}
+                        phx-value-id={col.temp_id}
+                        placeholder="표시명"
+                        class="w-full min-w-[70px] px-1.5 py-1 text-xs border border-gray-200 rounded focus:border-blue-400 focus:ring-1 focus:ring-blue-200"
+                      />
+                    </td>
 
-                <label class="flex items-center gap-1 text-xs text-gray-500" title="Editable">
-                  <input
-                    type="checkbox"
-                    checked={col.editable}
-                    phx-click="toggle_column_attr"
-                    phx-value-id={col.temp_id}
-                    phx-value-key="editable"
-                    phx-target={@myself}
-                    class="w-3.5 h-3.5"
-                  />
-                  Edit
-                </label>
+                    <%!-- Type --%>
+                    <td class="px-1 py-1.5">
+                      <form phx-change="update_column_type" phx-target={@myself}>
+                        <input type="hidden" name="col_id" value={col.temp_id} />
+                        <select name="value" class="w-full min-w-[70px] px-1 py-1 text-xs border border-gray-200 rounded focus:border-blue-400">
+                          <%= for {label, val} <- @type_options do %>
+                            <option value={val} selected={to_string(col.type) == val}><%= label %></option>
+                          <% end %>
+                        </select>
+                      </form>
+                    </td>
 
-                <%!-- Expand/Collapse --%>
-                <button
-                  phx-click="select_builder_column"
-                  phx-value-id={col.temp_id}
-                  phx-target={@myself}
-                  class="ml-auto px-2 py-1 text-xs text-gray-500 hover:text-blue-600 rounded"
-                  title="상세 설정"
-                >
-                  <%= if @selected_column_id == col.temp_id, do: "▲", else: "▼" %>
-                </button>
+                    <%!-- Width --%>
+                    <td class="px-1 py-1.5">
+                      <input
+                        type="number"
+                        value={if col.width == :auto, do: "", else: col.width}
+                        phx-blur="update_column_width"
+                        phx-target={@myself}
+                        phx-value-id={col.temp_id}
+                        placeholder="auto"
+                        min="40"
+                        max="600"
+                        class="w-14 px-1 py-1 text-xs border border-gray-200 rounded text-center focus:border-blue-400"
+                      />
+                    </td>
 
-                <%!-- Delete --%>
-                <button
-                  phx-click="remove_column"
-                  phx-value-id={col.temp_id}
-                  phx-target={@myself}
-                  class="px-2 py-1 text-xs text-red-400 hover:text-red-600 rounded"
-                  title="삭제"
-                >
-                  &times;
-                </button>
-              </div>
+                    <%!-- Sortable --%>
+                    <td class="px-1 py-1.5 text-center">
+                      <input
+                        type="checkbox"
+                        checked={col.sortable}
+                        phx-click="toggle_column_attr"
+                        phx-value-id={col.temp_id}
+                        phx-value-key="sortable"
+                        phx-target={@myself}
+                        class="w-3.5 h-3.5 text-blue-600 rounded"
+                      />
+                    </td>
 
-              <%!-- 상세 설정 패널 (확장) --%>
-              <%= if @selected_column_id == col.temp_id do %>
-                <.column_detail_panel
-                  col={col}
-                  myself={@myself}
-                  formatter_options={@formatter_options}
-                  validator_types={@validator_types}
-                  renderer_options={@renderer_options}
-                  align_options={@align_options}
-                  editor_type_options={@editor_type_options}
-                />
-              <% end %>
-            </div>
-          <% end %>
-        <% end %>
-      </div>
+                    <%!-- Filterable --%>
+                    <td class="px-1 py-1.5 text-center">
+                      <input
+                        type="checkbox"
+                        checked={col.filterable}
+                        phx-click="toggle_column_attr"
+                        phx-value-id={col.temp_id}
+                        phx-value-key="filterable"
+                        phx-target={@myself}
+                        class="w-3.5 h-3.5 text-blue-600 rounded"
+                      />
+                    </td>
+
+                    <%!-- Editable --%>
+                    <td class="px-1 py-1.5 text-center">
+                      <input
+                        type="checkbox"
+                        checked={col.editable}
+                        phx-click="toggle_column_attr"
+                        phx-value-id={col.temp_id}
+                        phx-value-key="editable"
+                        phx-target={@myself}
+                        class="w-3.5 h-3.5 text-blue-600 rounded"
+                      />
+                    </td>
+
+                    <%!-- Align --%>
+                    <td class="px-1 py-1.5">
+                      <form phx-change="update_column_align" phx-target={@myself}>
+                        <input type="hidden" name="col_id" value={col.temp_id} />
+                        <select name="value" class="w-full min-w-[60px] px-1 py-1 text-xs border border-gray-200 rounded focus:border-blue-400">
+                          <%= for {label, val} <- @align_options do %>
+                            <option value={val} selected={to_string(col.align) == val}><%= label %></option>
+                          <% end %>
+                        </select>
+                      </form>
+                    </td>
+
+                    <%!-- Editor --%>
+                    <td class="px-1 py-1.5">
+                      <form phx-change="update_column_editor" phx-target={@myself}>
+                        <input type="hidden" name="col_id" value={col.temp_id} />
+                        <select name="value" class="w-full min-w-[65px] px-1 py-1 text-xs border border-gray-200 rounded focus:border-blue-400">
+                          <%= for {label, val} <- @editor_type_options do %>
+                            <option value={val} selected={to_string(col.editor_type) == val}><%= label %></option>
+                          <% end %>
+                        </select>
+                      </form>
+                    </td>
+
+                    <%!-- Formatter --%>
+                    <td class="px-1 py-1.5">
+                      <form phx-change="set_column_formatter" phx-target={@myself}>
+                        <input type="hidden" name="col_id" value={col.temp_id} />
+                        <select name="value" class="w-full min-w-[90px] px-1 py-1 text-xs border border-gray-200 rounded focus:border-blue-400">
+                          <%= for {label, val} <- @formatter_options do %>
+                            <option value={val} selected={to_string(col.formatter || "") == val}><%= label %></option>
+                          <% end %>
+                        </select>
+                      </form>
+                    </td>
+
+                    <%!-- Renderer --%>
+                    <td class="px-1 py-1.5">
+                      <form phx-change="set_column_renderer" phx-target={@myself}>
+                        <input type="hidden" name="col_id" value={col.temp_id} />
+                        <select name="value" class="w-full min-w-[85px] px-1 py-1 text-xs border border-gray-200 rounded focus:border-blue-400">
+                          <%= for {label, val} <- @renderer_options do %>
+                            <option value={val} selected={to_string(col.renderer || "") == val}><%= label %></option>
+                          <% end %>
+                        </select>
+                      </form>
+                    </td>
+
+                    <%!-- Validators badge + expand --%>
+                    <td class="px-1 py-1.5 text-center">
+                      <button
+                        phx-click="select_builder_column"
+                        phx-value-id={col.temp_id}
+                        phx-target={@myself}
+                        class={[
+                          "inline-flex items-center gap-0.5 px-1.5 py-0.5 text-xs rounded-full transition-colors",
+                          cond do
+                            @selected_column_id == col.temp_id -> "bg-blue-600 text-white"
+                            length(col.validators) > 0 -> "bg-yellow-100 text-yellow-800 border border-yellow-300 hover:bg-yellow-200"
+                            true -> "bg-gray-100 text-gray-500 hover:bg-gray-200"
+                          end
+                        ]}
+                        title={"Validators (#{length(col.validators)}) + Renderer 옵션"}
+                      >
+                        <span class="font-mono"><%= length(col.validators) %></span>
+                        <%= if @selected_column_id == col.temp_id, do: "▲", else: "▼" %>
+                      </button>
+                    </td>
+
+                    <%!-- Delete --%>
+                    <td class="px-1 py-1.5 text-center">
+                      <button
+                        phx-click="remove_column"
+                        phx-value-id={col.temp_id}
+                        phx-target={@myself}
+                        class="text-red-400 hover:text-red-600 text-sm font-bold"
+                        title="삭제"
+                      >
+                        &times;
+                      </button>
+                    </td>
+                  </tr>
+
+                  <%!-- 확장 행: Renderer 옵션 + Validators --%>
+                  <%= if @selected_column_id == col.temp_id do %>
+                    <tr class="bg-blue-50 border-b border-blue-100">
+                      <td colspan="14" class="px-4 py-3">
+                        <.column_expand_panel
+                          col={col}
+                          myself={@myself}
+                          validator_types={@validator_types}
+                        />
+                      </td>
+                    </tr>
+                  <% end %>
+                <% end %>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      <% end %>
     </div>
     """
   end
 
-  # ── 컬럼 상세 설정 패널 ──
+  # ── 컬럼 확장 패널 (Validators + Renderer 옵션) ──
 
-  defp column_detail_panel(assigns) do
+  defp column_expand_panel(assigns) do
     ~H"""
-    <div class="px-4 pb-4 border-t border-gray-100 bg-gray-50 space-y-4">
-      <%!-- 속성 --%>
-      <div class="pt-3">
-        <h5 class="text-xs font-semibold text-gray-500 uppercase mb-2">속성</h5>
-        <div class="flex flex-wrap gap-4">
-          <label class="flex items-center gap-1.5 text-sm">
-            <input type="checkbox" checked={@col.filterable}
-              phx-click="toggle_column_attr" phx-value-id={@col.temp_id} phx-value-key="filterable"
-              phx-target={@myself} class="w-4 h-4" />
-            Filterable
-          </label>
-
-          <div class="flex items-center gap-2">
-            <label class="text-sm text-gray-600">Align:</label>
-            <form phx-change="update_column_align" phx-target={@myself}>
-              <input type="hidden" name="col_id" value={@col.temp_id} />
-              <select name="value" class="px-2 py-1 text-sm border border-gray-300 rounded">
-                <%= for {label, val} <- @align_options do %>
-                  <option value={val} selected={to_string(@col.align) == val}><%= label %></option>
-                <% end %>
-              </select>
-            </form>
-          </div>
-
-          <div class="flex items-center gap-2">
-            <label class="text-sm text-gray-600">Editor:</label>
-            <form phx-change="update_column_editor" phx-target={@myself}>
-              <input type="hidden" name="col_id" value={@col.temp_id} />
-              <select name="value" class="px-2 py-1 text-sm border border-gray-300 rounded">
-                <%= for {label, val} <- @editor_type_options do %>
-                  <option value={val} selected={to_string(@col.editor_type) == val}><%= label %></option>
-                <% end %>
-              </select>
-            </form>
-          </div>
-        </div>
-      </div>
-
-      <%!-- Formatter --%>
-      <div>
-        <h5 class="text-xs font-semibold text-gray-500 uppercase mb-2">Formatter</h5>
-        <form phx-change="set_column_formatter" phx-target={@myself}>
-          <input type="hidden" name="col_id" value={@col.temp_id} />
-          <select name="value" class="w-64 px-2 py-1.5 text-sm border border-gray-300 rounded">
-            <%= for {label, val} <- @formatter_options do %>
-              <option value={val} selected={to_string(@col.formatter || "") == val}><%= label %></option>
-            <% end %>
-          </select>
-        </form>
-      </div>
-
-      <%!-- Validators --%>
-      <div>
+    <div class="flex gap-6">
+      <%!-- Validators 섹션 --%>
+      <div class="flex-1">
         <div class="flex items-center justify-between mb-2">
-          <h5 class="text-xs font-semibold text-gray-500 uppercase">Validators</h5>
+          <h5 class="text-xs font-semibold text-gray-600 uppercase">Validators</h5>
           <button
             phx-click="add_column_validator"
             phx-value-id={@col.temp_id}
             phx-target={@myself}
-            class="px-2 py-0.5 text-xs text-blue-600 border border-blue-300 rounded hover:bg-blue-50"
+            class="px-2 py-0.5 text-xs text-blue-600 border border-blue-300 rounded hover:bg-blue-100"
           >
             + 추가
           </button>
         </div>
 
         <%= if @col.validators == [] do %>
-          <p class="text-xs text-gray-400">검증 규칙 없음</p>
+          <p class="text-xs text-gray-400 italic">검증 규칙 없음</p>
         <% else %>
-          <div class="space-y-2">
+          <div class="space-y-1.5">
             <%= for {v, idx} <- Enum.with_index(@col.validators) do %>
-              <div class="flex items-center gap-2 text-sm">
+              <div class="flex items-center gap-1.5 text-xs">
                 <form phx-change="update_column_validator" phx-target={@myself}>
                   <input type="hidden" name="col_id" value={@col.temp_id} />
                   <input type="hidden" name="index" value={idx} />
                   <input type="hidden" name="field" value="type" />
-                  <select name="type" class="w-28 px-2 py-1 border border-gray-300 rounded text-sm">
+                  <select name="type" class="w-24 px-1 py-1 border border-gray-300 rounded text-xs">
                     <%= for {label, val} <- @validator_types do %>
                       <option value={val} selected={v.type == val}><%= label %></option>
                     <% end %>
@@ -602,7 +671,7 @@ defmodule LiveViewGridWeb.Components.GridBuilder.BuilderModal do
                     phx-value-id={@col.temp_id}
                     phx-value-index={idx}
                     placeholder="값"
-                    class="w-16 px-2 py-1 border border-gray-300 rounded text-sm"
+                    class="w-14 px-1 py-1 border border-gray-300 rounded text-xs"
                   />
                 <% end %>
 
@@ -615,7 +684,7 @@ defmodule LiveViewGridWeb.Components.GridBuilder.BuilderModal do
                     phx-value-id={@col.temp_id}
                     phx-value-index={idx}
                     placeholder="정규식"
-                    class="w-28 px-2 py-1 border border-gray-300 rounded text-sm font-mono"
+                    class="w-24 px-1 py-1 border border-gray-300 rounded text-xs font-mono"
                   />
                 <% end %>
 
@@ -627,7 +696,7 @@ defmodule LiveViewGridWeb.Components.GridBuilder.BuilderModal do
                   phx-value-id={@col.temp_id}
                   phx-value-index={idx}
                   placeholder="에러 메시지"
-                  class="flex-1 px-2 py-1 border border-gray-300 rounded text-sm"
+                  class="flex-1 px-1 py-1 border border-gray-300 rounded text-xs"
                 />
 
                 <button
@@ -635,7 +704,7 @@ defmodule LiveViewGridWeb.Components.GridBuilder.BuilderModal do
                   phx-value-id={@col.temp_id}
                   phx-value-index={idx}
                   phx-target={@myself}
-                  class="text-red-400 hover:text-red-600"
+                  class="text-red-400 hover:text-red-600 font-bold"
                 >&times;</button>
               </div>
             <% end %>
@@ -643,94 +712,88 @@ defmodule LiveViewGridWeb.Components.GridBuilder.BuilderModal do
         <% end %>
       </div>
 
-      <%!-- Renderer --%>
-      <div>
-        <h5 class="text-xs font-semibold text-gray-500 uppercase mb-2">Renderer</h5>
-        <form phx-change="set_column_renderer" phx-target={@myself}>
-          <input type="hidden" name="col_id" value={@col.temp_id} />
-          <select name="value" class="w-64 px-2 py-1.5 text-sm border border-gray-300 rounded">
-            <%= for {label, val} <- @renderer_options do %>
-              <option value={val} selected={to_string(@col.renderer || "") == val}><%= label %></option>
-            <% end %>
-          </select>
-        </form>
+      <%!-- Renderer 옵션 섹션 --%>
+      <%= if @col.renderer && @col.renderer != "" do %>
+        <div class="w-64 border-l border-blue-200 pl-4">
+          <h5 class="text-xs font-semibold text-gray-600 uppercase mb-2">Renderer 옵션</h5>
 
-        <%!-- Renderer별 옵션 (badge: colors, link: prefix, progress: max/color) --%>
-        <%= if @col.renderer == "badge" do %>
-          <div class="mt-2 p-2 bg-white border border-gray-200 rounded text-sm">
-            <p class="text-xs text-gray-500 mb-1">값:색상 매핑 (콤마 구분). 색상: blue, green, red, yellow, gray, purple</p>
-            <input
-              type="text"
-              value={Map.get(@col.renderer_options, :colors_text, "")}
-              phx-blur="update_renderer_option"
-              phx-target={@myself}
-              phx-value-id={@col.temp_id}
-              phx-value-key="colors_text"
-              placeholder="서울:blue, 부산:green, 대구:red"
-              class="w-full px-2 py-1 border border-gray-300 rounded text-sm"
-            />
-          </div>
-        <% end %>
-
-        <%= if @col.renderer == "link" do %>
-          <div class="mt-2 flex gap-2">
-            <div>
-              <label class="text-xs text-gray-500">Prefix</label>
+          <%= if @col.renderer == "badge" do %>
+            <div class="space-y-1">
+              <p class="text-xs text-gray-500">값:색상 매핑 (콤마 구분)</p>
+              <p class="text-xs text-gray-400">색상: blue, green, red, yellow, gray, purple</p>
               <input
                 type="text"
-                value={Map.get(@col.renderer_options, :prefix, "")}
+                value={Map.get(@col.renderer_options, :colors_text, "")}
                 phx-blur="update_renderer_option"
                 phx-target={@myself}
                 phx-value-id={@col.temp_id}
-                phx-value-key="prefix"
-                placeholder="mailto: / tel:"
-                class="w-36 px-2 py-1 border border-gray-300 rounded text-sm"
+                phx-value-key="colors_text"
+                placeholder="서울:blue, 부산:green"
+                class="w-full px-2 py-1 border border-gray-300 rounded text-xs"
               />
             </div>
-            <div>
-              <label class="text-xs text-gray-500">Target</label>
-              <form phx-change="update_renderer_option" phx-target={@myself}>
-                <input type="hidden" name="col_id" value={@col.temp_id} />
-                <input type="hidden" name="key" value="target" />
-                <select name="value" class="px-2 py-1 border border-gray-300 rounded text-sm">
-                  <option value="">없음</option>
-                  <option value="_blank" selected={Map.get(@col.renderer_options, :target) == "_blank"}>_blank</option>
-                  <option value="_self" selected={Map.get(@col.renderer_options, :target) == "_self"}>_self</option>
-                </select>
-              </form>
-            </div>
-          </div>
-        <% end %>
+          <% end %>
 
-        <%= if @col.renderer == "progress" do %>
-          <div class="mt-2 flex gap-2">
-            <div>
-              <label class="text-xs text-gray-500">Max</label>
-              <input
-                type="number"
-                value={Map.get(@col.renderer_options, :max, 100)}
-                phx-blur="update_renderer_option"
-                phx-target={@myself}
-                phx-value-id={@col.temp_id}
-                phx-value-key="max"
-                class="w-20 px-2 py-1 border border-gray-300 rounded text-sm"
-              />
+          <%= if @col.renderer == "link" do %>
+            <div class="space-y-2">
+              <div>
+                <label class="text-xs text-gray-500">Prefix</label>
+                <input
+                  type="text"
+                  value={Map.get(@col.renderer_options, :prefix, "")}
+                  phx-blur="update_renderer_option"
+                  phx-target={@myself}
+                  phx-value-id={@col.temp_id}
+                  phx-value-key="prefix"
+                  placeholder="mailto: / tel:"
+                  class="w-full px-2 py-1 border border-gray-300 rounded text-xs"
+                />
+              </div>
+              <div>
+                <label class="text-xs text-gray-500">Target</label>
+                <form phx-change="update_renderer_option" phx-target={@myself}>
+                  <input type="hidden" name="col_id" value={@col.temp_id} />
+                  <input type="hidden" name="key" value="target" />
+                  <select name="value" class="w-full px-2 py-1 border border-gray-300 rounded text-xs">
+                    <option value="">없음</option>
+                    <option value="_blank" selected={Map.get(@col.renderer_options, :target) == "_blank"}>_blank</option>
+                    <option value="_self" selected={Map.get(@col.renderer_options, :target) == "_self"}>_self</option>
+                  </select>
+                </form>
+              </div>
             </div>
-            <div>
-              <label class="text-xs text-gray-500">Color</label>
-              <form phx-change="update_renderer_option" phx-target={@myself}>
-                <input type="hidden" name="col_id" value={@col.temp_id} />
-                <input type="hidden" name="key" value="color" />
-                <select name="value" class="px-2 py-1 border border-gray-300 rounded text-sm">
-                  <%= for c <- ["blue", "green", "red", "yellow"] do %>
-                    <option value={c} selected={Map.get(@col.renderer_options, :color) == c}><%= c %></option>
-                  <% end %>
-                </select>
-              </form>
+          <% end %>
+
+          <%= if @col.renderer == "progress" do %>
+            <div class="flex gap-2">
+              <div>
+                <label class="text-xs text-gray-500">Max</label>
+                <input
+                  type="number"
+                  value={Map.get(@col.renderer_options, :max, 100)}
+                  phx-blur="update_renderer_option"
+                  phx-target={@myself}
+                  phx-value-id={@col.temp_id}
+                  phx-value-key="max"
+                  class="w-16 px-2 py-1 border border-gray-300 rounded text-xs"
+                />
+              </div>
+              <div>
+                <label class="text-xs text-gray-500">Color</label>
+                <form phx-change="update_renderer_option" phx-target={@myself}>
+                  <input type="hidden" name="col_id" value={@col.temp_id} />
+                  <input type="hidden" name="key" value="color" />
+                  <select name="value" class="w-full px-2 py-1 border border-gray-300 rounded text-xs">
+                    <%= for c <- ["blue", "green", "red", "yellow"] do %>
+                      <option value={c} selected={Map.get(@col.renderer_options, :color) == c}><%= c %></option>
+                    <% end %>
+                  </select>
+                </form>
+              </div>
             </div>
-          </div>
-        <% end %>
-      </div>
+          <% end %>
+        </div>
+      <% end %>
     </div>
     """
   end
@@ -863,7 +926,8 @@ defmodule LiveViewGridWeb.Components.GridBuilder.BuilderModal do
      |> assign(:selected_table, nil)
      |> assign(:available_schemas, SchemaRegistry.list_schemas())
      |> assign(:available_tables, [])
-     |> assign(:table_columns_info, [])}
+     |> assign(:table_columns_info, [])
+     |> maybe_load_sample_columns("sample")}
   end
 
   @impl true
@@ -923,6 +987,7 @@ defmodule LiveViewGridWeb.Components.GridBuilder.BuilderModal do
       socket
       |> assign(:data_source_type, type)
       |> maybe_load_tables(type)
+      |> maybe_load_sample_columns(type)
 
     {:noreply, socket}
   end
@@ -1246,6 +1311,38 @@ defmodule LiveViewGridWeb.Components.GridBuilder.BuilderModal do
     end
   end
 
+  # ── Export / Import ──
+
+  def handle_event("export_grid_json", _params, socket) do
+    json = serialize_grid_config(socket)
+    content = Base.encode64(json)
+
+    name_slug =
+      socket.assigns.grid_name
+      |> String.replace(~r/[^\w가-힣]+/u, "_")
+      |> String.trim("_")
+
+    name_slug = if name_slug == "", do: "grid_config", else: name_slug
+    filename = "grid_config_#{name_slug}_#{System.system_time(:second)}.json"
+
+    send(self(), {:grid_download_file, %{content: content, filename: filename, mime_type: "application/json"}})
+    {:noreply, socket}
+  end
+
+  def handle_event("import_grid_json", data, socket) when is_map(data) do
+    case deserialize_grid_config(socket, data) do
+      {:ok, socket} ->
+        {:noreply, assign(socket, :active_tab, "columns")}
+
+      {:error, reason} ->
+        {:noreply, assign(socket, :errors, %{import: reason})}
+    end
+  end
+
+  def handle_event("import_grid_json_error", %{"error" => error}, socket) do
+    {:noreply, assign(socket, :errors, %{import: error})}
+  end
+
   # ══════════════════════════════════════════════════════
   # Helpers
   # ══════════════════════════════════════════════════════
@@ -1355,6 +1452,62 @@ defmodule LiveViewGridWeb.Components.GridBuilder.BuilderModal do
 
   defp maybe_load_tables(socket, _type), do: socket
 
+  defp maybe_load_sample_columns(socket, "sample") do
+    # 이미 컬럼이 있으면 덮어쓰지 않음
+    if socket.assigns.columns != [] do
+      socket
+    else
+      sample_cols = [
+        %{field: "name", label: "이름", type: :string},
+        %{field: "email", label: "이메일", type: :string},
+        %{field: "age", label: "나이", type: :integer},
+        %{field: "city", label: "도시", type: :string},
+        %{field: "active", label: "활성", type: :boolean},
+        %{field: "created_at", label: "생성일", type: :date}
+      ]
+
+      next_id = socket.assigns.next_temp_id
+
+      builder_cols =
+        sample_cols
+        |> Enum.with_index(next_id)
+        |> Enum.map(fn {col, idx} ->
+          %{
+            temp_id: "col_#{idx}",
+            field: col.field,
+            label: col.label,
+            type: col.type,
+            width: :auto,
+            align: :left,
+            sortable: true,
+            filterable: true,
+            editable: true,
+            editor_type: default_editor_type(col.type),
+            editor_options: [],
+            formatter: nil,
+            formatter_options: %{},
+            validators: [],
+            renderer: nil,
+            renderer_options: %{}
+          }
+        end)
+
+      socket
+      |> assign(:columns, builder_cols)
+      |> assign(:next_temp_id, next_id + length(builder_cols))
+      |> assign(:selected_column_id, List.first(builder_cols).temp_id)
+    end
+  end
+
+  defp maybe_load_sample_columns(socket, _type), do: socket
+
+  defp default_editor_type(:integer), do: :number
+  defp default_editor_type(:float), do: :number
+  defp default_editor_type(:boolean), do: :checkbox
+  defp default_editor_type(:date), do: :date
+  defp default_editor_type(:datetime), do: :datetime
+  defp default_editor_type(_), do: :text
+
   defp validate_builder(socket), do: BuilderHelpers.validate_builder(socket.assigns)
   defp generate_grid_id(name), do: BuilderHelpers.generate_grid_id(name)
   defp sanitize_grid_id(id), do: BuilderHelpers.sanitize_grid_id(id)
@@ -1398,4 +1551,156 @@ defmodule LiveViewGridWeb.Components.GridBuilder.BuilderModal do
     Grid.new(columns: columns, options: options, data: data)
     """
   end
+
+  # ══════════════════════════════════════════════════════
+  # JSON Export / Import
+  # ══════════════════════════════════════════════════════
+
+  @spec serialize_grid_config(Phoenix.LiveView.Socket.t()) :: String.t()
+  defp serialize_grid_config(socket) do
+    a = socket.assigns
+
+    json = %{
+      version: "1.0",
+      grid_name: a.grid_name,
+      grid_id: a.grid_id,
+      data_source_type: a.data_source_type,
+      grid_options: a.grid_options,
+      columns: Enum.map(a.columns, &serialize_column/1)
+    }
+
+    Jason.encode!(json, pretty: true)
+  end
+
+  defp serialize_column(col) do
+    %{
+      field: col.field,
+      label: col.label,
+      type: to_string(col.type),
+      width: if(col.width == :auto, do: "auto", else: col.width),
+      align: to_string(col.align),
+      sortable: col.sortable,
+      filterable: col.filterable,
+      editable: col.editable,
+      editor_type: to_string(col.editor_type),
+      formatter: if(col.formatter, do: to_string(col.formatter)),
+      formatter_options: col.formatter_options,
+      validators: col.validators,
+      renderer: col.renderer,
+      renderer_options: stringify_keys(col.renderer_options)
+    }
+  end
+
+  defp stringify_keys(map) when is_map(map) do
+    Map.new(map, fn {k, v} -> {to_string(k), v} end)
+  end
+
+  @spec deserialize_grid_config(Phoenix.LiveView.Socket.t(), map()) ::
+          {:ok, Phoenix.LiveView.Socket.t()} | {:error, String.t()}
+  defp deserialize_grid_config(socket, data) do
+    with true <- is_list(data["columns"]) || :no_columns,
+         columns when is_list(columns) <- data["columns"] do
+      next_id = socket.assigns.next_temp_id
+
+      builder_cols =
+        columns
+        |> Enum.with_index(next_id)
+        |> Enum.map(fn {raw, idx} ->
+          %{
+            temp_id: "col_#{idx}",
+            field: raw["field"] || "",
+            label: raw["label"] || "",
+            type: safe_to_atom(raw["type"], :string),
+            width: parse_width(raw["width"]),
+            align: safe_to_atom(raw["align"], :left),
+            sortable: raw["sortable"] == true,
+            filterable: raw["filterable"] == true,
+            editable: raw["editable"] == true,
+            editor_type: safe_to_atom(raw["editor_type"], :text),
+            editor_options: [],
+            formatter: if(raw["formatter"], do: safe_to_atom(raw["formatter"], nil)),
+            formatter_options: atomize_keys(raw["formatter_options"] || %{}),
+            validators: parse_validators(raw["validators"]),
+            renderer: raw["renderer"],
+            renderer_options: atomize_keys(raw["renderer_options"] || %{})
+          }
+        end)
+
+      grid_options = parse_grid_options(data["grid_options"], socket.assigns.grid_options)
+
+      socket =
+        socket
+        |> assign(:grid_name, data["grid_name"] || "")
+        |> assign(:grid_id, data["grid_id"] || "")
+        |> assign(:data_source_type, data["data_source_type"] || "sample")
+        |> assign(:grid_options, grid_options)
+        |> assign(:columns, builder_cols)
+        |> assign(:next_temp_id, next_id + length(builder_cols))
+        |> assign(:selected_column_id, nil)
+        |> assign(:errors, %{})
+
+      {:ok, socket}
+    else
+      :no_columns -> {:error, "JSON에 columns 배열이 없습니다"}
+      _ -> {:error, "잘못된 JSON 형식입니다"}
+    end
+  end
+
+  defp parse_width("auto"), do: :auto
+  defp parse_width(nil), do: :auto
+  defp parse_width(v) when is_integer(v), do: v
+  defp parse_width(v) when is_binary(v) do
+    case Integer.parse(v) do
+      {n, _} -> n
+      :error -> :auto
+    end
+  end
+  defp parse_width(_), do: :auto
+
+  @allowed_atoms ~w(string integer float boolean date datetime
+                     left center right
+                     text number select checkbox
+                     currency dollar percent number filesize
+                     truncate uppercase lowercase mask
+                     relative_time time)a
+
+  defp safe_to_atom(nil, default), do: default
+  defp safe_to_atom(val, default) when is_binary(val) do
+    atom = String.to_atom(val)
+    if atom in @allowed_atoms, do: atom, else: default
+  rescue
+    _ -> default
+  end
+  defp safe_to_atom(val, _default) when is_atom(val), do: val
+  defp safe_to_atom(_, default), do: default
+
+  defp atomize_keys(map) when is_map(map) do
+    Map.new(map, fn {k, v} -> {String.to_atom(to_string(k)), v} end)
+  end
+  defp atomize_keys(_), do: %{}
+
+  defp parse_validators(nil), do: []
+  defp parse_validators(validators) when is_list(validators) do
+    Enum.map(validators, fn v ->
+      %{
+        type: v["type"] || "required",
+        message: v["message"] || "",
+        value: v["value"]
+      }
+    end)
+  end
+  defp parse_validators(_), do: []
+
+  defp parse_grid_options(nil, defaults), do: defaults
+  defp parse_grid_options(opts, defaults) when is_map(opts) do
+    %{
+      page_size: opts["page_size"] || defaults.page_size,
+      theme: opts["theme"] || defaults.theme,
+      virtual_scroll: opts["virtual_scroll"] == true,
+      row_height: opts["row_height"] || defaults.row_height,
+      frozen_columns: opts["frozen_columns"] || defaults.frozen_columns,
+      show_row_number: opts["show_row_number"] == true
+    }
+  end
+  defp parse_grid_options(_, defaults), do: defaults
 end

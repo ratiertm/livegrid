@@ -49,7 +49,7 @@ mix docs
 open doc/index.html
 ```
 
-## ✨ Implemented Features (v0.1 ~ v0.7)
+## ✨ Implemented Features (v0.1 ~ v0.10)
 
 ### v0.1 - Core Grid
 - [x] Table rendering (LiveComponent-based)
@@ -115,7 +115,7 @@ open doc/index.html
 - [x] Row edit mode (edit all cells in a row simultaneously)
 - [x] Undo/Redo (Ctrl+Z/Y edit history with 50-action stack)
 
-### v0.7 - Grid Config & Architecture (Current)
+### v0.7 - Grid Config & Architecture
 - [x] Grid Configuration Modal (column visibility, order, width, frozen columns, formatters, validators)
 - [x] Grid Settings tab (page size, virtual scroll, theme, row height)
 - [x] Grid Builder (dynamic grid creation with column definition UI)
@@ -132,28 +132,63 @@ open doc/index.html
 - [x] GridComponent refactoring (EventHandlers + RenderHelpers extraction)
 - [x] ExDoc documentation (@doc/@spec across all public modules)
 
+### v0.8 - Row Enhancement & UI Components
+- [x] Row Pinning - pin rows to top/bottom (`pin_row/3`, `unpin_row/2`)
+- [x] Status Bar - footer statistics display (`show_status_bar`, `status_bar_data/1`)
+- [x] Overlay System - loading/no_data/error overlays (`set_overlay/2`, `clear_overlay/1`)
+- [x] Column Resize Lock - per-column `resizable: false` option
+- [x] Cell Text Selection - `enable_cell_text_selection` option
+
+### v0.9 - State Management & i18n
+- [x] Grid State Save/Restore - persist full grid state (`get_state/1`, `restore_state/2`, `GridStatePersist` JS Hook)
+- [x] Column State Save/Restore - persist column order/width/visibility (`get_column_state/1`, `apply_column_state/2`)
+- [x] Value Getters/Setters - computed columns (`value_getter`, `value_setter` column options)
+- [x] Row Animation - enter/exit CSS animations (`animate_rows` option)
+- [x] Localization (i18n) - `Locale` module with ko/en/ja, `grid_t/2` helper
+
+### v0.10 - Enterprise Features (Current)
+- [x] Side Bar - toggle sidebar with columns/filters tabs
+- [x] Batch Edit - multi-cell range editing (`batch_update_cells/3`)
+- [x] Find & Highlight - in-grid search with match navigation (`find_in_grid/2`, `find_next/prev`)
+- [x] Full-Width Rows - spanning rows (`add_full_width_row/3`)
+- [x] Large Text Editor - textarea modal for long text editing
+- [x] Radio Button Column - single-select radio renderer
+- [x] Empty Area Fill - fill empty grid space option
+- [x] Column Hover Highlight - column highlight on mouse hover
+- [x] Grid Builder JSON Export/Import - save/load grid configs as JSON files
+
 ## 📊 Implementation Status
 
 | Item | Count |
 |------|-------|
-| Total Features | 62 |
-| Completed | 62 (100%) |
-| Versions Shipped | v0.1 ~ v0.7 |
-| Tests | 428 passing |
+| Total Features | 84 |
+| Completed | 84 (100%) |
+| Versions Shipped | v0.1 ~ v0.10 |
+| Tests | 578 |
+| AG Grid Feature Coverage | ~91/200+ (~68 full match, ~13 partial) |
 
 ## 🗺️ Roadmap (Not Yet Implemented)
 
-### v0.8 - Enterprise Data
-- [ ] Multi-DB drivers - PostgreSQL (`postgrex`), MySQL/MariaDB (`myxql`)
-- [ ] Multi-DB drivers - MSSQL (`tds_ecto`), Oracle (`ecto_oracle`)
-- [ ] Large dataset streaming (`Repo.stream` for memory-efficient processing)
-- [ ] Cursor-based pagination (in addition to offset)
-- [ ] GraphQL data source support
+### Priority 0 - Accessibility
+- [ ] WCAG 2.1 AA - ARIA roles/attributes (`role="grid"`, `aria-*`)
 
-### v0.9 - Collaboration & UX
-- [ ] Cell locking (concurrent edit conflict prevention)
-- [ ] Date Picker UI component (calendar popup for date columns)
-- [ ] Column pinning UI (pin left/right via context menu)
+### Priority 1 - Core Missing Features
+- [ ] Column Menu (header dropdown: sort/filter/hide/pin)
+- [ ] Set Filter (unique value checkbox filter)
+- [ ] Cell Fill Handle (Excel auto-fill drag)
+- [ ] Master-Detail (expandable row detail grid)
+- [ ] Date Editor (datepicker component for date columns)
+- [ ] Printing (print button + `print_data/1` API)
+
+### Priority 2 - Enterprise Extensions
+- [ ] Rich Select Editor (searchable dropdown)
+- [ ] Sparklines (in-cell mini charts)
+- [ ] Integrated Charts (data-driven charts)
+- [ ] Cell Expressions/Formulas
+- [ ] Multi-DB drivers (PostgreSQL, MySQL, MSSQL, Oracle)
+- [ ] GraphQL DataSource
+- [ ] RTL Support
+- [ ] Touch Device Support
 
 ## 📁 Project Structure
 
@@ -161,72 +196,57 @@ open doc/index.html
 lib/
 ├── liveview_grid/              # Business logic
 │   ├── grid.ex                 # Grid core module (data/state management)
-│   ├── grid_definition.ex      # Grid definition struct (v0.7)
+│   ├── grid_definition.ex      # Grid definition struct
+│   ├── locale.ex               # i18n Localization (ko/en/ja) (v0.9)
 │   ├── data_source.ex          # DataSource behaviour (adapter pattern)
 │   ├── data_source/
-│   │   ├── in_memory.ex        # InMemory adapter (v0.1)
-│   │   ├── ecto.ex             # Ecto/DB adapter (v0.3)
+│   │   ├── in_memory.ex        # InMemory adapter
+│   │   ├── ecto.ex             # Ecto/DB adapter
 │   │   ├── ecto/
 │   │   │   └── query_builder.ex # SQL query builder
-│   │   ├── rest.ex             # REST API adapter (v0.5)
-│   │   └── raw_table.ex        # Raw table adapter (v0.7)
+│   │   ├── rest.ex             # REST API adapter
+│   │   └── raw_table.ex        # Raw table adapter
 │   ├── operations/
-│   │   ├── sorting.ex          # Sorting engine (v0.1)
-│   │   ├── filter.ex           # Filter engine - basic+advanced (v0.1/v0.2)
-│   │   ├── pagination.ex       # Pagination (v0.1)
-│   │   ├── grouping.ex         # Multi-level grouping (v0.7)
-│   │   ├── tree.ex             # Tree grid hierarchy (v0.7)
-│   │   └── pivot.ex            # Pivot table transform (v0.7)
-│   ├── renderers.ex            # Custom cell renderer presets (v0.5)
-│   ├── formatter.ex            # 16 data formatters (v0.7)
-│   ├── export.ex               # Excel/CSV Export (v0.5)
-│   ├── api_key.ex              # API Key schema
-│   ├── api_keys.ex             # API Key context (CRUD)
-│   ├── demo_user.ex            # Demo User schema
-│   ├── sample_data.ex          # Sample data generator (v0.7)
-│   ├── schema_registry.ex      # Schema registry for Grid Builder (v0.7)
-│   ├── table_inspector.ex      # DB table introspection (v0.7)
-│   ├── grid_presence.ex        # Phoenix Presence for collaboration (v0.7)
-│   ├── pub_sub_bridge.ex       # PubSub bridge for real-time sync (v0.7)
-│   ├── repo.ex                 # Ecto Repo
-│   └── application.ex
+│   │   ├── sorting.ex          # Sorting engine
+│   │   ├── filter.ex           # Filter engine (basic + advanced)
+│   │   ├── pagination.ex       # Pagination
+│   │   ├── grouping.ex         # Multi-level grouping
+│   │   ├── tree.ex             # Tree grid hierarchy
+│   │   └── pivot.ex            # Pivot table transform
+│   ├── renderers.ex            # Custom cell renderer presets
+│   ├── formatter.ex            # 16 data formatters
+│   ├── export.ex               # Excel/CSV Export
+│   ├── sample_data.ex          # Sample data generator
+│   ├── schema_registry.ex      # Schema registry for Grid Builder
+│   ├── table_inspector.ex      # DB table introspection
+│   ├── grid_presence.ex        # Phoenix Presence (collaboration)
+│   └── pub_sub_bridge.ex       # PubSub bridge (real-time sync)
 └── liveview_grid_web/          # Web layer
     ├── live/
-    │   ├── grid_live.ex         # Grid LiveView
     │   ├── demo_live.ex         # InMemory demo
     │   ├── dbms_demo_live.ex    # DBMS demo (SQLite)
     │   ├── api_demo_live.ex     # REST API demo
     │   ├── renderer_demo_live.ex # Renderer demo
-    │   ├── advanced_demo_live.ex # Advanced features demo (v0.7)
-    │   ├── grid_config_demo_live.ex # Grid Config demo (v0.7)
-    │   ├── builder_live.ex      # Grid Builder page (v0.7)
-    │   ├── api_key_live.ex      # API Key management
+    │   ├── advanced_demo_live.ex # Advanced features demo
+    │   ├── builder_live.ex      # Grid Builder page
     │   └── api_doc_live.ex      # API documentation
     ├── components/
     │   ├── grid_component.ex    # Grid LiveComponent (core)
     │   ├── grid_component/
-    │   │   ├── event_handlers.ex  # Event handler callbacks (v0.7)
-    │   │   └── render_helpers.ex  # Render helper functions (v0.7)
+    │   │   ├── event_handlers.ex  # Event handler callbacks
+    │   │   └── render_helpers.ex  # Render helper functions
     │   ├── grid_config/
-    │   │   └── config_modal.ex    # Grid Configuration Modal (v0.7)
-    │   ├── grid_builder/
-    │   │   ├── builder_modal.ex   # Grid Builder Modal (v0.7)
-    │   │   ├── builder_helpers.ex # Builder helper functions (v0.7)
-    │   │   └── builder_data_source.ex # Builder data source logic (v0.7)
-    │   ├── core_components.ex   # Phoenix core components
-    │   └── layouts/
-    │       └── dashboard.html.heex  # Sidebar dashboard layout
-    ├── plugs/
-    │   └── require_api_key.ex       # API Key authentication plug (v0.6)
-    ├── controllers/
-    │   ├── mock_api_controller.ex   # Mock REST API
-    │   └── csv_controller.ex        # CSV download
+    │   │   └── config_modal.ex    # Grid Configuration Modal
+    │   └── grid_builder/
+    │       ├── builder_modal.ex   # Grid Builder Modal
+    │       ├── builder_helpers.ex # Builder helper functions
+    │       └── builder_data_source.ex # Builder data source logic
     └── router.ex
 
 assets/
 ├── js/
 │   ├── app.js                     # JS entry point + hook registry
-│   └── hooks/                     # Modular JS hooks (v0.7)
+│   └── hooks/                     # Modular JS hooks (12 modules)
 │       ├── virtual-scroll.js      # Virtual scrolling
 │       ├── cell-editor.js         # Cell editing
 │       ├── cell-editable.js       # Cell editable behavior
@@ -236,25 +256,22 @@ assets/
 │       ├── keyboard-nav.js        # Keyboard navigation
 │       ├── row-edit-save.js       # Row edit/save
 │       ├── file-import.js         # File import
-│       └── config-sortable.js     # Config sortable drag
+│       ├── config-sortable.js     # Config sortable drag
+│       ├── grid-state-persist.js  # Grid state persistence (v0.9)
+│       └── json-import.js         # JSON config import (v0.10)
 └── css/
     ├── liveview_grid.css          # CSS entry point (imports)
-    └── grid/                      # Modular CSS (v0.7)
-        ├── variables.css          # CSS variables & themes
-        ├── layout.css             # Grid layout
+    └── grid/                      # Modular CSS (10 files)
+        ├── variables.css          # CSS variables & themes (z-index scale)
+        ├── layout.css             # Grid layout + renderers
         ├── header.css             # Header styles
         ├── body.css               # Body & cell styles
         ├── toolbar.css            # Toolbar styles
         ├── interactions.css       # Interactions (selection, editing)
         ├── advanced.css           # Advanced features (grouping, tree, pivot)
         ├── config-modal.css       # Config modal styles
-        └── context-menu.css       # Context menu styles
-
-guides/                            # ex_doc guide documents
-├── getting-started.md / -en.md    # Installation & basic usage
-├── formatters.md / -en.md         # 16 formatter types reference
-├── data-sources.md / -en.md       # InMemory, Ecto, REST adapters
-└── advanced-features.md / -en.md  # CRUD, Grouping, Tree, Pivot
+        ├── context-menu.css       # Context menu styles
+        └── print.css              # Print media styles (v0.10)
 ```
 
 ## 🔧 Tech Stack

@@ -43,23 +43,7 @@ defmodule LiveviewGridWeb.BuilderLiveTest do
       |> element("input[phx-blur=\"update_grid_name\"]")
       |> render_blur(%{"value" => "Test Grid"})
 
-      # Switch to columns tab
-      view |> element("button", "컬럼 정의") |> render_click()
-
-      # Add a column
-      view |> element("button", "+ 컬럼 추가") |> render_click()
-
-      # Fill field name - find the input for field name
-      view
-      |> element("input[phx-blur=\"update_column_field\"][phx-value-id=\"col_1\"]")
-      |> render_blur(%{"value" => "name"})
-
-      # Fill label
-      view
-      |> element("input[phx-blur=\"update_column_label\"][phx-value-id=\"col_1\"]")
-      |> render_blur(%{"value" => "이름"})
-
-      # Create grid
+      # Sample columns are auto-generated on mount, so just create directly
       view |> element("button", "그리드 생성") |> render_click()
 
       html = render(view)
@@ -85,12 +69,8 @@ defmodule LiveviewGridWeb.BuilderLiveTest do
       {:ok, view, _html} = live(conn, "/builder")
       view |> element("button", "Create New Grid") |> render_click()
 
-      # Quick create
+      # Set grid name - sample columns auto-generated
       view |> element("input[phx-blur=\"update_grid_name\"]") |> render_blur(%{"value" => "Del Grid"})
-      view |> element("button", "컬럼 정의") |> render_click()
-      view |> element("button", "+ 컬럼 추가") |> render_click()
-      view |> element("input[phx-blur=\"update_column_field\"][phx-value-id=\"col_1\"]") |> render_blur(%{"value" => "x"})
-      view |> element("input[phx-blur=\"update_column_label\"][phx-value-id=\"col_1\"]") |> render_blur(%{"value" => "X"})
       view |> element("button", "그리드 생성") |> render_click()
 
       # Verify created
@@ -101,6 +81,57 @@ defmodule LiveviewGridWeb.BuilderLiveTest do
       html = render(view)
 
       assert html =~ "No grids created yet"
+    end
+  end
+
+  describe "BuilderLive - Export/Import" do
+    test "export button renders in modal footer", %{conn: conn} do
+      {:ok, view, _html} = live(conn, "/builder")
+      view |> element("button", "Create New Grid") |> render_click()
+
+      html = render(view)
+      assert html =~ "Export"
+      assert html =~ "Import"
+      assert html =~ "컬럼 6개 정의됨"
+    end
+
+    test "export from modal triggers download event", %{conn: conn} do
+      {:ok, view, _html} = live(conn, "/builder")
+      view |> element("button", "Create New Grid") |> render_click()
+
+      # Set name first
+      view |> element("input[phx-blur=\"update_grid_name\"]") |> render_blur(%{"value" => "Export Test"})
+
+      # Click export - should not crash
+      view |> element("button[phx-click=\"export_grid_json\"]") |> render_click()
+      html = render(view)
+
+      # Modal should still be open (export doesn't close it)
+      assert html =~ "Grid Builder -"
+    end
+
+    test "import hook element renders with correct attributes", %{conn: conn} do
+      {:ok, view, _html} = live(conn, "/builder")
+      view |> element("button", "Create New Grid") |> render_click()
+
+      html = render(view)
+
+      # Verify JsonImport hook element is rendered with correct attributes
+      assert html =~ "id=\"builder-json-import\""
+      assert html =~ "phx-hook=\"JsonImport\""
+      assert html =~ "Import"
+    end
+
+    test "export button renders on grid cards", %{conn: conn} do
+      {:ok, view, _html} = live(conn, "/builder")
+      view |> element("button", "Create New Grid") |> render_click()
+
+      view |> element("input[phx-blur=\"update_grid_name\"]") |> render_blur(%{"value" => "Card Export"})
+      view |> element("button", "그리드 생성") |> render_click()
+
+      html = render(view)
+      assert html =~ "Export"
+      assert html =~ "export_dynamic_grid"
     end
   end
 

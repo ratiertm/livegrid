@@ -57,6 +57,18 @@
   --lv-grid-cell-content-h: 24px;            /* editable span & editor 공유 */
   --lv-grid-cell-min-h: calc(var(--lv-grid-cell-content-h) + var(--lv-grid-space-2) * 2);
 
+  /* ── z-index 체계 ── */
+  --lv-grid-z-cell: 1;
+  --lv-grid-z-cell-focused: 2;
+  --lv-grid-z-resize: 5;
+  --lv-grid-z-frozen: 5;
+  --lv-grid-z-header: 10;
+  --lv-grid-z-pinned: 10;
+  --lv-grid-z-sidebar: 20;
+  --lv-grid-z-dropdown: 50;
+  --lv-grid-z-overlay: 100;
+  --lv-grid-z-modal: 200;
+
   /* ── 링크 ── */
   --lv-grid-link-color: var(--lv-grid-primary-dark);
 
@@ -107,4 +119,8 @@
 
   /* ── 링크 ── */
   --lv-grid-link-color: #90caf9;
+
+  /* ── 뱃지 ── */
+  --lv-grid-badge-purple-bg: #2d1f3d;
+  --lv-grid-badge-purple-text: #ce93d8;
 }

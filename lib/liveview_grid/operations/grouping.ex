@@ -111,4 +111,67 @@ defmodule LiveViewGrid.Grouping do
     current = Map.get(expanded, group_key, true)
     Map.put(expanded, group_key, !current)
   end
+
+  # ── F-963: Multi-Level Subtotals ──
+
+  @doc """
+  그룹 데이터에 소계 행을 삽입합니다.
+
+  ## Parameters
+  - `grouped_data` - group_data/4의 결과
+  - `aggregates` - 집계 설정 맵 (%{field => :sum | :avg | ...})
+  - `position` - 소계 위치 (:bottom | :top)
+  """
+  @spec insert_subtotals(list(map()), map(), atom()) :: list(map())
+  def insert_subtotals(grouped_data, aggregates, position \\ :bottom)
+  def insert_subtotals(grouped_data, aggregates, position) when map_size(aggregates) > 0 do
+    do_insert_subtotals(grouped_data, aggregates, position, [])
+    |> Enum.reverse()
+  end
+  def insert_subtotals(grouped_data, _aggregates, _position), do: grouped_data
+
+  defp do_insert_subtotals([], _aggregates, _position, acc), do: acc
+  defp do_insert_subtotals([%{_row_type: :group_header} = header | rest], aggregates, position, acc) do
+    # Collect data rows for this group (until next group header of same or lower depth)
+    {group_rows, remaining} = collect_group_rows(rest, header._group_depth)
+
+    subtotal_row = %{
+      _row_type: :subtotal,
+      _group_key: header._group_key,
+      _group_field: header._group_field,
+      _group_value: header._group_value,
+      _group_depth: header._group_depth,
+      _subtotal_aggregates: compute_aggregates(data_rows_only(group_rows), aggregates)
+    }
+
+    # Recurse into group_rows first (they may contain sub-groups)
+    processed_rows = do_insert_subtotals(group_rows, aggregates, position, []) |> Enum.reverse()
+
+    new_acc = case position do
+      :top ->
+        [subtotal_row | processed_rows] ++ [header | acc]
+      _ ->
+        Enum.reverse([header | Enum.reverse(processed_rows ++ [subtotal_row])]) ++ acc
+    end
+
+    do_insert_subtotals(remaining, aggregates, position, Enum.reverse(new_acc))
+  end
+  defp do_insert_subtotals([row | rest], aggregates, position, acc) do
+    do_insert_subtotals(rest, aggregates, position, [row | acc])
+  end
+
+  defp collect_group_rows(rows, parent_depth) do
+    Enum.split_while(rows, fn row ->
+      case Map.get(row, :_row_type) do
+        :group_header -> row._group_depth > parent_depth
+        _ -> true
+      end
+    end)
+  end
+
+  defp data_rows_only(rows) do
+    Enum.filter(rows, fn row ->
+      Map.get(row, :_row_type) not in [:group_header, :subtotal]
+    end)
+  end
 end

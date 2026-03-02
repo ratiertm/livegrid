@@ -218,6 +218,14 @@ defmodule LiveViewGrid.Filter do
     end
   end
 
+  # ── FA-012: Set Filter ──
+
+  defp match_filter?(row, field, {:set, values}, _filter_type) when is_list(values) do
+    cell_value = Map.get(row, field)
+    cell_str = if is_nil(cell_value), do: "", else: to_string(cell_value)
+    cell_str in Enum.map(values, &to_string/1)
+  end
+
   # ── Legacy: Basic filter matching ──
 
   defp match_filter?(row, field, value, :text) do

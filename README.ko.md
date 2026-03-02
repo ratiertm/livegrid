@@ -49,7 +49,7 @@ mix docs
 open doc/index.html
 ```
 
-## ✨ 구현된 기능 (v0.1 ~ v0.7)
+## ✨ 구현된 기능 (v0.1 ~ v0.10)
 
 ### v0.1 - 핵심 그리드
 - [x] 테이블 렌더링 (LiveComponent 기반)
@@ -115,7 +115,7 @@ open doc/index.html
 - [x] 행 단위 편집 모드 (행 전체 셀 동시 편집)
 - [x] Undo/Redo (Ctrl+Z/Y 편집 히스토리, 최대 50건 스택)
 
-### v0.7 - Grid 설정 & 아키텍처 (현재)
+### v0.7 - Grid 설정 & 아키텍처
 - [x] Grid 설정 모달 (컬럼 표시/순서/너비, 고정 컬럼, 포맷터, 검증기)
 - [x] Grid 설정 탭 (페이지 크기, 가상 스크롤, 테마, 행 높이)
 - [x] Grid Builder (동적 그리드 생성, 컬럼 정의 UI)
@@ -132,28 +132,63 @@ open doc/index.html
 - [x] GridComponent 리팩토링 (EventHandlers + RenderHelpers 추출)
 - [x] ExDoc 문서화 (전체 공개 모듈 @doc/@spec)
 
+### v0.8 - 행 강화 & UI 컴포넌트
+- [x] Row Pinning - 행 상단/하단 고정 (`pin_row/3`, `unpin_row/2`)
+- [x] Status Bar - 하단 통계 표시 (`show_status_bar`, `status_bar_data/1`)
+- [x] Overlay 시스템 - loading/no_data/error 오버레이 (`set_overlay/2`, `clear_overlay/1`)
+- [x] 컬럼 리사이즈 잠금 - 컬럼별 `resizable: false` 옵션
+- [x] 셀 텍스트 선택 - `enable_cell_text_selection` 옵션
+
+### v0.9 - 상태 관리 & 다국어
+- [x] Grid 상태 저장/복원 - 전체 그리드 상태 영속화 (`get_state/1`, `restore_state/2`, `GridStatePersist` JS Hook)
+- [x] Column 상태 저장/복원 - 컬럼 순서/너비/표시 영속화 (`get_column_state/1`, `apply_column_state/2`)
+- [x] Value Getters/Setters - 계산 컬럼 (`value_getter`, `value_setter` 컬럼 옵션)
+- [x] 행 애니메이션 - 행 진입/퇴장 CSS 애니메이션 (`animate_rows` 옵션)
+- [x] 다국어 (i18n) - `Locale` 모듈, ko/en/ja 3개 언어, `grid_t/2` 헬퍼
+
+### v0.10 - 엔터프라이즈 기능 (현재)
+- [x] Side Bar - 사이드바 토글 (columns/filters 탭)
+- [x] Batch Edit - 셀 범위 일괄 편집 (`batch_update_cells/3`)
+- [x] Find & Highlight - 그리드 내 검색 + 매치 내비게이션 (`find_in_grid/2`, `find_next/prev`)
+- [x] Full-Width Rows - 전체 너비 행 (`add_full_width_row/3`)
+- [x] Large Text Editor - 긴 텍스트용 textarea 모달 편집
+- [x] Radio Button Column - 라디오 버튼 단일 선택 렌더러
+- [x] Empty Area Fill - 빈 영역 채우기 옵션
+- [x] Column Hover Highlight - 컬럼 마우스 호버 하이라이트
+- [x] Grid Builder JSON Export/Import - 그리드 설정 JSON 파일 저장/불러오기
+
 ## 📊 구현 현황
 
 | 항목 | 수치 |
 |------|------|
-| 전체 기능 | 62개 |
-| 구현 완료 | 62개 (100%) |
-| 구현 버전 | v0.1 ~ v0.7 |
-| 테스트 | 428개 통과 |
+| 전체 기능 | 84개 |
+| 구현 완료 | 84개 (100%) |
+| 구현 버전 | v0.1 ~ v0.10 |
+| 테스트 | 578개 |
+| AG Grid 기능 커버리지 | ~91/200+ (완전 매칭 ~68, 부분 매칭 ~13) |
 
 ## 🗺️ 로드맵 (미구현)
 
-### v0.8 - 엔터프라이즈 데이터
-- [ ] 멀티 DB 드라이버 - PostgreSQL (`postgrex`), MySQL/MariaDB (`myxql`)
-- [ ] 멀티 DB 드라이버 - MSSQL (`tds_ecto`), Oracle (`ecto_oracle`)
-- [ ] 대용량 데이터 스트리밍 (`Repo.stream` 메모리 효율 처리)
-- [ ] 커서 기반 페이지네이션 (오프셋 외 추가)
-- [ ] GraphQL 데이터 소스 지원
+### P0 - 접근성
+- [ ] WCAG 2.1 AA - ARIA role/속성 (`role="grid"`, `aria-*`)
 
-### v0.9 - 협업 & UX
-- [ ] 셀 잠금 (동시 편집 충돌 방지)
-- [ ] Date Picker UI 컴포넌트 (날짜 컬럼용 캘린더 팝업)
-- [ ] 컬럼 고정 UI (컨텍스트 메뉴에서 좌/우 고정)
+### P1 - 핵심 미구현 기능
+- [ ] Column Menu (헤더 드롭다운: 정렬/필터/숨기기/고정)
+- [ ] Set Filter (고유값 체크박스 필터)
+- [ ] Cell Fill Handle (Excel 자동채움 드래그)
+- [ ] Master-Detail (행 확장 디테일 그리드)
+- [ ] Date Editor (날짜 컬럼용 datepicker)
+- [ ] Printing (인쇄 버튼 + `print_data/1` API)
+
+### P2 - 엔터프라이즈 확장
+- [ ] Rich Select Editor (검색 가능 드롭다운)
+- [ ] Sparklines (셀 내 미니 차트)
+- [ ] Integrated Charts (데이터 기반 차트)
+- [ ] 셀 수식/표현식
+- [ ] 멀티 DB 드라이버 (PostgreSQL, MySQL, MSSQL, Oracle)
+- [ ] GraphQL 데이터 소스
+- [ ] RTL 지원 (우→좌 언어)
+- [ ] 터치 디바이스 지원
 
 ## 📁 프로젝트 구조
 
@@ -161,72 +196,57 @@ open doc/index.html
 lib/
 ├── liveview_grid/              # 비즈니스 로직
 │   ├── grid.ex                 # Grid 핵심 모듈 (데이터/상태 관리)
-│   ├── grid_definition.ex      # Grid 정의 구조체 (v0.7)
+│   ├── grid_definition.ex      # Grid 정의 구조체
+│   ├── locale.ex               # 다국어 지원 (ko/en/ja) (v0.9)
 │   ├── data_source.ex          # DataSource behaviour (어댑터 패턴)
 │   ├── data_source/
-│   │   ├── in_memory.ex        # InMemory 어댑터 (v0.1)
-│   │   ├── ecto.ex             # Ecto/DB 어댑터 (v0.3)
+│   │   ├── in_memory.ex        # InMemory 어댑터
+│   │   ├── ecto.ex             # Ecto/DB 어댑터
 │   │   ├── ecto/
 │   │   │   └── query_builder.ex # SQL 쿼리 빌더
-│   │   ├── rest.ex             # REST API 어댑터 (v0.5)
-│   │   └── raw_table.ex        # Raw Table 어댑터 (v0.7)
+│   │   ├── rest.ex             # REST API 어댑터
+│   │   └── raw_table.ex        # Raw Table 어댑터
 │   ├── operations/
-│   │   ├── sorting.ex          # 정렬 엔진 (v0.1)
-│   │   ├── filter.ex           # 필터 엔진 - 기본+고급 (v0.1/v0.2)
-│   │   ├── pagination.ex       # 페이지네이션 (v0.1)
-│   │   ├── grouping.ex         # 다중 필드 그룹핑 (v0.7)
-│   │   ├── tree.ex             # 트리 그리드 계층 (v0.7)
-│   │   └── pivot.ex            # 피벗 테이블 변환 (v0.7)
-│   ├── renderers.ex            # 커스텀 셀 렌더러 프리셋 (v0.5)
-│   ├── formatter.ex            # 16종 데이터 포맷터 (v0.7)
-│   ├── export.ex               # Excel/CSV Export (v0.5)
-│   ├── api_key.ex              # API Key 스키마
-│   ├── api_keys.ex             # API Key 컨텍스트 (CRUD)
-│   ├── demo_user.ex            # 데모용 User 스키마
-│   ├── sample_data.ex          # 샘플 데이터 생성기 (v0.7)
-│   ├── schema_registry.ex      # Grid Builder용 스키마 레지스트리 (v0.7)
-│   ├── table_inspector.ex      # DB 테이블 인트로스펙션 (v0.7)
-│   ├── grid_presence.ex        # 실시간 협업 Phoenix Presence (v0.7)
-│   ├── pub_sub_bridge.ex       # 실시간 동기화 PubSub 브리지 (v0.7)
-│   ├── repo.ex                 # Ecto Repo
-│   └── application.ex
+│   │   ├── sorting.ex          # 정렬 엔진
+│   │   ├── filter.ex           # 필터 엔진 (기본+고급)
+│   │   ├── pagination.ex       # 페이지네이션
+│   │   ├── grouping.ex         # 다중 필드 그룹핑
+│   │   ├── tree.ex             # 트리 그리드 계층
+│   │   └── pivot.ex            # 피벗 테이블 변환
+│   ├── renderers.ex            # 커스텀 셀 렌더러 프리셋
+│   ├── formatter.ex            # 16종 데이터 포맷터
+│   ├── export.ex               # Excel/CSV Export
+│   ├── sample_data.ex          # 샘플 데이터 생성기
+│   ├── schema_registry.ex      # Grid Builder용 스키마 레지스트리
+│   ├── table_inspector.ex      # DB 테이블 인트로스펙션
+│   ├── grid_presence.ex        # 실시간 협업 Phoenix Presence
+│   └── pub_sub_bridge.ex       # 실시간 동기화 PubSub 브리지
 └── liveview_grid_web/          # 웹 레이어
     ├── live/
-    │   ├── grid_live.ex         # Grid LiveView
     │   ├── demo_live.ex         # InMemory 데모
     │   ├── dbms_demo_live.ex    # DBMS 데모 (SQLite)
     │   ├── api_demo_live.ex     # REST API 데모
     │   ├── renderer_demo_live.ex # 렌더러 데모
-    │   ├── advanced_demo_live.ex # 고급 기능 데모 (v0.7)
-    │   ├── grid_config_demo_live.ex # Grid 설정 데모 (v0.7)
-    │   ├── builder_live.ex      # Grid Builder 페이지 (v0.7)
-    │   ├── api_key_live.ex      # API Key 관리
+    │   ├── advanced_demo_live.ex # 고급 기능 데모
+    │   ├── builder_live.ex      # Grid Builder 페이지
     │   └── api_doc_live.ex      # API 문서
     ├── components/
     │   ├── grid_component.ex    # Grid LiveComponent (핵심)
     │   ├── grid_component/
-    │   │   ├── event_handlers.ex  # 이벤트 핸들러 콜백 (v0.7)
-    │   │   └── render_helpers.ex  # 렌더 헬퍼 함수 (v0.7)
+    │   │   ├── event_handlers.ex  # 이벤트 핸들러 콜백
+    │   │   └── render_helpers.ex  # 렌더 헬퍼 함수
     │   ├── grid_config/
-    │   │   └── config_modal.ex    # Grid 설정 모달 (v0.7)
-    │   ├── grid_builder/
-    │   │   ├── builder_modal.ex   # Grid Builder 모달 (v0.7)
-    │   │   ├── builder_helpers.ex # Builder 헬퍼 함수 (v0.7)
-    │   │   └── builder_data_source.ex # Builder 데이터 소스 로직 (v0.7)
-    │   ├── core_components.ex   # Phoenix 기본 컴포넌트
-    │   └── layouts/
-    │       └── dashboard.html.heex  # 사이드바 대시보드 레이아웃
-    ├── plugs/
-    │   └── require_api_key.ex       # API Key 인증 plug (v0.6)
-    ├── controllers/
-    │   ├── mock_api_controller.ex   # Mock REST API
-    │   └── csv_controller.ex        # CSV 다운로드
+    │   │   └── config_modal.ex    # Grid 설정 모달
+    │   └── grid_builder/
+    │       ├── builder_modal.ex   # Grid Builder 모달
+    │       ├── builder_helpers.ex # Builder 헬퍼 함수
+    │       └── builder_data_source.ex # Builder 데이터 소스 로직
     └── router.ex
 
 assets/
 ├── js/
 │   ├── app.js                     # JS 진입점 + Hook 레지스트리
-│   └── hooks/                     # 모듈화된 JS Hooks (v0.7)
+│   └── hooks/                     # 모듈화된 JS Hooks (12개 모듈)
 │       ├── virtual-scroll.js      # 가상 스크롤
 │       ├── cell-editor.js         # 셀 편집
 │       ├── cell-editable.js       # 셀 편집 가능 동작
@@ -236,25 +256,22 @@ assets/
 │       ├── keyboard-nav.js        # 키보드 네비게이션
 │       ├── row-edit-save.js       # 행 편집/저장
 │       ├── file-import.js         # 파일 임포트
-│       └── config-sortable.js     # 설정 정렬 드래그
+│       ├── config-sortable.js     # 설정 정렬 드래그
+│       ├── grid-state-persist.js  # 그리드 상태 영속화 (v0.9)
+│       └── json-import.js         # JSON 설정 임포트 (v0.10)
 └── css/
     ├── liveview_grid.css          # CSS 진입점 (imports)
-    └── grid/                      # 모듈화된 CSS (v0.7)
-        ├── variables.css          # CSS 변수 & 테마
-        ├── layout.css             # 그리드 레이아웃
+    └── grid/                      # 모듈화된 CSS (10개 파일)
+        ├── variables.css          # CSS 변수 & 테마 (z-index 체계)
+        ├── layout.css             # 그리드 레이아웃 + 렌더러
         ├── header.css             # 헤더 스타일
         ├── body.css               # 바디 & 셀 스타일
         ├── toolbar.css            # 툴바 스타일
         ├── interactions.css       # 인터랙션 (선택, 편집)
         ├── advanced.css           # 고급 기능 (그룹핑, 트리, 피벗)
         ├── config-modal.css       # 설정 모달 스타일
-        └── context-menu.css       # 컨텍스트 메뉴 스타일
-
-guides/                            # ex_doc 가이드 문서
-├── getting-started.md / -en.md    # 설치 및 기본 사용법
-├── formatters.md / -en.md         # 16종 포맷터 레퍼런스
-├── data-sources.md / -en.md       # InMemory, Ecto, REST 어댑터
-└── advanced-features.md / -en.md  # CRUD, 그룹핑, 트리, 피벗
+        ├── context-menu.css       # 컨텍스트 메뉴 스타일
+        └── print.css              # 인쇄 미디어 스타일 (v0.10)
 ```
 
 ## 🔧 기술 스택

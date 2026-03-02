@@ -1,0 +1,94 @@
+/* ========================================
+   LiveView Grid - Print Styles (FA-018)
+   ======================================== */
+
+@media print {
+  /* Hide interactive elements */
+  .lv-grid__toolbar,
+  .lv-grid__search-bar,
+  .lv-grid__action-area,
+  .lv-grid__filter-row,
+  .lv-grid__cell--checkbox,
+  .lv-grid__cell--row-actions,
+  .lv-grid__row-edit-btn,
+  .lv-grid__row-edit-save,
+  .lv-grid__row-edit-cancel,
+  .lv-grid__row-drag-handle,
+  .lv-grid__tree-toggle,
+  .lv-grid__detail-toggle,
+  .lv-grid__fill-handle,
+  .lv-grid__column-menu-btn,
+  .lv-grid__column-menu-dropdown,
+  .lv-grid__resize-handle,
+  .lv-grid__context-menu,
+  .lv-grid__pagination,
+  .lv-grid__footer,
+  .lv-grid__overlay,
+  .lv-grid__status-bar,
+  .lv-grid__sidebar,
+  .lv-grid__find-bar,
+  .lv-grid__config-modal {
+    display: none;
+  }
+
+  /* Remove scroll constraints */
+  .lv-grid__body,
+  .lv-grid__body--virtual {
+    max-height: none;
+    height: auto;
+    overflow: visible;
+  }
+
+  /* Grid layout adjustments */
+  .lv-grid {
+    border: 1px solid #333;
+    box-shadow: none;
+    overflow: visible;
+  }
+
+  .lv-grid__header {
+    background: #f0f0f0;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .lv-grid__header-cell {
+    border-bottom: 2px solid #333;
+    font-weight: bold;
+    color: #000;
+  }
+
+  .lv-grid__row {
+    border-bottom: 1px solid #ccc;
+    page-break-inside: avoid;
+  }
+
+  .lv-grid__cell {
+    border-right: 1px solid #e0e0e0;
+    color: #000;
+  }
+
+  /* Group headers */
+  .lv-grid__row--group-header {
+    background: #e0e0e0;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+    font-weight: bold;
+  }
+
+  /* Subtotal rows */
+  .lv-grid__row--subtotal {
+    background: #f0f0f0;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Selection highlight removal */
+  .lv-grid__row--selected {
+    background: transparent;
+  }
+
+  .lv-grid__cell--in-range {
+    background: transparent;
+  }
+}

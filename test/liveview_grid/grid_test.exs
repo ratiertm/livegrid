@@ -957,6 +957,171 @@ defmodule LiveViewGrid.GridTest do
     end
   end
 
+  describe "column resizable option (F-914)" do
+    test "columns default to resizable: true" do
+      grid = Grid.new(data: [], columns: [%{field: :name, label: "이름"}])
+      col = hd(grid.columns)
+      assert col.resizable == true
+    end
+
+    test "column can be set to resizable: false" do
+      grid = Grid.new(data: [], columns: [%{field: :id, label: "ID", resizable: false}])
+      col = hd(grid.columns)
+      assert col.resizable == false
+    end
+
+    test "mixed resizable settings" do
+      grid = Grid.new(data: [], columns: [
+        %{field: :id, label: "ID", resizable: false},
+        %{field: :name, label: "이름"},
+        %{field: :age, label: "나이", resizable: true}
+      ])
+      assert Enum.at(grid.columns, 0).resizable == false
+      assert Enum.at(grid.columns, 1).resizable == true
+      assert Enum.at(grid.columns, 2).resizable == true
+    end
+  end
+
+  describe "cell text selection option (FA-020)" do
+    test "enable_cell_text_selection defaults to false" do
+      grid = Grid.new(data: [], columns: [%{field: :name, label: "이름"}])
+      assert grid.options.enable_cell_text_selection == false
+    end
+
+    test "enable_cell_text_selection can be set to true" do
+      grid = Grid.new(data: [], columns: [%{field: :name, label: "이름"}],
+        options: %{enable_cell_text_selection: true})
+      assert grid.options.enable_cell_text_selection == true
+    end
+  end
+
+  describe "overlay system (FA-005)" do
+    setup do
+      grid = Grid.new(data: [%{id: 1, name: "Alice"}], columns: [%{field: :name, label: "이름"}])
+      %{grid: grid}
+    end
+
+    test "overlay defaults to nil", %{grid: grid} do
+      assert grid.state.overlay == nil
+      assert grid.state.overlay_message == nil
+    end
+
+    test "set_overlay sets loading state", %{grid: grid} do
+      updated = Grid.set_overlay(grid, :loading)
+      assert updated.state.overlay == :loading
+      assert updated.state.overlay_message == nil
+    end
+
+    test "set_overlay with custom message", %{grid: grid} do
+      updated = Grid.set_overlay(grid, :loading, "서버에서 가져오는 중...")
+      assert updated.state.overlay == :loading
+      assert updated.state.overlay_message == "서버에서 가져오는 중..."
+    end
+
+    test "set_overlay supports :no_data", %{grid: grid} do
+      updated = Grid.set_overlay(grid, :no_data)
+      assert updated.state.overlay == :no_data
+    end
+
+    test "set_overlay supports :error", %{grid: grid} do
+      updated = Grid.set_overlay(grid, :error, "네트워크 오류")
+      assert updated.state.overlay == :error
+      assert updated.state.overlay_message == "네트워크 오류"
+    end
+
+    test "clear_overlay removes overlay", %{grid: grid} do
+      updated = grid |> Grid.set_overlay(:loading) |> Grid.clear_overlay()
+      assert updated.state.overlay == nil
+      assert updated.state.overlay_message == nil
+    end
+  end
+
+  describe "status bar (FA-004)" do
+    test "show_status_bar defaults to false" do
+      grid = Grid.new(data: [], columns: [%{field: :name, label: "이름"}])
+      assert grid.options.show_status_bar == false
+    end
+
+    test "status_bar_data returns correct counts" do
+      data = [%{id: 1, name: "Alice"}, %{id: 2, name: "Bob"}, %{id: 3, name: "Carol"}]
+      grid = Grid.new(data: data, columns: [%{field: :name, label: "이름"}])
+      sb = Grid.status_bar_data(grid)
+      assert sb.total_rows == 3
+      assert sb.filtered_rows == 3
+      assert sb.selected_count == 0
+      assert sb.editing == nil
+    end
+
+    test "status_bar_data reflects selection" do
+      data = [%{id: 1, name: "Alice"}, %{id: 2, name: "Bob"}]
+      grid = Grid.new(data: data, columns: [%{field: :name, label: "이름"}])
+      grid = put_in(grid.state.selection.selected_ids, [1])
+      sb = Grid.status_bar_data(grid)
+      assert sb.selected_count == 1
+    end
+  end
+
+  describe "row pinning (FA-001)" do
+    setup do
+      data = [%{id: 1, name: "Alice"}, %{id: 2, name: "Bob"}, %{id: 3, name: "Carol"}]
+      grid = Grid.new(data: data, columns: [%{field: :name, label: "이름"}])
+      %{grid: grid}
+    end
+
+    test "pinned_top and pinned_bottom default to empty", %{grid: grid} do
+      assert grid.state.pinned_top == []
+      assert grid.state.pinned_bottom == []
+    end
+
+    test "pin_row adds row to top", %{grid: grid} do
+      updated = Grid.pin_row(grid, 1, :top)
+      assert updated.state.pinned_top == [1]
+      assert updated.state.pinned_bottom == []
+    end
+
+    test "pin_row adds row to bottom", %{grid: grid} do
+      updated = Grid.pin_row(grid, 2, :bottom)
+      assert updated.state.pinned_top == []
+      assert updated.state.pinned_bottom == [2]
+    end
+
+    test "pin_row moves from top to bottom", %{grid: grid} do
+      updated = grid |> Grid.pin_row(1, :top) |> Grid.pin_row(1, :bottom)
+      assert updated.state.pinned_top == []
+      assert updated.state.pinned_bottom == [1]
+    end
+
+    test "unpin_row removes from top", %{grid: grid} do
+      updated = grid |> Grid.pin_row(1, :top) |> Grid.unpin_row(1)
+      assert updated.state.pinned_top == []
+    end
+
+    test "unpin_row removes from bottom", %{grid: grid} do
+      updated = grid |> Grid.pin_row(2, :bottom) |> Grid.unpin_row(2)
+      assert updated.state.pinned_bottom == []
+    end
+
+    test "pinned_rows returns row data", %{grid: grid} do
+      updated = Grid.pin_row(grid, 1, :top)
+      rows = Grid.pinned_rows(updated, :top)
+      assert length(rows) == 1
+      assert hd(rows).name == "Alice"
+    end
+
+    test "pinned_rows handles non-existent row_id", %{grid: grid} do
+      updated = Grid.pin_row(grid, 999, :top)
+      rows = Grid.pinned_rows(updated, :top)
+      assert rows == []
+    end
+
+    test "multiple rows can be pinned", %{grid: grid} do
+      updated = grid |> Grid.pin_row(1, :top) |> Grid.pin_row(3, :top)
+      assert updated.state.pinned_top == [1, 3]
+      rows = Grid.pinned_rows(updated, :top)
+      assert length(rows) == 2
+    end
+  end
+
   describe "reorder_columns/2" do
     setup do
       data = [%{id: 1, name: "Alice", age: 30, dept: "개발"}]
@@ -2107,6 +2272,737 @@ defmodule LiveViewGrid.GridTest do
       )
       updated = Grid.append_data(grid, [])
       assert updated.data == grid.data
+    end
+  end
+
+  # ── Phase 2 (v0.12) ──
+
+  describe "date filter (FA-003)" do
+    setup do
+      data = [
+        %{id: 1, name: "Alice", created_at: ~D[2026-01-15]},
+        %{id: 2, name: "Bob", created_at: ~D[2026-02-20]},
+        %{id: 3, name: "Carol", created_at: ~D[2026-03-01]}
+      ]
+      columns = [
+        %{field: :name, label: "이름"},
+        %{field: :created_at, label: "생성일", filterable: true, filter_type: :date}
+      ]
+      %{data: data, columns: columns}
+    end
+
+    test "date range filter works with from~to format", %{data: data, columns: columns} do
+      _grid = Grid.new(data: data, columns: columns)
+      filtered = LiveViewGrid.Filter.apply(data, %{created_at: "2026-01-01~2026-02-28"}, columns)
+      assert length(filtered) == 2
+      assert Enum.map(filtered, & &1.name) == ["Alice", "Bob"]
+    end
+
+    test "date filter with only from works", %{data: data, columns: columns} do
+      filtered = LiveViewGrid.Filter.apply(data, %{created_at: "2026-02-01~"}, columns)
+      assert length(filtered) == 2
+      assert Enum.map(filtered, & &1.name) == ["Bob", "Carol"]
+    end
+
+    test "date filter with only to works", %{data: data, columns: columns} do
+      filtered = LiveViewGrid.Filter.apply(data, %{created_at: "~2026-02-28"}, columns)
+      assert length(filtered) == 2
+      assert Enum.map(filtered, & &1.name) == ["Alice", "Bob"]
+    end
+  end
+
+  describe "floating filter (FA-011)" do
+    test "floating_filter option defaults to false" do
+      grid = Grid.new(data: [], columns: [%{field: :id, label: "ID"}])
+      assert grid.options[:floating_filter] == false
+    end
+
+    test "floating_filter option can be enabled" do
+      grid = Grid.new(data: [], columns: [%{field: :id, label: "ID"}], options: %{floating_filter: true})
+      assert grid.options[:floating_filter] == true
+    end
+
+    test "column-level floating_filter defaults to nil" do
+      grid = Grid.new(data: [], columns: [%{field: :name, label: "Name"}])
+      col = hd(grid.columns)
+      assert Map.get(col, :floating_filter) == nil
+    end
+  end
+
+  describe "set filter (FA-012)" do
+    setup do
+      data = [
+        %{id: 1, city: "서울"},
+        %{id: 2, city: "부산"},
+        %{id: 3, city: "서울"},
+        %{id: 4, city: "대구"},
+        %{id: 5, city: "부산"}
+      ]
+      columns = [%{field: :city, label: "도시", filterable: true, filter_type: :set}]
+      %{data: data, columns: columns}
+    end
+
+    test "set filter with selected values", %{data: data, columns: columns} do
+      filtered = LiveViewGrid.Filter.apply(data, %{city: {:set, ["서울", "부산"]}}, columns)
+      assert length(filtered) == 4
+    end
+
+    test "set filter with single value", %{data: data, columns: columns} do
+      filtered = LiveViewGrid.Filter.apply(data, %{city: {:set, ["대구"]}}, columns)
+      assert length(filtered) == 1
+      assert hd(filtered).city == "대구"
+    end
+
+    test "set filter with empty list returns nothing", %{data: data, columns: columns} do
+      filtered = LiveViewGrid.Filter.apply(data, %{city: {:set, []}}, columns)
+      assert length(filtered) == 0
+    end
+  end
+
+  describe "column menu (FA-010)" do
+    test "show_column_menu option defaults to false" do
+      grid = Grid.new(data: [], columns: [%{field: :id, label: "ID"}])
+      assert grid.options[:show_column_menu] == false
+    end
+
+    test "show_column_menu option can be enabled" do
+      grid = Grid.new(data: [], columns: [%{field: :id, label: "ID"}], options: %{show_column_menu: true})
+      assert grid.options[:show_column_menu] == true
+    end
+
+    test "column_menu_open state defaults to nil" do
+      grid = Grid.new(data: [], columns: [%{field: :id, label: "ID"}])
+      assert grid.state.column_menu_open == nil
+    end
+
+    test "column-level menu defaults to true" do
+      grid = Grid.new(data: [], columns: [%{field: :name, label: "Name"}])
+      col = hd(grid.columns)
+      assert Map.get(col, :menu) == true
+    end
+
+    test "column-level menu can be disabled" do
+      grid = Grid.new(data: [], columns: [%{field: :name, label: "Name", menu: false}])
+      col = hd(grid.columns)
+      assert Map.get(col, :menu) == false
+    end
+
+    test "column_menu_enabled? respects grid option and column setting" do
+      alias LiveviewGridWeb.GridComponent.RenderHelpers
+
+      grid_on = Grid.new(data: [], columns: [%{field: :name, label: "Name"}], options: %{show_column_menu: true})
+      grid_off = Grid.new(data: [], columns: [%{field: :name, label: "Name"}], options: %{show_column_menu: false})
+      col = hd(grid_on.columns)
+      col_disabled = Map.put(col, :menu, false)
+
+      assert RenderHelpers.column_menu_enabled?(col, grid_on) == true
+      assert RenderHelpers.column_menu_enabled?(col, grid_off) == false
+      assert RenderHelpers.column_menu_enabled?(col_disabled, grid_on) == false
+    end
+  end
+
+  describe "grid state save/restore (FA-002)" do
+    test "get_state returns serializable map" do
+      grid = Grid.new(
+        data: [%{id: 1, name: "Alice", age: 30}],
+        columns: [%{field: :name, label: "Name"}, %{field: :age, label: "Age"}]
+      )
+
+      grid = put_in(grid.state.sort, %{field: :name, direction: :asc})
+      grid = put_in(grid.state.filters, %{name: "ali"})
+      grid = put_in(grid.state.global_search, "test")
+
+      state_map = Grid.get_state(grid)
+
+      assert state_map.sort == %{field: "name", direction: "asc"}
+      assert state_map.filters == %{"name" => "ali"}
+      assert state_map.global_search == "test"
+      assert is_integer(state_map.current_page)
+    end
+
+    test "restore_state restores sort and filters" do
+      grid = Grid.new(
+        data: [%{id: 1, name: "Alice"}],
+        columns: [%{field: :name, label: "Name"}]
+      )
+
+      state_map = %{
+        "sort" => %{"field" => "name", "direction" => "desc"},
+        "filters" => %{"name" => "bob"},
+        "global_search" => "search term"
+      }
+
+      restored = Grid.restore_state(grid, state_map)
+      assert restored.state.sort == %{field: :name, direction: :desc}
+      assert restored.state.filters == %{name: "bob"}
+      assert restored.state.global_search == "search term"
+    end
+
+    test "restore_state handles set filters" do
+      grid = Grid.new(
+        data: [%{id: 1, city: "Seoul"}],
+        columns: [%{field: :city, label: "City", filter_type: :set}]
+      )
+
+      state_map = %{
+        "filters" => %{"city" => %{"type" => "set", "values" => ["Seoul", "Busan"]}}
+      }
+
+      restored = Grid.restore_state(grid, state_map)
+      assert restored.state.filters == %{city: {:set, ["Seoul", "Busan"]}}
+    end
+
+    test "get_state and restore_state are round-trip compatible" do
+      grid = Grid.new(
+        data: [%{id: 1, name: "Alice", age: 30}],
+        columns: [%{field: :name, label: "Name"}, %{field: :age, label: "Age"}]
+      )
+      grid = put_in(grid.state.sort, %{field: :name, direction: :asc})
+      grid = put_in(grid.state.filters, %{name: "test"})
+
+      state_map = Grid.get_state(grid)
+      restored = Grid.restore_state(grid, state_map)
+
+      assert restored.state.sort == grid.state.sort
+      assert restored.state.filters == grid.state.filters
+    end
+  end
+
+  describe "column state save/restore (FA-016)" do
+    test "get_column_state returns column state list" do
+      grid = Grid.new(
+        data: [],
+        columns: [%{field: :name, label: "Name"}, %{field: :age, label: "Age"}]
+      )
+
+      col_states = Grid.get_column_state(grid)
+      assert length(col_states) == 2
+      assert hd(col_states).field == "name"
+      assert hd(col_states).visible == true
+    end
+
+    test "get_column_state reflects sort state" do
+      grid = Grid.new(
+        data: [],
+        columns: [%{field: :name, label: "Name"}, %{field: :age, label: "Age"}]
+      )
+      grid = put_in(grid.state.sort, %{field: :name, direction: :asc})
+
+      col_states = Grid.get_column_state(grid)
+      name_state = Enum.find(col_states, &(&1.field == "name"))
+      age_state = Enum.find(col_states, &(&1.field == "age"))
+
+      assert name_state.sort == "asc"
+      assert age_state.sort == nil
+    end
+
+    test "apply_column_state restores column order and visibility" do
+      grid = Grid.new(
+        data: [%{id: 1, name: "Alice", age: 30}],
+        columns: [%{field: :name, label: "Name"}, %{field: :age, label: "Age"}]
+      )
+
+      col_states = [
+        %{"field" => "age", "order_index" => 0, "visible" => true, "width" => :auto, "sort" => nil},
+        %{"field" => "name", "order_index" => 1, "visible" => true, "width" => :auto, "sort" => nil}
+      ]
+
+      restored = Grid.apply_column_state(grid, col_states)
+      assert restored.state.column_order == [:age, :name]
+    end
+  end
+
+  describe "value getters/setters (FA-015)" do
+    test "value_getter defaults to nil in normalize_columns" do
+      grid = Grid.new(data: [], columns: [%{field: :name, label: "Name"}])
+      col = hd(grid.columns)
+      assert Map.get(col, :value_getter) == nil
+      assert Map.get(col, :value_setter) == nil
+    end
+
+    test "get_cell_value uses value_getter when provided" do
+      getter = fn row -> "#{row.first} #{row.last}" end
+      col = %{field: :full_name, value_getter: getter}
+      row = %{id: 1, first: "Alice", last: "Kim"}
+
+      assert Grid.get_cell_value(row, col) == "Alice Kim"
+    end
+
+    test "get_cell_value falls back to field value" do
+      col = %{field: :name, value_getter: nil}
+      row = %{id: 1, name: "Alice"}
+
+      assert Grid.get_cell_value(row, col) == "Alice"
+    end
+
+    test "value_getter with calculation" do
+      getter = fn row -> row.price * row.quantity end
+      col = %{field: :total, value_getter: getter}
+      row = %{id: 1, price: 100, quantity: 5}
+
+      assert Grid.get_cell_value(row, col) == 500
+    end
+  end
+
+  describe "row animation (FA-017)" do
+    test "animate_rows option defaults to false" do
+      grid = Grid.new(data: [], columns: [%{field: :id, label: "ID"}])
+      assert grid.options[:animate_rows] == false
+    end
+
+    test "animate_rows option can be enabled" do
+      grid = Grid.new(data: [], columns: [%{field: :id, label: "ID"}], options: %{animate_rows: true})
+      assert grid.options[:animate_rows] == true
+    end
+  end
+
+  describe "localization (FA-021)" do
+    alias LiveViewGrid.Locale
+
+    test "locale option defaults to :ko" do
+      grid = Grid.new(data: [], columns: [%{field: :id, label: "ID"}])
+      assert grid.options[:locale] == :ko
+    end
+
+    test "Locale.t returns Korean text by default" do
+      assert Locale.t(:loading) == "로딩 중..."
+      assert Locale.t(:no_data) == "데이터가 없습니다"
+    end
+
+    test "Locale.t returns English text" do
+      assert Locale.t(:loading, :en) == "Loading..."
+      assert Locale.t(:no_data, :en) == "No data available"
+    end
+
+    test "Locale.t returns Japanese text" do
+      assert Locale.t(:loading, :ja) == "読み込み中..."
+    end
+
+    test "Locale.t supports custom overrides" do
+      overrides = %{loading: "불러오는 중..."}
+      assert Locale.t(:loading, :ko, overrides) == "불러오는 중..."
+    end
+
+    test "grid_t helper uses grid options" do
+      alias LiveviewGridWeb.GridComponent.RenderHelpers
+
+      grid = Grid.new(data: [], columns: [%{field: :id, label: "ID"}], options: %{locale: :en})
+      assert RenderHelpers.grid_t(grid, :loading) == "Loading..."
+    end
+
+    test "supported_locales returns available locales" do
+      locales = Locale.supported_locales()
+      assert :ko in locales
+      assert :en in locales
+      assert :ja in locales
+    end
+  end
+
+  # ── Phase 4 (v0.14) ──
+
+  describe "FA-013: Cell Fill Handle" do
+    setup do
+      data = [
+        %{id: 1, name: "Alice", salary: 100},
+        %{id: 2, name: "Bob", salary: 200},
+        %{id: 3, name: "Charlie", salary: 300}
+      ]
+      columns = [
+        %{field: :name, label: "이름", editable: true},
+        %{field: :salary, label: "급여", editable: true}
+      ]
+      grid = Grid.new(data: data, columns: columns)
+      %{grid: grid}
+    end
+
+    test "fill_cells copies source value to targets", %{grid: grid} do
+      updated = Grid.fill_cells(grid, 1, :salary, [2, 3])
+      assert Enum.find(updated.data, &(&1.id == 2)).salary == 100
+      assert Enum.find(updated.data, &(&1.id == 3)).salary == 100
+    end
+
+    test "fill_cells marks target rows as updated", %{grid: grid} do
+      updated = Grid.fill_cells(grid, 1, :name, [2])
+      assert Map.get(updated.state.row_statuses, 2) == :updated
+    end
+
+    test "fill_cells ignores non-editable columns" do
+      data = [%{id: 1, name: "Alice"}, %{id: 2, name: "Bob"}]
+      columns = [%{field: :name, label: "이름", editable: false}]
+      grid = Grid.new(data: data, columns: columns)
+
+      updated = Grid.fill_cells(grid, 1, :name, [2])
+      assert Enum.find(updated.data, &(&1.id == 2)).name == "Bob"
+    end
+
+    test "fill_cells with empty targets returns unchanged grid", %{grid: grid} do
+      updated = Grid.fill_cells(grid, 1, :salary, [])
+      assert updated == grid
+    end
+
+    test "enable_fill_handle default is false" do
+      grid = Grid.new(data: [], columns: [%{field: :id, label: "ID"}])
+      assert grid.options.enable_fill_handle == false
+    end
+  end
+
+  describe "FA-014: Master-Detail" do
+    setup do
+      data = [%{id: 1, name: "Alice"}, %{id: 2, name: "Bob"}]
+      columns = [%{field: :name, label: "이름"}]
+      grid = Grid.new(data: data, columns: columns, options: %{enable_master_detail: true})
+      %{grid: grid}
+    end
+
+    test "toggle_detail opens detail", %{grid: grid} do
+      updated = Grid.toggle_detail(grid, 1)
+      assert MapSet.member?(updated.state.expanded_details, 1)
+    end
+
+    test "toggle_detail closes opened detail", %{grid: grid} do
+      updated = grid |> Grid.toggle_detail(1) |> Grid.toggle_detail(1)
+      refute MapSet.member?(updated.state.expanded_details, 1)
+    end
+
+    test "multiple details can be open", %{grid: grid} do
+      updated = grid |> Grid.toggle_detail(1) |> Grid.toggle_detail(2)
+      assert MapSet.member?(updated.state.expanded_details, 1)
+      assert MapSet.member?(updated.state.expanded_details, 2)
+    end
+
+    test "enable_master_detail default is false" do
+      grid = Grid.new(data: [], columns: [%{field: :id, label: "ID"}])
+      assert grid.options.enable_master_detail == false
+    end
+  end
+
+  describe "FA-018: Printing" do
+    test "print_data returns all filtered/sorted data without pagination" do
+      data = for i <- 1..50, do: %{id: i, name: "User #{i}", salary: i * 100}
+      columns = [
+        %{field: :name, label: "이름", sortable: true},
+        %{field: :salary, label: "급여", sortable: true}
+      ]
+      grid = Grid.new(data: data, columns: columns, options: %{page_size: 10})
+      sorted = put_in(grid.state.sort, %{field: :salary, direction: :desc})
+
+      result = Grid.print_data(sorted)
+      assert length(result) == 50
+      assert hd(result).salary == 5000
+    end
+
+    test "enable_print default is false" do
+      grid = Grid.new(data: [], columns: [%{field: :id, label: "ID"}])
+      assert grid.options.enable_print == false
+    end
+  end
+
+  describe "FA-006: Accessibility" do
+    test "aria_sort_value returns correct values" do
+      alias LiveviewGridWeb.GridComponent.RenderHelpers
+
+      assert RenderHelpers.aria_sort_value(nil, :name) == "none"
+      assert RenderHelpers.aria_sort_value(%{field: :name, direction: :asc}, :name) == "ascending"
+      assert RenderHelpers.aria_sort_value(%{field: :name, direction: :desc}, :name) == "descending"
+      assert RenderHelpers.aria_sort_value(%{field: :name, direction: :asc}, :other) == "none"
+    end
+
+    test "grid role attribute in options" do
+      grid = Grid.new(data: [], columns: [%{field: :id, label: "ID"}])
+      # grid has role="grid" in render, options can have aria_label
+      assert grid.options[:aria_label] == nil
+    end
+  end
+
+  describe "F-961: Tree Batch Expand" do
+    setup do
+      data = [
+        %{id: 1, name: "Root A", parent_id: nil},
+        %{id: 2, name: "Child A1", parent_id: 1},
+        %{id: 3, name: "Child A2", parent_id: 1},
+        %{id: 4, name: "Grandchild A1a", parent_id: 2},
+        %{id: 5, name: "Root B", parent_id: nil},
+        %{id: 6, name: "Child B1", parent_id: 5}
+      ]
+      columns = [%{field: :name, label: "이름"}]
+      grid = Grid.new(data: data, columns: columns)
+      grid = Grid.set_tree_mode(grid, true, :parent_id)
+      %{grid: grid}
+    end
+
+    test "expand_all_nodes expands all parent nodes", %{grid: grid} do
+      updated = Grid.expand_all_nodes(grid)
+      assert Map.get(updated.state.tree_expanded, 1) == true
+      assert Map.get(updated.state.tree_expanded, 2) == true
+      assert Map.get(updated.state.tree_expanded, 5) == true
+    end
+
+    test "collapse_all_nodes collapses all parent nodes", %{grid: grid} do
+      updated = Grid.collapse_all_nodes(grid)
+      assert Map.get(updated.state.tree_expanded, 1) == false
+      assert Map.get(updated.state.tree_expanded, 2) == false
+      assert Map.get(updated.state.tree_expanded, 5) == false
+    end
+
+    test "expand_to_level 1 expands root only", %{grid: grid} do
+      updated = Grid.expand_to_level(grid, 1)
+      assert Map.get(updated.state.tree_expanded, 1) == true
+      assert Map.get(updated.state.tree_expanded, 5) == true
+      assert Map.get(updated.state.tree_expanded, 2) == false
+    end
+
+    test "expand_to_level 0 collapses all", %{grid: grid} do
+      updated = Grid.expand_to_level(grid, 0)
+      assert Map.get(updated.state.tree_expanded, 1) == false
+      assert Map.get(updated.state.tree_expanded, 5) == false
+    end
+  end
+
+  describe "F-963: Multi-Level Subtotals" do
+    test "show_subtotals default is false" do
+      grid = Grid.new(data: [], columns: [%{field: :id, label: "ID"}])
+      assert grid.options.show_subtotals == false
+    end
+
+    test "subtotal_position default is :bottom" do
+      grid = Grid.new(data: [], columns: [%{field: :id, label: "ID"}])
+      assert grid.options.subtotal_position == :bottom
+    end
+
+    test "insert_subtotals adds subtotal rows to grouped data" do
+      alias LiveViewGrid.Grouping
+
+      data = [
+        %{id: 1, name: "Alice", dept: "Dev", salary: 100},
+        %{id: 2, name: "Bob", dept: "Dev", salary: 200},
+        %{id: 3, name: "Charlie", dept: "HR", salary: 150}
+      ]
+
+      grouped = Grouping.group_data(data, [:dept], %{}, %{salary: :sum})
+      result = Grouping.insert_subtotals(grouped, %{salary: :sum}, :bottom)
+
+      subtotals = Enum.filter(result, &(Map.get(&1, :_row_type) == :subtotal))
+      assert length(subtotals) == 2
+
+      dev_subtotal = Enum.find(subtotals, &(&1._group_value == "Dev"))
+      assert dev_subtotal._subtotal_aggregates[:salary] == 300
+    end
+  end
+
+  describe "F-964: Tree Inline Edit" do
+    test "update_cell works in tree mode" do
+      data = [
+        %{id: 1, name: "Root", parent_id: nil},
+        %{id: 2, name: "Child", parent_id: 1}
+      ]
+      columns = [%{field: :name, label: "이름", editable: true}]
+      grid = Grid.new(data: data, columns: columns)
+      grid = Grid.set_tree_mode(grid, true, :parent_id)
+
+      updated = Grid.update_cell(grid, 2, :name, "Updated Child")
+      row = Enum.find(updated.data, &(&1.id == 2))
+      assert row.name == "Updated Child"
+      assert row.parent_id == 1
+    end
+
+    test "tree structure preserved after edit" do
+      data = [
+        %{id: 1, name: "Root", parent_id: nil},
+        %{id: 2, name: "Child", parent_id: 1},
+        %{id: 3, name: "Grandchild", parent_id: 2}
+      ]
+      columns = [%{field: :name, label: "이름", editable: true}]
+      grid = Grid.new(data: data, columns: columns)
+      grid = Grid.set_tree_mode(grid, true, :parent_id)
+
+      updated = Grid.update_cell(grid, 2, :name, "Updated")
+      visible = Grid.visible_data(updated)
+      child = Enum.find(visible, &(&1.id == 2))
+      assert child._tree_has_children == true
+      assert child._tree_depth == 1
+    end
+  end
+
+  # ── Phase 5 (v1.0+) Tests ──
+
+  # Phase 5 공통 테스트 데이터 헬퍼
+  defp p5_data, do: [%{id: 1, name: "Alice", email: "alice@test.com"}, %{id: 2, name: "Bob", email: "bob@test.com"}, %{id: 3, name: "Charlie", email: "charlie@test.com"}]
+  defp p5_cols, do: [%{field: :name, label: "Name", editable: true, filterable: true}, %{field: :email, label: "Email", filterable: true}]
+
+  describe "FA-030: Side Bar" do
+    test "toggle_sidebar opens and closes" do
+      grid = Grid.new(data: p5_data(), columns: p5_cols())
+      assert grid.state.sidebar_open == false
+      grid = Grid.toggle_sidebar(grid)
+      assert grid.state.sidebar_open == true
+      grid = Grid.toggle_sidebar(grid)
+      assert grid.state.sidebar_open == false
+    end
+
+    test "set_sidebar_tab switches tab and opens sidebar" do
+      grid = Grid.new(data: p5_data(), columns: p5_cols())
+      grid = Grid.set_sidebar_tab(grid, :filters)
+      assert grid.state.sidebar_tab == :filters
+      assert grid.state.sidebar_open == true
+    end
+
+    test "default options include enable_sidebar" do
+      opts = Grid.default_options()
+      assert opts.enable_sidebar == false
+    end
+  end
+
+  describe "FA-034: Batch Edit" do
+    test "batch_update_cells updates all rows in range" do
+      grid = Grid.new(data: p5_data(), columns: p5_cols())
+      grid = put_in(grid.state.cell_range, %{row_ids: [1, 2, 3]})
+      grid = Grid.batch_update_cells(grid, :name, "Batch Name")
+
+      Enum.each([1, 2, 3], fn id ->
+        row = Enum.find(grid.data, &(&1.id == id))
+        assert row.name == "Batch Name"
+      end)
+    end
+
+    test "batch_update_cells ignores non-editable columns" do
+      grid = Grid.new(data: p5_data(), columns: [%{field: :name, label: "Name", editable: false}])
+      grid = put_in(grid.state.cell_range, %{row_ids: [1, 2]})
+      original = Enum.find(grid.data, &(&1.id == 1)).name
+      grid = Grid.batch_update_cells(grid, :name, "Should Not Change")
+      assert Enum.find(grid.data, &(&1.id == 1)).name == original
+    end
+
+    test "batch_update_cells with nil range does nothing" do
+      grid = Grid.new(data: p5_data(), columns: p5_cols())
+      updated = Grid.batch_update_cells(grid, :name, "test")
+      assert updated == grid
+    end
+  end
+
+  describe "FA-036: Full-Width Rows" do
+    test "add_full_width_row adds a full_width row" do
+      grid = Grid.new(data: p5_data(), columns: p5_cols())
+      original_count = length(grid.data)
+      grid = Grid.add_full_width_row(grid, "This is an announcement!")
+      assert length(grid.data) == original_count + 1
+      fw_row = Enum.find(grid.data, &(Map.get(&1, :_row_type) == :full_width))
+      assert fw_row._full_width_content == "This is an announcement!"
+    end
+  end
+
+  describe "FA-044: Find & Highlight" do
+    test "find_in_grid finds matching cells" do
+      grid = Grid.new(data: p5_data(), columns: p5_cols())
+      grid = Grid.find_in_grid(grid, "alice")
+      assert grid.state.find_text == "alice"
+      assert length(grid.state.find_matches) > 0
+      assert grid.state.find_current_index == 1
+    end
+
+    test "find_in_grid with empty text clears results" do
+      grid = Grid.new(data: p5_data(), columns: p5_cols())
+      grid = Grid.find_in_grid(grid, "alice")
+      grid = Grid.find_in_grid(grid, "")
+      assert grid.state.find_text == ""
+      assert grid.state.find_matches == []
+    end
+
+    test "find_next cycles through matches" do
+      grid = Grid.new(data: p5_data(), columns: p5_cols())
+      grid = Grid.find_in_grid(grid, "alice")
+      total = length(grid.state.find_matches)
+      if total > 0 do
+        grid = Grid.find_next(grid)
+        assert grid.state.find_current_index == min(2, total)
+      end
+    end
+
+    test "find_prev wraps around" do
+      grid = Grid.new(data: p5_data(), columns: p5_cols())
+      grid = Grid.find_in_grid(grid, "alice")
+      total = length(grid.state.find_matches)
+      if total > 0 do
+        grid = Grid.find_prev(grid)
+        assert grid.state.find_current_index == total
+      end
+    end
+
+    test "default options include enable_find" do
+      opts = Grid.default_options()
+      assert opts.enable_find == false
+    end
+  end
+
+  describe "FA-045: Large Text Editor" do
+    test "start_large_text_edit sets editing state" do
+      grid = Grid.new(data: p5_data(), columns: p5_cols())
+      grid = Grid.start_large_text_edit(grid, 1, :name)
+      assert grid.state.large_text_editing != nil
+      assert grid.state.large_text_editing.row_id == 1
+      assert grid.state.large_text_editing.field == :name
+    end
+
+    test "save_large_text_edit updates cell and clears state" do
+      grid = Grid.new(data: p5_data(), columns: p5_cols())
+      grid = Grid.start_large_text_edit(grid, 1, :name)
+      grid = Grid.save_large_text_edit(grid, "New Long Text")
+      assert grid.state.large_text_editing == nil
+      row = Enum.find(grid.data, &(&1.id == 1))
+      assert row.name == "New Long Text"
+    end
+
+    test "cancel_large_text_edit clears state" do
+      grid = Grid.new(data: p5_data(), columns: p5_cols())
+      grid = Grid.start_large_text_edit(grid, 1, :name)
+      grid = Grid.cancel_large_text_edit(grid)
+      assert grid.state.large_text_editing == nil
+    end
+  end
+
+  describe "F-906: Radio Renderer" do
+    test "radio renderer returns a function" do
+      renderer = LiveViewGrid.Renderers.radio(options: [{"a", "A"}, {"b", "B"}])
+      assert is_function(renderer, 3)
+    end
+  end
+
+  describe "F-909: Empty Area Fill" do
+    test "default options include fill_empty_area" do
+      opts = Grid.default_options()
+      assert opts.fill_empty_area == false
+      assert opts.empty_area_rows == 5
+    end
+
+    test "empty_rows_count helper" do
+      alias LiveviewGridWeb.GridComponent.RenderHelpers
+      assert RenderHelpers.empty_rows_count(3, 10) == 7
+      assert RenderHelpers.empty_rows_count(10, 5) == 0
+      assert RenderHelpers.empty_rows_count(5, 5) == 0
+    end
+  end
+
+  describe "FA-037: Column Hover Highlight" do
+    test "default options" do
+      grid = Grid.new(data: p5_data(), columns: p5_cols())
+      assert grid.options != nil
+    end
+  end
+
+  describe "Phase 5 render helpers" do
+    test "all_columns_for_sidebar returns columns" do
+      alias LiveviewGridWeb.GridComponent.RenderHelpers
+      grid = Grid.new(data: p5_data(), columns: p5_cols())
+      cols = RenderHelpers.all_columns_for_sidebar(grid)
+      assert is_list(cols)
+      assert length(cols) > 0
+    end
+
+    test "cell_matches_find? checks matches" do
+      alias LiveviewGridWeb.GridComponent.RenderHelpers
+      matches = [%{row_id: 1, field: :name}, %{row_id: 2, field: :email}]
+      assert RenderHelpers.cell_matches_find?(matches, 1, :name) == true
+      assert RenderHelpers.cell_matches_find?(matches, 1, :email) == false
+      assert RenderHelpers.cell_matches_find?([], 1, :name) == false
     end
   end
 end

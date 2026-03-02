@@ -754,7 +754,7 @@ defmodule LiveviewGridWeb.DemoLive do
           id="users-grid"
           data={if @virtual_scroll, do: @filtered_users, else: @visible_users}
           columns={[
-            %{field: :id, label: "ID", width: 80, sortable: true},
+            %{field: :id, label: "ID", width: 80, sortable: true, resizable: false},
             %{field: :name, label: "이름", width: 150, sortable: true, filterable: true, filter_type: :text, editable: true,
               header_group: "인적 정보",
               # input_pattern 제거: 국제 문자(한글, 중국어, 일본어, 이모지 등) 모두 허용
@@ -777,7 +777,7 @@ defmodule LiveviewGridWeb.DemoLive do
                 end
               end},
             %{field: :active, label: "활성", width: 70, editable: true, editor_type: :checkbox, header_group: "부가 정보", summary: :count},
-            %{field: :city, label: "도시", width: 120, sortable: true, filterable: true, filter_type: :text, editable: true, editor_type: :select,
+            %{field: :city, label: "도시", width: 120, sortable: true, filterable: true, filter_type: :set, editable: true, editor_type: :select,
               header_group: "부가 정보", suppress: true,
               renderer: LiveViewGrid.Renderers.badge(
                 colors: %{"서울" => "blue", "부산" => "green", "대구" => "red",
@@ -802,6 +802,16 @@ defmodule LiveviewGridWeb.DemoLive do
             theme: @theme,
             custom_css_vars: @custom_css_vars,
             row_reorder: true,
+            enable_cell_text_selection: true,
+            show_status_bar: true,
+            floating_filter: true,
+            show_column_menu: true,
+            enable_sidebar: true,
+            enable_find: true,
+            enable_batch_edit: true,
+            fill_empty_area: true,
+            empty_area_rows: 3,
+            enable_large_text_editor: true,
             merge_regions: [
               %{row_id: 1, col_field: :name, colspan: 2},
               %{row_id: 3, col_field: :age, rowspan: 2}

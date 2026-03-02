@@ -28,6 +28,26 @@ defmodule LiveviewGridWeb.BuilderLive do
     {:noreply, assign(socket, dynamic_grids: updated)}
   end
 
+  @impl true
+  def handle_event("export_dynamic_grid", %{"id" => grid_id}, socket) do
+    case Enum.find(socket.assigns.dynamic_grids, &(&1.id == grid_id)) do
+      nil ->
+        {:noreply, socket}
+
+      dg ->
+        json = export_grid_to_json(dg)
+        content = Base.encode64(json)
+        name_slug = String.replace(dg.name, ~r/[^\w가-힣]+/u, "_") |> String.trim("_")
+        filename = "grid_config_#{name_slug}_#{System.system_time(:second)}.json"
+
+        {:noreply, push_event(socket, "download_file", %{
+          content: content,
+          filename: filename,
+          mime_type: "application/json"
+        })}
+    end
+  end
+
   # GridComponent 이벤트가 부모로 전파될 경우 안전하게 무시
   def handle_event("clear_cell_range", _params, socket), do: {:noreply, socket}
 
@@ -147,6 +167,38 @@ defmodule LiveviewGridWeb.BuilderLive do
     }
   end
 
+  # ── Export helper ──
+
+  defp export_grid_to_json(dg) do
+    columns =
+      Enum.map(dg.columns, fn col ->
+        %{
+          field: to_string(col.field),
+          label: col.label,
+          type: to_string(col.type),
+          width: if(col[:width] == :auto or is_nil(col[:width]), do: "auto", else: col[:width]),
+          align: to_string(col[:align] || :left),
+          sortable: col[:sortable] == true,
+          filterable: col[:filterable] == true,
+          editable: col[:editable] == true,
+          editor_type: to_string(col[:editor_type] || :text),
+          formatter: if(col[:formatter], do: to_string(col[:formatter])),
+          validators: col[:validators] || [],
+          renderer: col[:renderer],
+          renderer_options: col[:renderer_options] || %{}
+        }
+      end)
+
+    Jason.encode!(%{
+      version: "1.0",
+      grid_name: dg.name,
+      grid_id: dg.id,
+      data_source_type: Map.get(dg, :source_type, "sample"),
+      grid_options: dg.options,
+      columns: columns
+    }, pretty: true)
+  end
+
   @doc "Grid Builder 페이지를 렌더링한다."
   @impl true
   def render(assigns) do
@@ -212,13 +264,22 @@ defmodule LiveviewGridWeb.BuilderLive do
                 </span>
               <% end %>
             </h2>
-            <button
-              phx-click="remove_dynamic_grid"
-              phx-value-id={dg.id}
-              style="padding: 6px 14px; background: #fff; color: #f44336; border: 1px solid #f44336; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: 500; transition: all 0.2s;"
-            >
-              Delete
-            </button>
+            <div style="display: flex; gap: 8px;">
+              <button
+                phx-click="export_dynamic_grid"
+                phx-value-id={dg.id}
+                style="padding: 6px 14px; background: #fff; color: #1976d2; border: 1px solid #1976d2; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: 500; transition: all 0.2s;"
+              >
+                Export
+              </button>
+              <button
+                phx-click="remove_dynamic_grid"
+                phx-value-id={dg.id}
+                style="padding: 6px 14px; background: #fff; color: #f44336; border: 1px solid #f44336; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: 500; transition: all 0.2s;"
+              >
+                Delete
+              </button>
+            </div>
           </div>
           <div style="padding: 0;">
             <.live_component
