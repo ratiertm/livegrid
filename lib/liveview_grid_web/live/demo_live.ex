@@ -32,6 +32,8 @@ defmodule LiveviewGridWeb.DemoLive do
       page_size: 10,
       loaded_count: min(100, length(all_users)),
       virtual_scroll: false,
+      pinned_top: [],
+      pinned_bottom: [],
       theme: "light",
       online_users: online_users,
       # 테마 커스터마이저 상태
@@ -147,6 +149,30 @@ defmodule LiveviewGridWeb.DemoLive do
       filtered_users: socket.assigns.all_users,
       search_query: ""
     )}
+  end
+
+  # FA-001: Row Pinning 이벤트 핸들러
+  @impl true
+  def handle_event("pin_first_row_top", _params, socket) do
+    first_row = List.first(socket.assigns.visible_users)
+    if first_row do
+      {:noreply, assign(socket, pinned_top: [first_row.id], pinned_bottom: socket.assigns[:pinned_bottom] || [])}
+    else
+      {:noreply, socket}
+    end
+  end
+
+  def handle_event("pin_last_row_bottom", _params, socket) do
+    last_row = List.last(socket.assigns.visible_users)
+    if last_row do
+      {:noreply, assign(socket, pinned_bottom: [last_row.id], pinned_top: socket.assigns[:pinned_top] || [])}
+    else
+      {:noreply, socket}
+    end
+  end
+
+  def handle_event("unpin_all", _params, socket) do
+    {:noreply, assign(socket, pinned_top: [], pinned_bottom: [])}
   end
 
   @impl true
@@ -556,6 +582,20 @@ defmodule LiveviewGridWeb.DemoLive do
         </span>
       </div>
       
+      <!-- FA-001: Row Pinning 제어 -->
+      <div style="margin: 20px 0; padding: 15px; background: #e8f5e9; border-radius: 4px; border-left: 4px solid #4caf50;">
+        <label style="font-weight: 600;">📌 Row Pinning:</label>
+        <button phx-click="pin_first_row_top" style="padding: 6px 14px; background: #4caf50; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: 600; margin-left: 8px;">
+          첫 행 상단 고정
+        </button>
+        <button phx-click="pin_last_row_bottom" style="padding: 6px 14px; background: #2196f3; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: 600; margin-left: 8px;">
+          마지막 행 하단 고정
+        </button>
+        <button phx-click="unpin_all" style="padding: 6px 14px; background: #f44336; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: 600; margin-left: 8px;">
+          고정 해제
+        </button>
+      </div>
+
       <!-- 검색 기능 -->
       <div style="margin: 20px 0; padding: 15px; background: #e3f2fd; border-radius: 4px; border-left: 4px solid #2196f3;">
         <form phx-submit="search" style="display: flex; align-items: center; gap: 10px;">
@@ -754,7 +794,7 @@ defmodule LiveviewGridWeb.DemoLive do
           id="users-grid"
           data={if @virtual_scroll, do: @filtered_users, else: @visible_users}
           columns={[
-            %{field: :id, label: "ID", width: 80, sortable: true},
+            %{field: :id, label: "ID", width: 80, sortable: true, resizable: false},
             %{field: :name, label: "이름", width: 150, sortable: true, filterable: true, filter_type: :text, editable: true,
               header_group: "인적 정보",
               # input_pattern 제거: 국제 문자(한글, 중국어, 일본어, 이모지 등) 모두 허용
@@ -805,7 +845,11 @@ defmodule LiveviewGridWeb.DemoLive do
             merge_regions: [
               %{row_id: 1, col_field: :name, colspan: 2},
               %{row_id: 3, col_field: :age, rowspan: 2}
-            ]
+            ],
+            chart_panel: true,
+            text_selectable: true,
+            pinned_top: @pinned_top,
+            pinned_bottom: @pinned_bottom
           }}
         />
         

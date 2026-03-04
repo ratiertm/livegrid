@@ -957,6 +957,87 @@ defmodule LiveViewGrid.GridTest do
     end
   end
 
+  describe "set_loading/2 and set_error/2 (FA-005)" do
+    test "set_loading/2 sets loading state" do
+      grid = Grid.new(columns: [%{field: :name, label: "Name"}], data: [])
+      assert Grid.set_loading(grid, true).state.loading == true
+      assert Grid.set_loading(grid, false).state.loading == false
+    end
+
+    test "set_error/2 sets error state" do
+      grid = Grid.new(columns: [%{field: :name, label: "Name"}], data: [])
+      updated = Grid.set_error(grid, "Connection failed")
+      assert updated.state.error == "Connection failed"
+      assert Grid.set_error(updated, nil).state.error == nil
+    end
+  end
+
+  describe "resize_column/3 with resizable option" do
+    test "resizable: true (기본값) 컬럼은 리사이즈 허용" do
+      grid = Grid.new(columns: [%{field: :name, label: "Name"}], data: [])
+      updated = Grid.resize_column(grid, :name, 200)
+      assert updated.state.column_widths[:name] == 200
+    end
+
+    test "resizable: false 컬럼은 리사이즈 차단" do
+      grid = Grid.new(columns: [%{field: :id, label: "ID", resizable: false}], data: [])
+      updated = Grid.resize_column(grid, :id, 200)
+      assert updated.state.column_widths[:id] == nil
+    end
+
+    test "resizable 키 미지정 시 기본값 true로 동작" do
+      grid = Grid.new(columns: [%{field: :age, label: "Age"}], data: [])
+      column = Enum.find(grid.columns, &(&1.field == :age))
+      assert column.resizable == true
+    end
+  end
+
+  describe "pin_row/3 and unpin_row/2 (FA-001)" do
+    setup do
+      data = [%{id: 1, name: "Alice"}, %{id: 2, name: "Bob"}, %{id: 3, name: "Charlie"}]
+      columns = [%{field: :name, label: "Name"}]
+      grid = Grid.new(columns: columns, data: data)
+      %{grid: grid}
+    end
+
+    test "pin_row/3 pins to top", %{grid: grid} do
+      updated = Grid.pin_row(grid, 1, :top)
+      assert 1 in updated.state.pinned_top
+      assert updated.state.pinned_bottom == []
+    end
+
+    test "pin_row/3 pins to bottom", %{grid: grid} do
+      updated = Grid.pin_row(grid, 3, :bottom)
+      assert 3 in updated.state.pinned_bottom
+      assert updated.state.pinned_top == []
+    end
+
+    test "unpin_row/2 removes from top", %{grid: grid} do
+      updated = grid |> Grid.pin_row(1, :top) |> Grid.unpin_row(1)
+      assert updated.state.pinned_top == []
+    end
+
+    test "pin_row/3 moves pin position (top -> bottom)", %{grid: grid} do
+      updated = grid |> Grid.pin_row(1, :top) |> Grid.pin_row(1, :bottom)
+      assert updated.state.pinned_top == []
+      assert 1 in updated.state.pinned_bottom
+    end
+
+    test "pinned_top_rows/1 returns pinned rows in order", %{grid: grid} do
+      updated = grid |> Grid.pin_row(2, :top) |> Grid.pin_row(1, :top)
+      rows = Grid.pinned_top_rows(updated)
+      assert length(rows) == 2
+      assert Enum.at(rows, 0).id == 2
+      assert Enum.at(rows, 1).id == 1
+    end
+
+    test "pinned rows excluded from visible_data", %{grid: grid} do
+      updated = Grid.pin_row(grid, 1, :top)
+      visible = Grid.visible_data(updated)
+      assert Enum.all?(visible, fn row -> row.id != 1 end)
+    end
+  end
+
   describe "reorder_columns/2" do
     setup do
       data = [%{id: 1, name: "Alice", age: 30, dept: "개발"}]

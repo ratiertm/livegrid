@@ -49,7 +49,7 @@ mix docs
 open doc/index.html
 ```
 
-## ✨ Implemented Features (v0.1 ~ v0.7)
+## ✨ Implemented Features (v0.1 ~ v0.12)
 
 ### v0.1 - Core Grid
 - [x] Table rendering (LiveComponent-based)
@@ -115,7 +115,7 @@ open doc/index.html
 - [x] Row edit mode (edit all cells in a row simultaneously)
 - [x] Undo/Redo (Ctrl+Z/Y edit history with 50-action stack)
 
-### v0.7 - Grid Config & Architecture (Current)
+### v0.7 - Grid Config & Architecture
 - [x] Grid Configuration Modal (column visibility, order, width, frozen columns, formatters, validators)
 - [x] Grid Settings tab (page size, virtual scroll, theme, row height)
 - [x] Grid Builder (dynamic grid creation with column definition UI)
@@ -132,14 +132,21 @@ open doc/index.html
 - [x] GridComponent refactoring (EventHandlers + RenderHelpers extraction)
 - [x] ExDoc documentation (@doc/@spec across all public modules)
 
+### v0.12.0 - Core UX Enhancement (Current)
+- [x] Row Pinning — Pin rows to top/bottom of grid (`Grid.pin_row/3`, `Grid.unpin_row/2`)
+- [x] Overlay System — Loading/No Data/Error overlay messages
+- [x] Status Bar — Bottom info bar (total rows, search results, filter status)
+- [x] Cell Text Selection — Allow drag-select text in cells (`user-select: text`)
+- [x] Column Resize Lock — Disable resize per column with `resizable: false` option
+
 ## 📊 Implementation Status
 
 | Item | Count |
 |------|-------|
-| Total Features | 62 |
-| Completed | 62 (100%) |
-| Versions Shipped | v0.1 ~ v0.7 |
-| Tests | 428 passing |
+| Total Features | 67 |
+| Completed | 67 (100%) |
+| Versions Shipped | v0.1 ~ v0.12 |
+| Tests | 222 passing |
 
 ## 🗺️ Roadmap (Not Yet Implemented)
 

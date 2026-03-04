@@ -237,7 +237,8 @@ defmodule LiveviewGridWeb.DbmsDemoLive do
           show_footer: true,
           frozen_columns: 1,
           debug: true,
-          theme: "light"
+          theme: "light",
+          chart_panel: true
         }}
         data_source={{LiveViewGrid.DataSource.Ecto, %{
           repo: LiveviewGrid.Repo,

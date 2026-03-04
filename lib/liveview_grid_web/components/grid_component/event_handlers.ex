@@ -1161,6 +1161,19 @@ defmodule LiveviewGridWeb.GridComponent.EventHandlers do
       grid
     end
 
+    # FA-001: Row Pinning
+    grid = if Map.has_key?(options, :pinned_top) do
+      put_in(grid.state.pinned_top, Map.get(options, :pinned_top, []))
+    else
+      grid
+    end
+
+    grid = if Map.has_key?(options, :pinned_bottom) do
+      put_in(grid.state.pinned_bottom, Map.get(options, :pinned_bottom, []))
+    else
+      grid
+    end
+
     grid
   end
 
@@ -1496,6 +1509,115 @@ defmodule LiveviewGridWeb.GridComponent.EventHandlers do
         else
           {:noreply, socket}
         end
+    end
+  end
+
+  # ── FA-031: Chart Panel ──
+
+  @doc """
+  차트 패널 표시/숨김을 토글한다. 처음 표시 시 자동으로 카테고리/값 컬럼을 설정한다.
+  """
+  @spec handle_toggle_chart(params :: map(), socket :: Phoenix.LiveView.Socket.t()) ::
+          {:noreply, Phoenix.LiveView.Socket.t()}
+  def handle_toggle_chart(_params, socket) do
+    grid = socket.assigns.grid
+    show = !grid.state.show_chart_panel
+
+    grid =
+      if show do
+        grid
+        |> put_in([:state, :show_chart_panel], true)
+        |> maybe_auto_configure_chart()
+        |> recalculate_chart_data()
+      else
+        put_in(grid.state.show_chart_panel, false)
+      end
+
+    {:noreply, assign(socket, grid: grid)}
+  end
+
+  @doc """
+  차트 설정(타입, 카테고리, 집계, 값 필드)을 변경한다.
+  """
+  @spec handle_update_chart_config(params :: map(), socket :: Phoenix.LiveView.Socket.t()) ::
+          {:noreply, Phoenix.LiveView.Socket.t()}
+  def handle_update_chart_config(%{"field" => field, "value" => value}, socket) do
+    grid = socket.assigns.grid
+    config = grid.state.chart_config
+
+    config =
+      case field do
+        "chart_type" ->
+          Map.put(config, :chart_type, String.to_existing_atom(value))
+
+        "category_field" ->
+          Map.put(config, :category_field, String.to_existing_atom(value))
+
+        "aggregation" ->
+          Map.put(config, :aggregation, String.to_existing_atom(value))
+
+        "toggle_value_field" ->
+          field_atom = String.to_existing_atom(value)
+          current = config.value_fields
+
+          new_fields =
+            if field_atom in current,
+              do: List.delete(current, field_atom),
+              else: current ++ [field_atom]
+
+          Map.put(config, :value_fields, new_fields)
+
+        _ ->
+          config
+      end
+
+    grid =
+      grid
+      |> put_in([:state, :chart_config], config)
+      |> recalculate_chart_data()
+
+    {:noreply, assign(socket, grid: grid)}
+  end
+
+  defp recalculate_chart_data(grid) do
+    data = Grid.visible_data(grid)
+    chart_data = LiveviewGrid.Chart.prepare_data(data, grid.state.chart_config)
+    put_in(grid.state.chart_data, chart_data)
+  end
+
+  defp maybe_auto_configure_chart(grid) do
+    config = grid.state.chart_config
+
+    if is_nil(config.category_field) or config.value_fields == [] do
+      columns = Grid.display_columns(grid)
+
+      category =
+        Enum.find(columns, fn c ->
+          c.field not in [:id, :inserted_at, :updated_at] and
+            Map.get(c, :filter_type) != :number and
+            Map.get(c, :filter_type) != :date
+        end)
+
+      value_cols =
+        columns
+        |> Enum.filter(fn c ->
+          Map.get(c, :filter_type) == :number or Map.get(c, :align) == :right
+        end)
+        |> Enum.take(2)
+
+      new_config = %{
+        config
+        | category_field: if(category, do: category.field, else: config.category_field),
+          value_fields:
+            if(value_cols != [],
+              do: Enum.map(value_cols, & &1.field),
+              else: config.value_fields
+            )
+      }
+
+      put_in(grid.state.chart_config, new_config)
+    else
+      grid
     end
   end
 end

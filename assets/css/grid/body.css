@@ -429,7 +429,133 @@ select.lv-grid__cell-editor {
   pointer-events: none;
 }
 
-/* 5.14 Suppress (F-903, 동일값 병합) */
+/* 5.14 Overlay System (FA-005) */
+.lv-grid__overlay {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 200px;
+  background: var(--lv-grid-bg, #fff);
+  z-index: 20;
+}
+
+.lv-grid__overlay-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 24px;
+}
+
+.lv-grid__overlay-spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid var(--lv-grid-border, #e0e0e0);
+  border-top-color: var(--lv-grid-primary, #3b82f6);
+  border-radius: 50%;
+  animation: lv-grid-spin 0.8s linear infinite;
+}
+
+@keyframes lv-grid-spin {
+  to { transform: rotate(360deg); }
+}
+
+.lv-grid__overlay-text {
+  color: var(--lv-grid-text-muted, #888);
+  font-size: var(--lv-grid-font-size-md, 14px);
+}
+
+.lv-grid__overlay-icon {
+  font-size: 32px;
+}
+
+.lv-grid__overlay--error .lv-grid__overlay-text {
+  color: var(--lv-grid-danger, #ef4444);
+}
+
+/* 5.15 Cell Text Selection (FA-020) */
+.lv-grid--text-selectable .lv-grid__cell {
+  user-select: text;
+  -webkit-user-select: text;
+  cursor: text;
+}
+
+.lv-grid--text-selectable .lv-grid__cell-value {
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.lv-grid--text-selectable .lv-grid__header-cell,
+.lv-grid--text-selectable .lv-grid__cell--row-number,
+.lv-grid--text-selectable .lv-grid__cell-checkbox {
+  user-select: none;
+  -webkit-user-select: none;
+  cursor: default;
+}
+
+/* 5.16 Status Bar (FA-004) */
+.lv-grid__status-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 12px;
+  font-size: var(--lv-grid-font-size-sm, 12px);
+  color: var(--lv-grid-text-secondary, #666);
+  background: var(--lv-grid-header-bg, #fafafa);
+  border-top: 1px solid var(--lv-grid-border, #e0e0e0);
+  min-height: 28px;
+}
+
+.lv-grid__status-bar-left,
+.lv-grid__status-bar-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.lv-grid__status-item--filter {
+  color: var(--lv-grid-warning, #ff9800);
+  font-weight: 600;
+}
+
+.lv-grid__status-item--selected {
+  color: var(--lv-grid-primary, #2196f3);
+  font-weight: 600;
+}
+
+.lv-grid__status-item--changed {
+  color: var(--lv-grid-warning, #ff9800);
+  font-weight: 600;
+}
+
+.lv-grid__status-separator {
+  color: var(--lv-grid-border, #ccc);
+}
+
+/* 5.17 Row Pinning (FA-001) */
+.lv-grid__pinned {
+  z-index: 10;
+  background: var(--lv-grid-bg, #fff);
+}
+
+.lv-grid__pinned--top {
+  border-bottom: 2px solid var(--lv-grid-primary, #2196f3);
+}
+
+.lv-grid__pinned--bottom {
+  border-top: 2px solid var(--lv-grid-primary, #2196f3);
+}
+
+.lv-grid__row--pinned {
+  background: var(--lv-grid-pinned-bg, #f0f7ff);
+}
+
+[data-theme="dark"] .lv-grid__row--pinned {
+  background: var(--lv-grid-pinned-bg, #1a2a3a);
+}
+
+/* 5.15 Suppress (F-903, 동일값 병합) */
 .lv-grid__cell--suppressed {
   border-top-color: transparent;
 }

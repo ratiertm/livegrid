@@ -180,7 +180,67 @@ defmodule LiveViewGrid.Grid do
   """
   @spec resize_column(grid :: t(), field :: atom(), width :: pos_integer()) :: t()
   def resize_column(grid, field, width) when is_atom(field) and is_integer(width) and width >= 50 do
-    put_in(grid.state.column_widths, Map.put(grid.state.column_widths, field, width))
+    column = Enum.find(grid.columns, &(&1.field == field))
+
+    if column && Map.get(column, :resizable, true) do
+      put_in(grid.state.column_widths, Map.put(grid.state.column_widths, field, width))
+    else
+      grid
+    end
+  end
+
+  @doc """
+  로딩 상태를 설정합니다.
+  """
+  @spec set_loading(grid :: t(), loading :: boolean()) :: t()
+  def set_loading(grid, loading) when is_boolean(loading) do
+    put_in(grid.state.loading, loading)
+  end
+
+  @doc """
+  에러 상태를 설정합니다. nil이면 에러 해제.
+  """
+  @spec set_error(grid :: t(), error :: String.t() | nil) :: t()
+  def set_error(grid, error) when is_binary(error) or is_nil(error) do
+    put_in(grid.state.error, error)
+  end
+
+  # ── FA-001: Row Pinning API ──
+
+  @doc """
+  행을 상단 또는 하단에 고정합니다.
+  position은 :top 또는 :bottom.
+  """
+  @spec pin_row(grid :: t(), row_id :: any(), position :: :top | :bottom) :: t()
+  def pin_row(grid, row_id, position) when position in [:top, :bottom] do
+    grid = unpin_row(grid, row_id)
+
+    case position do
+      :top -> update_in(grid.state.pinned_top, &(&1 ++ [row_id]))
+      :bottom -> update_in(grid.state.pinned_bottom, &(&1 ++ [row_id]))
+    end
+  end
+
+  @doc "행의 고정을 해제합니다."
+  @spec unpin_row(grid :: t(), row_id :: any()) :: t()
+  def unpin_row(grid, row_id) do
+    grid
+    |> update_in([:state, :pinned_top], &List.delete(&1, row_id))
+    |> update_in([:state, :pinned_bottom], &List.delete(&1, row_id))
+  end
+
+  @doc "상단 고정된 행 데이터를 반환합니다."
+  @spec pinned_top_rows(grid :: t()) :: list(map())
+  def pinned_top_rows(%{data: data, state: %{pinned_top: pinned_top}}) do
+    Enum.filter(data, fn row -> row.id in pinned_top end)
+    |> Enum.sort_by(fn row -> Enum.find_index(pinned_top, &(&1 == row.id)) end)
+  end
+
+  @doc "하단 고정된 행 데이터를 반환합니다."
+  @spec pinned_bottom_rows(grid :: t()) :: list(map())
+  def pinned_bottom_rows(%{data: data, state: %{pinned_bottom: pinned_bottom}}) do
+    Enum.filter(data, fn row -> row.id in pinned_bottom end)
+    |> Enum.sort_by(fn row -> Enum.find_index(pinned_bottom, &(&1 == row.id)) end)
   end
 
   @doc """
@@ -237,11 +297,15 @@ defmodule LiveViewGrid.Grid do
     # v0.7: Grouping / Tree 적용 (pagination 전에)
     structured = apply_data_structuring(sorted, state)
 
+    # FA-001: pinned 행 제외
+    all_pinned = state.pinned_top ++ state.pinned_bottom
+    unpinned = if all_pinned == [], do: structured, else: Enum.reject(structured, fn row -> row.id in all_pinned end)
+
     # Virtual Scrolling 사용 시
     if options.virtual_scroll do
-      apply_virtual_scroll(structured, state.scroll_offset, options)
+      apply_virtual_scroll(unpinned, state.scroll_offset, options)
     else
-      apply_pagination(structured, state.pagination, options.page_size)
+      apply_pagination(unpinned, state.pagination, options.page_size)
     end
   end
 
@@ -1036,7 +1100,17 @@ defmodule LiveViewGrid.Grid do
       theme: "light",
       show_row_number: false,
       show_summary: false,
-      autofit_type: :none
+      autofit_type: :none,
+      # FA-031: Chart Panel
+      chart_panel: false,
+      # FA-020: Cell Text Selection
+      text_selectable: false,
+      # FA-005: Overlay messages
+      overlay_loading_text: "데이터 로딩 중...",
+      overlay_no_data_text: "표시할 데이터가 없습니다",
+      overlay_error_text: nil,
+      # FA-004: Status Bar
+      show_status_bar: true
     }
   end
 
@@ -1353,7 +1427,8 @@ defmodule LiveViewGrid.Grid do
         header_group: nil,
         nulls: :last,
         required: false,
-        summary: nil
+        summary: nil,
+        resizable: true
       }, col)
     end)
   end
@@ -1400,7 +1475,22 @@ defmodule LiveViewGrid.Grid do
       # F-904: Cell Merge
       merge_regions: %{},
       # Per-row Heights (extendsizetype)
-      row_heights: %{}
+      row_heights: %{},
+      # FA-001: Row Pinning
+      pinned_top: [],
+      pinned_bottom: [],
+      # FA-005: Overlay
+      loading: false,
+      error: nil,
+      # FA-031: Chart Panel
+      show_chart_panel: false,
+      chart_config: %{
+        chart_type: :bar,
+        category_field: nil,
+        value_fields: [],
+        aggregation: :sum
+      },
+      chart_data: nil
     }
   end
 

@@ -168,22 +168,23 @@ defmodule LiveViewGridWeb.Components.GridBuilder.BuilderHelpers do
         end
       end)
 
-    Map.put(base, :renderer, LiveViewGrid.Renderers.badge(colors: colors))
+    base
+    |> Map.put(:renderer, LiveViewGrid.Renderers.badge(colors: colors))
+    |> Map.put(:renderer_spec, %{type: "badge", options: %{colors: colors}})
   end
 
   def build_renderer(base, %{renderer: "link", renderer_options: opts}) do
-    Map.put(
-      base,
-      :renderer,
-      LiveViewGrid.Renderers.link(
-        prefix: Map.get(opts, :prefix, ""),
-        target:
-          case Map.get(opts, :target, "") do
-            "" -> nil
-            t -> t
-          end
-      )
-    )
+    prefix = Map.get(opts, :prefix, "")
+
+    target =
+      case Map.get(opts, :target, "") do
+        "" -> nil
+        t -> t
+      end
+
+    base
+    |> Map.put(:renderer, LiveViewGrid.Renderers.link(prefix: prefix, target: target))
+    |> Map.put(:renderer_spec, %{type: "link", options: %{prefix: prefix, target: target}})
   end
 
   def build_renderer(base, %{renderer: "progress", renderer_options: opts}) do
@@ -194,14 +195,11 @@ defmodule LiveViewGridWeb.Components.GridBuilder.BuilderHelpers do
         _ -> 100
       end
 
-    Map.put(
-      base,
-      :renderer,
-      LiveViewGrid.Renderers.progress(
-        max: max_val,
-        color: Map.get(opts, :color, "blue")
-      )
-    )
+    color = Map.get(opts, :color, "blue")
+
+    base
+    |> Map.put(:renderer, LiveViewGrid.Renderers.progress(max: max_val, color: color))
+    |> Map.put(:renderer_spec, %{type: "progress", options: %{max: max_val, color: color}})
   end
 
   def build_renderer(base, _col), do: base

@@ -360,6 +360,15 @@ defmodule LiveviewGridWeb.GridComponent do
   def handle_event("copy_cell_range", params, socket),
     do: EventHandlers.handle_copy_cell_range(params, socket)
 
+  # FA-031: Chart Panel
+  @impl true
+  def handle_event("grid_toggle_chart", params, socket),
+    do: EventHandlers.handle_toggle_chart(params, socket)
+
+  @impl true
+  def handle_event("grid_update_chart_config", params, socket),
+    do: EventHandlers.handle_update_chart_config(params, socket)
+
   # ── Config Modal Events ──
 
   @impl true
@@ -422,7 +431,7 @@ defmodule LiveviewGridWeb.GridComponent do
   @doc "Grid 컴포넌트의 전체 UI를 렌더링한다. 툴바, 헤더, 바디, 푸터, Config Modal을 포함한다."
   def render(assigns) do
     ~H"""
-    <div class="lv-grid" id={"#{@grid.id}-keyboard-nav"} phx-hook="GridKeyboardNav" tabindex="0" data-theme={@grid.options[:theme] || "light"} style={build_custom_css_vars(@grid.options[:custom_css_vars])}>
+    <div class={"lv-grid #{if @grid.options[:text_selectable], do: "lv-grid--text-selectable"}"} id={"#{@grid.id}-keyboard-nav"} phx-hook="GridKeyboardNav" tabindex="0" data-theme={@grid.options[:theme] || "light"} style={build_custom_css_vars(@grid.options[:custom_css_vars])}>
       <!-- Toolbar: Search + Save -->
       <div class="lv-grid__toolbar">
         <div class="lv-grid__search-bar">
@@ -495,6 +504,17 @@ defmodule LiveviewGridWeb.GridComponent do
             </button>
           <% end %>
         </div>
+
+        <%= if @grid.options.chart_panel do %>
+          <button
+            class={"lv-grid__toolbar-btn #{if @grid.state.show_chart_panel, do: "lv-grid__toolbar-btn--active"}"}
+            phx-click="grid_toggle_chart"
+            phx-target={@myself}
+            title={if @grid.state.show_chart_panel, do: "차트 숨기기", else: "차트 표시"}
+          >
+            <span style="font-size: 14px;">📊</span>
+          </button>
+        <% end %>
 
         <span class="lv-grid__toolbar-separator"></span>
 
@@ -617,13 +637,15 @@ defmodule LiveviewGridWeb.GridComponent do
                   <%= sort_icon(@grid.state.sort.direction) %>
                 </span>
               <% end %>
-              <span
-                class="lv-grid__resize-handle"
-                phx-hook="ColumnResize"
-                id={"resize-#{column.field}"}
-                data-col-index={col_idx}
-                data-field={column.field}
-              ></span>
+              <%= if Map.get(column, :resizable, true) do %>
+                <span
+                  class="lv-grid__resize-handle"
+                  phx-hook="ColumnResize"
+                  id={"resize-#{column.field}"}
+                  data-col-index={col_idx}
+                  data-field={column.field}
+                ></span>
+              <% end %>
             </div>
           <% end %>
         </div>
@@ -830,6 +852,60 @@ defmodule LiveviewGridWeb.GridComponent do
               >초기화</button>
             </div>
           </div>
+        </div>
+      <% end %>
+
+      <!-- FA-005: Overlay System -->
+      <%= cond do %>
+        <% @grid.state.loading -> %>
+          <div class="lv-grid__overlay">
+            <div class="lv-grid__overlay-content">
+              <div class="lv-grid__overlay-spinner"></div>
+              <span class="lv-grid__overlay-text"><%= @grid.options[:overlay_loading_text] || "데이터 로딩 중..." %></span>
+            </div>
+          </div>
+        <% @grid.state[:error] -> %>
+          <div class="lv-grid__overlay lv-grid__overlay--error">
+            <div class="lv-grid__overlay-content">
+              <span class="lv-grid__overlay-icon"><span>&#x26A0;</span></span>
+              <span class="lv-grid__overlay-text"><%= @grid.options[:overlay_error_text] || @grid.state.error %></span>
+            </div>
+          </div>
+        <% @grid.data == [] or Grid.visible_data(@grid) == [] -> %>
+          <div class="lv-grid__overlay lv-grid__overlay--no-data">
+            <div class="lv-grid__overlay-content">
+              <span class="lv-grid__overlay-icon"><span>&#x1F4ED;</span></span>
+              <span class="lv-grid__overlay-text"><%= @grid.options[:overlay_no_data_text] || "표시할 데이터가 없습니다" %></span>
+            </div>
+          </div>
+        <% true -> %>
+      <% end %>
+
+      <!-- FA-001: Pinned Top Rows -->
+      <%= if length(@grid.state.pinned_top) > 0 do %>
+        <div class="lv-grid__pinned lv-grid__pinned--top">
+          <%= for row <- Grid.pinned_top_rows(@grid) do %>
+            <div class={"lv-grid__row lv-grid__row--pinned #{if row.id in @grid.state.selection.selected_ids, do: "lv-grid__row--selected"}"} data-row-id={row.id}>
+              <%= if @grid.options[:show_checkbox] do %>
+                <div class="lv-grid__cell lv-grid__cell--checkbox" style="width: 40px; flex: 0 0 40px;">
+                  <input type="checkbox" checked={row.id in @grid.state.selection.selected_ids} phx-click="grid_toggle_select" phx-value-id={row.id} phx-target={@myself} />
+                </div>
+              <% end %>
+              <%= if @grid.options.show_row_number do %>
+                <div class="lv-grid__cell lv-grid__cell--row-number" style="width: 50px; flex: 0 0 50px; justify-content: center;">📌</div>
+              <% end %>
+              <%= if @grid.state.show_status_column do %>
+                <div class="lv-grid__cell lv-grid__cell--status" style="width: 60px; flex: 0 0 60px; justify-content: center;">
+                  <%= render_status_badge(Map.get(@grid.state.row_statuses, row.id, :normal)) %>
+                </div>
+              <% end %>
+              <%= for {column, col_idx} <- Enum.with_index(Grid.display_columns(@grid)) do %>
+                <div class={"lv-grid__cell #{frozen_class(col_idx, @grid)}"} style={"#{column_width_style(column, @grid)}; #{frozen_style(col_idx, @grid)}"} data-col-index={col_idx}>
+                  <%= render_cell(assigns, row, column) %>
+                </div>
+              <% end %>
+            </div>
+          <% end %>
         </div>
       <% end %>
 
@@ -1082,6 +1158,151 @@ defmodule LiveviewGridWeb.GridComponent do
         </div>
       <% end %>
 
+      <!-- FA-031: Chart Panel -->
+      <%= if @grid.options.chart_panel && @grid.state.show_chart_panel do %>
+        <div class="lv-grid__chart-panel">
+          <div class="lv-grid__chart-controls">
+            <div class="lv-grid__chart-control-group">
+              <label class="lv-grid__chart-label">차트</label>
+              <select
+                phx-change="grid_update_chart_config"
+                phx-target={@myself}
+                name="value"
+                class="lv-grid__chart-select"
+              >
+                <input type="hidden" name="field" value="chart_type" />
+                <option value="bar" selected={@grid.state.chart_config.chart_type == :bar}>Bar</option>
+                <option value="column" selected={@grid.state.chart_config.chart_type == :column}>Column</option>
+                <option value="line" selected={@grid.state.chart_config.chart_type == :line}>Line</option>
+                <option value="pie" selected={@grid.state.chart_config.chart_type == :pie}>Pie</option>
+              </select>
+            </div>
+
+            <div class="lv-grid__chart-control-group">
+              <label class="lv-grid__chart-label">카테고리 (X축)</label>
+              <select
+                phx-change="grid_update_chart_config"
+                phx-target={@myself}
+                name="value"
+                class="lv-grid__chart-select"
+              >
+                <input type="hidden" name="field" value="category_field" />
+                <option value="">선택...</option>
+                <%= for col <- Grid.display_columns(@grid), col.field not in [:id] do %>
+                  <option value={col.field} selected={@grid.state.chart_config.category_field == col.field}>
+                    <%= col.label %>
+                  </option>
+                <% end %>
+              </select>
+            </div>
+
+            <div class="lv-grid__chart-control-group">
+              <label class="lv-grid__chart-label">집계</label>
+              <select
+                phx-change="grid_update_chart_config"
+                phx-target={@myself}
+                name="value"
+                class="lv-grid__chart-select"
+              >
+                <input type="hidden" name="field" value="aggregation" />
+                <option value="sum" selected={@grid.state.chart_config.aggregation == :sum}>합계</option>
+                <option value="avg" selected={@grid.state.chart_config.aggregation == :avg}>평균</option>
+                <option value="count" selected={@grid.state.chart_config.aggregation == :count}>개수</option>
+                <option value="min" selected={@grid.state.chart_config.aggregation == :min}>최소</option>
+                <option value="max" selected={@grid.state.chart_config.aggregation == :max}>최대</option>
+              </select>
+            </div>
+
+            <div class="lv-grid__chart-control-group">
+              <label class="lv-grid__chart-label">값 (Y축)</label>
+              <div class="lv-grid__chart-value-fields">
+                <%= for col <- Grid.display_columns(@grid),
+                        Map.get(col, :filter_type) == :number or Map.get(col, :align) == :right do %>
+                  <label class="lv-grid__chart-checkbox-label">
+                    <input
+                      type="checkbox"
+                      checked={col.field in @grid.state.chart_config.value_fields}
+                      phx-click="grid_update_chart_config"
+                      phx-target={@myself}
+                      phx-value-field="toggle_value_field"
+                      phx-value-value={col.field}
+                    />
+                    <%= col.label %>
+                  </label>
+                <% end %>
+              </div>
+            </div>
+          </div>
+
+          <div class="lv-grid__chart-body">
+            <%= if @grid.state.chart_data do %>
+              <%= case @grid.state.chart_config.chart_type do %>
+                <% type when type in [:bar, :column] -> %>
+                  <LiveviewGrid.Chart.SvgRenderer.bar_chart
+                    chart_data={@grid.state.chart_data}
+                    width={600}
+                    height={300}
+                    theme={to_string(@grid.options.theme)}
+                  />
+                <% :line -> %>
+                  <LiveviewGrid.Chart.SvgRenderer.line_chart
+                    chart_data={@grid.state.chart_data}
+                    width={600}
+                    height={300}
+                    theme={to_string(@grid.options.theme)}
+                  />
+                <% :pie -> %>
+                  <LiveviewGrid.Chart.SvgRenderer.pie_chart
+                    chart_data={@grid.state.chart_data}
+                    width={300}
+                    height={300}
+                    theme={to_string(@grid.options.theme)}
+                  />
+                <% _ -> %>
+                  <LiveviewGrid.Chart.SvgRenderer.bar_chart
+                    chart_data={@grid.state.chart_data}
+                    width={600}
+                    height={300}
+                    theme={to_string(@grid.options.theme)}
+                  />
+              <% end %>
+            <% else %>
+              <div class="lv-grid__chart-empty">
+                <p>카테고리와 값 컬럼을 선택하세요</p>
+              </div>
+            <% end %>
+          </div>
+        </div>
+      <% end %>
+
+      <!-- FA-001: Pinned Bottom Rows -->
+      <%= if length(@grid.state.pinned_bottom) > 0 do %>
+        <div class="lv-grid__pinned lv-grid__pinned--bottom">
+          <%= for row <- Grid.pinned_bottom_rows(@grid) do %>
+            <div class={"lv-grid__row lv-grid__row--pinned #{if row.id in @grid.state.selection.selected_ids, do: "lv-grid__row--selected"}"} data-row-id={row.id}>
+              <%= if @grid.options[:show_checkbox] do %>
+                <div class="lv-grid__cell lv-grid__cell--checkbox" style="width: 40px; flex: 0 0 40px;">
+                  <input type="checkbox" checked={row.id in @grid.state.selection.selected_ids} phx-click="grid_toggle_select" phx-value-id={row.id} phx-target={@myself} />
+                </div>
+              <% end %>
+              <%= if @grid.options.show_row_number do %>
+                <div class="lv-grid__cell lv-grid__cell--row-number" style="width: 50px; flex: 0 0 50px; justify-content: center;">📌</div>
+              <% end %>
+              <%= if @grid.state.show_status_column do %>
+                <div class="lv-grid__cell lv-grid__cell--status" style="width: 60px; flex: 0 0 60px; justify-content: center;">
+                  <%= render_status_badge(Map.get(@grid.state.row_statuses, row.id, :normal)) %>
+                </div>
+              <% end %>
+              <%= for {column, col_idx} <- Enum.with_index(Grid.display_columns(@grid)) do %>
+                <div class={"lv-grid__cell #{frozen_class(col_idx, @grid)}"} style={"#{column_width_style(column, @grid)}; #{frozen_style(col_idx, @grid)}"} data-col-index={col_idx}>
+                  <%= render_cell(assigns, row, column) %>
+                </div>
+              <% end %>
+            </div>
+          <% end %>
+        </div>
+      <% end %>
+
       <!-- Footer -->
       <%= if @grid.options.show_footer do %>
         <div class="lv-grid__footer" style="flex-direction: column; align-items: center; gap: 8px;">
@@ -1136,51 +1357,42 @@ defmodule LiveviewGridWeb.GridComponent do
             </div>
           <% end %>
 
-          <div class="lv-grid__info">
-            <%!-- F-941: Cell Range Summary --%>
-            <%= if (range_summary = Grid.cell_range_summary(@grid)) do %>
-              <div class="lv-grid__range-summary">
-                <span class="lv-grid__range-summary-label">선택 영역:</span>
-                <span class="lv-grid__range-summary-item">
-                  Count: <strong><%= range_summary.count %></strong>
+          <!-- FA-004: Status Bar -->
+          <%= if @grid.options[:show_status_bar] do %>
+            <div class="lv-grid__status-bar">
+              <div class="lv-grid__status-bar-left">
+                <%= if @grid.state.global_search != "" or map_size(@grid.state.filters) > 0 do %>
+                  <span class="lv-grid__status-item lv-grid__status-item--filter">
+                    <%= Grid.filtered_count(@grid) %>개 검색됨 /
+                  </span>
+                <% end %>
+                <span class="lv-grid__status-item">
+                  총 <%= @grid.state.pagination.total_rows %>행
                 </span>
-                <%= if range_summary.numeric_count > 0 do %>
-                  <span class="lv-grid__range-summary-item">
-                    Sum: <strong><%= format_summary_number(range_summary.sum) %></strong>
-                  </span>
-                  <span class="lv-grid__range-summary-item">
-                    Avg: <strong><%= format_summary_number(range_summary.avg) %></strong>
-                  </span>
-                  <span class="lv-grid__range-summary-item">
-                    Min: <strong><%= format_summary_number(range_summary.min) %></strong>
-                  </span>
-                  <span class="lv-grid__range-summary-item">
-                    Max: <strong><%= format_summary_number(range_summary.max) %></strong>
+                <%= if map_size(@grid.state.row_statuses) > 0 do %>
+                  <span class="lv-grid__status-separator">|</span>
+                  <span class="lv-grid__status-item lv-grid__status-item--changed">
+                    <%= map_size(@grid.state.row_statuses) %>개 변경됨
                   </span>
                 <% end %>
               </div>
-              <span style="margin: 0 8px; color: #ccc;">|</span>
-            <% end %>
-            <%= if length(@grid.state.selection.selected_ids) > 0 do %>
-              <span style="color: #2196f3; font-weight: 600;">
-                <%= length(@grid.state.selection.selected_ids) %>개 선택됨
-              </span>
-              <span style="margin: 0 8px; color: #ccc;">|</span>
-            <% end %>
-            <%= if @grid.state.global_search != "" or map_size(@grid.state.filters) > 0 do %>
-              <span style="color: #ff9800; font-weight: 600;">
-                <%= Grid.filtered_count(@grid) %>개 검색됨
-              </span>
-              <span style="margin: 0 4px; color: #ccc;">/</span>
-            <% end %>
-            총 <%= @grid.state.pagination.total_rows %>개
-            <%= if map_size(@grid.state.row_statuses) > 0 do %>
-              <span style="margin: 0 8px; color: #ccc;">|</span>
-              <span style="color: #ff9800; font-weight: 600;">
-                <%= map_size(@grid.state.row_statuses) %>개 변경됨
-              </span>
-            <% end %>
-          </div>
+              <div class="lv-grid__status-bar-right">
+                <%!-- F-941: Cell Range Summary --%>
+                <%= if (range_summary = Grid.cell_range_summary(@grid)) do %>
+                  <span class="lv-grid__status-item">Count: <strong><%= range_summary.count %></strong></span>
+                  <%= if range_summary.numeric_count > 0 do %>
+                    <span class="lv-grid__status-item">Sum: <strong><%= format_summary_number(range_summary.sum) %></strong></span>
+                    <span class="lv-grid__status-item">Avg: <strong><%= format_summary_number(range_summary.avg) %></strong></span>
+                  <% end %>
+                <% end %>
+                <%= if length(@grid.state.selection.selected_ids) > 0 do %>
+                  <span class="lv-grid__status-item lv-grid__status-item--selected">
+                    <%= length(@grid.state.selection.selected_ids) %>개 선택됨
+                  </span>
+                <% end %>
+              </div>
+            </div>
+          <% end %>
 
           <!-- Import 버튼 (F-511) -->
           <div class="lv-grid__export" style="margin-right: 8px;">

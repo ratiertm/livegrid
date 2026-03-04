@@ -26,7 +26,8 @@ defmodule LiveViewGrid.GridDefinition do
     input_pattern: String.t() | nil,
     style_expr: term(),
     nulls: :first | :last,
-    required: boolean()
+    required: boolean(),
+    resizable: boolean()
   }
 
   @type t :: %{
@@ -53,7 +54,8 @@ defmodule LiveViewGrid.GridDefinition do
     style_expr: nil,
     nulls: :last,
     required: false,
-    summary: nil
+    summary: nil,
+    resizable: true
   }
 
   @doc """

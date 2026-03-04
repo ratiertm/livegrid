@@ -142,6 +142,8 @@
   height: 40px;
   display: flex;
   align-items: center;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .lv-grid__filter-input {

@@ -77,6 +77,15 @@ defmodule LiveViewGridWeb.Components.GridBuilder.BuilderDataSource do
         </label>
       </div>
 
+      <%!-- Sample 모드 안내 --%>
+      <%= if @data_source_type == "sample" do %>
+        <div class="p-4 bg-gray-50 border border-gray-200 rounded-lg">
+          <p class="text-sm text-gray-600">
+            📋 <strong>컬럼 정의</strong> 탭에서 직접 컬럼을 추가하세요. 그리드 생성 시 샘플 데이터가 자동 생성됩니다.
+          </p>
+        </div>
+      <% end %>
+
       <%!-- Schema 모드 --%>
       <%= if @data_source_type == "schema" do %>
         <div class="p-4 bg-blue-50 border border-blue-200 rounded-lg space-y-3">

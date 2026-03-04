@@ -49,7 +49,7 @@ mix docs
 open doc/index.html
 ```
 
-## ✨ 구현된 기능 (v0.1 ~ v0.7)
+## ✨ 구현된 기능 (v0.1 ~ v0.12)
 
 ### v0.1 - 핵심 그리드
 - [x] 테이블 렌더링 (LiveComponent 기반)
@@ -115,7 +115,7 @@ open doc/index.html
 - [x] 행 단위 편집 모드 (행 전체 셀 동시 편집)
 - [x] Undo/Redo (Ctrl+Z/Y 편집 히스토리, 최대 50건 스택)
 
-### v0.7 - Grid 설정 & 아키텍처 (현재)
+### v0.7 - Grid 설정 & 아키텍처
 - [x] Grid 설정 모달 (컬럼 표시/순서/너비, 고정 컬럼, 포맷터, 검증기)
 - [x] Grid 설정 탭 (페이지 크기, 가상 스크롤, 테마, 행 높이)
 - [x] Grid Builder (동적 그리드 생성, 컬럼 정의 UI)
@@ -132,14 +132,21 @@ open doc/index.html
 - [x] GridComponent 리팩토링 (EventHandlers + RenderHelpers 추출)
 - [x] ExDoc 문서화 (전체 공개 모듈 @doc/@spec)
 
+### v0.12.0 - 핵심 UX 보완 (현재)
+- [x] Row Pinning — 행 상단/하단 고정 (`Grid.pin_row/3`, `Grid.unpin_row/2`)
+- [x] Overlay System — Loading/No Data/Error 오버레이 메시지
+- [x] Status Bar — 하단 정보바 (총 행수, 검색 결과, 필터 상태)
+- [x] Cell Text Selection — 셀 텍스트 드래그 선택 허용 (`user-select: text`)
+- [x] 컬럼 리사이즈 제한 — `resizable: false` 옵션으로 개별 컬럼 리사이즈 비활성화
+
 ## 📊 구현 현황
 
 | 항목 | 수치 |
 |------|------|
-| 전체 기능 | 62개 |
-| 구현 완료 | 62개 (100%) |
-| 구현 버전 | v0.1 ~ v0.7 |
-| 테스트 | 428개 통과 |
+| 전체 기능 | 67개 |
+| 구현 완료 | 67개 (100%) |
+| 구현 버전 | v0.1 ~ v0.12 |
+| 테스트 | 222개 통과 |
 
 ## 🗺️ 로드맵 (미구현)
 
