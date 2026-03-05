@@ -817,7 +817,7 @@ defmodule LiveviewGridWeb.DemoLive do
                 end
               end},
             %{field: :active, label: "활성", width: 70, editable: true, editor_type: :checkbox, header_group: "부가 정보", summary: :count},
-            %{field: :city, label: "도시", width: 120, sortable: true, filterable: true, filter_type: :text, editable: true, editor_type: :select,
+            %{field: :city, label: "도시", width: 120, sortable: true, filterable: true, filter_type: :set, editable: true, editor_type: :select,
               header_group: "부가 정보", suppress: true,
               renderer: LiveViewGrid.Renderers.badge(
                 colors: %{"서울" => "blue", "부산" => "green", "대구" => "red",

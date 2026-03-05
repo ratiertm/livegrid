@@ -25,6 +25,25 @@ import {ScrollSync} from "./hooks/scroll-sync"
 import {ConfigImport} from "./hooks/config-import"
 
 // Assemble hooks
+// FA-010: Column Menu Trigger Hook
+const ColumnMenuTrigger = {
+  mounted() {
+    this.el.addEventListener("click", (e) => {
+      e.stopPropagation()
+      const rect = this.el.getBoundingClientRect()
+      const field = this.el.dataset.field
+      // LiveComponent target: find nearest lv-grid
+      const grid = this.el.closest("[phx-target]") || this.el.closest(".lv-grid")
+      const target = this.el.getAttribute("phx-target")
+      this.pushEventTo(target, "toggle_column_menu", {
+        field: field,
+        x: String(Math.round(rect.left)),
+        y: String(Math.round(rect.bottom + 4))
+      })
+    })
+  }
+}
+
 let Hooks = {
   VirtualScroll,
   FileImport,
@@ -37,7 +56,8 @@ let Hooks = {
   ConfigSortable,
   RowReorder,
   ScrollSync,
-  ConfigImport
+  ConfigImport,
+  ColumnMenuTrigger
 }
 
 // Progress bar

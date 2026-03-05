@@ -1225,6 +1225,133 @@ defmodule LiveviewGridWeb.GridComponent.EventHandlers do
     {:noreply, assign(socket, grid: updated_grid)}
   end
 
+  # ── FA-012: Set Filter ──
+
+  @doc "Set Filter 드롭다운 토글"
+  def handle_toggle_set_filter(%{"field" => field_str}, socket) do
+    field = String.to_existing_atom(field_str)
+    current = socket.assigns[:set_filter_open]
+    new_val = if current == field, do: nil, else: field
+
+    # 처음 열 때 모든 값 선택 상태로 초기화
+    selections = socket.assigns[:set_filter_selections] || %{}
+    selections = if new_val && !Map.has_key?(selections, field) do
+      all_values = Grid.unique_values(socket.assigns.grid, field)
+      Map.put(selections, field, all_values)
+    else
+      selections
+    end
+
+    {:noreply, assign(socket, set_filter_open: new_val, set_filter_query: "", set_filter_selections: selections)}
+  end
+
+  @doc "Set Filter 닫기"
+  def handle_close_set_filter(_params, socket) do
+    {:noreply, assign(socket, set_filter_open: nil, set_filter_query: "")}
+  end
+
+  @doc "Set Filter 검색"
+  def handle_set_filter_search(%{"value" => query}, socket) do
+    {:noreply, assign(socket, set_filter_query: query)}
+  end
+
+  @doc "체크박스 토글"
+  def handle_toggle_set_filter_value(%{"field" => field_str, "val" => val}, socket) do
+    field = String.to_existing_atom(field_str)
+    selections = socket.assigns[:set_filter_selections] || %{}
+    current = Map.get(selections, field, [])
+    new_selected = if val in current do
+      List.delete(current, val)
+    else
+      [val | current]
+    end
+    {:noreply, assign(socket, set_filter_selections: Map.put(selections, field, new_selected))}
+  end
+
+  @doc "전체 선택"
+  def handle_set_filter_select_all(%{"field" => field_str}, socket) do
+    field = String.to_existing_atom(field_str)
+    all = Grid.unique_values(socket.assigns.grid, field)
+    selections = Map.put(socket.assigns[:set_filter_selections] || %{}, field, all)
+    {:noreply, assign(socket, set_filter_selections: selections)}
+  end
+
+  @doc "전체 해제"
+  def handle_set_filter_clear_all(%{"field" => field_str}, socket) do
+    field = String.to_existing_atom(field_str)
+    selections = Map.put(socket.assigns[:set_filter_selections] || %{}, field, [])
+    {:noreply, assign(socket, set_filter_selections: selections)}
+  end
+
+  @doc "Set Filter 적용"
+  def handle_apply_set_filter(%{"field" => field_str}, socket) do
+    field = String.to_existing_atom(field_str)
+    selections = socket.assigns[:set_filter_selections] || %{}
+    selected = Map.get(selections, field, [])
+
+    grid = socket.assigns.grid
+    filters = Map.put(grid.state.filters, field, selected)
+    grid = put_in(grid.state.filters, filters)
+
+    {:noreply, assign(socket, grid: grid, set_filter_open: nil, set_filter_query: "")}
+  end
+
+  # ── FA-010: Column Menu ──
+
+  def handle_toggle_column_menu(%{"field" => field_str} = params, socket) do
+    field = String.to_existing_atom(field_str)
+    current = socket.assigns[:column_menu]
+
+    if current && current.field == field do
+      {:noreply, assign(socket, column_menu: nil)}
+    else
+      # JS Hook에서 위치를 받거나, 기본 위치 사용
+      x = params["x"] || "0"
+      y = params["y"] || "0"
+      {:noreply, assign(socket, column_menu: %{field: field, x: x, y: y})}
+    end
+  end
+
+  def handle_close_column_menu(_params, socket) do
+    {:noreply, assign(socket, column_menu: nil)}
+  end
+
+  def handle_column_menu_action(%{"action" => action, "field" => field_str}, socket) do
+    field = String.to_existing_atom(field_str)
+    grid = socket.assigns.grid
+
+    grid =
+      case action do
+        "sort_asc" ->
+          grid
+          |> put_in([:state, :sort], %{field: field, direction: :asc})
+          |> put_in([:state, :scroll_offset], 0)
+
+        "sort_desc" ->
+          grid
+          |> put_in([:state, :sort], %{field: field, direction: :desc})
+          |> put_in([:state, :scroll_offset], 0)
+
+        "clear_sort" ->
+          Grid.clear_sort(grid)
+
+        "pin_left" ->
+          col_idx = Enum.find_index(Grid.display_columns(grid), &(&1.field == field))
+          if col_idx, do: Grid.set_frozen_columns(grid, col_idx + 1), else: grid
+
+        "unpin" ->
+          Grid.set_frozen_columns(grid, 0)
+
+        "hide_column" ->
+          Grid.hide_column(grid, field)
+
+        _ ->
+          grid
+      end
+
+    {:noreply, assign(socket, grid: grid, column_menu: nil)}
+  end
+
   # ── F-800: Context Menu ──
 
   @doc """

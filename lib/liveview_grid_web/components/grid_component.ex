@@ -105,6 +105,22 @@ defmodule LiveviewGridWeb.GridComponent do
         assign(socket, context_menu: nil)
       end
 
+    # FA-012: Set Filter state
+    socket =
+      if Map.has_key?(socket.assigns, :set_filter_open) do
+        socket
+      else
+        assign(socket, set_filter_open: nil, set_filter_query: "", set_filter_selections: %{})
+      end
+
+    # FA-010: Column Menu state
+    socket =
+      if Map.has_key?(socket.assigns, :column_menu) do
+        socket
+      else
+        assign(socket, column_menu: nil)
+      end
+
     socket = if virtual_changed? do
       push_event(socket, "reset_virtual_scroll", %{})
     else
@@ -334,6 +350,35 @@ defmodule LiveviewGridWeb.GridComponent do
   def handle_event("grid_toggle_tree_node", params, socket),
     do: EventHandlers.handle_toggle_tree_node(params, socket)
 
+  # FA-012: Set Filter
+  @impl true
+  def handle_event("toggle_set_filter", params, socket),
+    do: EventHandlers.handle_toggle_set_filter(params, socket)
+
+  @impl true
+  def handle_event("close_set_filter", params, socket),
+    do: EventHandlers.handle_close_set_filter(params, socket)
+
+  @impl true
+  def handle_event("set_filter_search", params, socket),
+    do: EventHandlers.handle_set_filter_search(params, socket)
+
+  @impl true
+  def handle_event("toggle_set_filter_value", params, socket),
+    do: EventHandlers.handle_toggle_set_filter_value(params, socket)
+
+  @impl true
+  def handle_event("set_filter_select_all", params, socket),
+    do: EventHandlers.handle_set_filter_select_all(params, socket)
+
+  @impl true
+  def handle_event("set_filter_clear_all", params, socket),
+    do: EventHandlers.handle_set_filter_clear_all(params, socket)
+
+  @impl true
+  def handle_event("apply_set_filter", params, socket),
+    do: EventHandlers.handle_apply_set_filter(params, socket)
+
   # F-800: Context Menu
   @impl true
   def handle_event("show_context_menu", params, socket),
@@ -346,6 +391,19 @@ defmodule LiveviewGridWeb.GridComponent do
   @impl true
   def handle_event("context_menu_action", params, socket),
     do: EventHandlers.handle_context_menu_action(params, socket)
+
+  # FA-010: Column Menu
+  @impl true
+  def handle_event("toggle_column_menu", params, socket),
+    do: EventHandlers.handle_toggle_column_menu(params, socket)
+
+  @impl true
+  def handle_event("close_column_menu", params, socket),
+    do: EventHandlers.handle_close_column_menu(params, socket)
+
+  @impl true
+  def handle_event("column_menu_action", params, socket),
+    do: EventHandlers.handle_column_menu_action(params, socket)
 
   # F-940: Cell Range Selection
   @impl true
@@ -631,12 +689,20 @@ defmodule LiveviewGridWeb.GridComponent do
               id={"header-#{column.field}"}
               phx-hook="ColumnReorder"
             >
-              <%= column.label %>
+              <span class="lv-grid__header-label"><%= column.label %></span>
               <%= if column.sortable && sort_active?(@grid.state.sort, column.field) do %>
                 <span class="lv-grid__sort-icon">
                   <%= sort_icon(@grid.state.sort.direction) %>
                 </span>
               <% end %>
+              <%!-- FA-010: Column Menu trigger --%>
+              <button
+                class="lv-grid__column-menu-trigger"
+                phx-hook="ColumnMenuTrigger"
+                id={"col-menu-trigger-#{column.field}"}
+                data-field={column.field}
+                phx-target={@myself}
+              >⋮</button>
               <%= if Map.get(column, :resizable, true) do %>
                 <span
                   class="lv-grid__resize-handle"
@@ -670,41 +736,94 @@ defmodule LiveviewGridWeb.GridComponent do
           <%= for {column, col_idx} <- Enum.with_index(Grid.display_columns(@grid)) do %>
             <div class={"lv-grid__filter-cell #{frozen_class(col_idx, @grid)}"} style={"#{column_width_style(column, @grid)}; #{frozen_style(col_idx, @grid)}"} data-col-index={col_idx}>
               <%= if column.filterable do %>
-                <%= if column.filter_type == :date do %>
-                  <div class="lv-grid__date-filter">
-                    <form phx-change="grid_filter_date" phx-target={@myself} style="display: contents;">
-                      <input type="hidden" name="field" value={column.field} />
-                      <input type="hidden" name="part" value="from" />
-                      <input
-                        type="date"
-                        name="value"
-                        class="lv-grid__filter-input lv-grid__filter-input--date"
-                        value={parse_date_part(Map.get(@grid.state.filters, column.field, ""), :from)}
-                      />
-                    </form>
-                    <span class="lv-grid__date-filter-sep">~</span>
-                    <form phx-change="grid_filter_date" phx-target={@myself} style="display: contents;">
-                      <input type="hidden" name="field" value={column.field} />
-                      <input type="hidden" name="part" value="to" />
-                      <input
-                        type="date"
-                        name="value"
-                        class="lv-grid__filter-input lv-grid__filter-input--date"
-                        value={parse_date_part(Map.get(@grid.state.filters, column.field, ""), :to)}
-                      />
-                    </form>
-                  </div>
-                <% else %>
-                  <input
-                    type="text"
-                    class="lv-grid__filter-input"
-                    placeholder={filter_placeholder(column)}
-                    value={Map.get(@grid.state.filters, column.field, "")}
-                    phx-keyup="grid_filter"
-                    phx-value-field={column.field}
-                    phx-debounce="300"
-                    phx-target={@myself}
-                  />
+                <%= cond do %>
+                  <% column.filter_type == :set -> %>
+                    <%!-- FA-012: Set Filter --%>
+                    <div class="lv-grid__set-filter">
+                      <button
+                        class={"lv-grid__set-filter-btn #{if is_list(Map.get(@grid.state.filters, column.field)), do: "lv-grid__set-filter-btn--active"}"}
+                        phx-click="toggle_set_filter"
+                        phx-value-field={column.field}
+                        phx-target={@myself}
+                      >
+                        ▼ <%= if is_list(Map.get(@grid.state.filters, column.field)) do %><span class="lv-grid__set-filter-count">(<%= length(Map.get(@grid.state.filters, column.field, [])) %>)</span><% end %>
+                      </button>
+                      <%= if @set_filter_open == column.field do %>
+                        <div class="lv-grid__set-filter-dropdown" phx-click-away="close_set_filter" phx-target={@myself}>
+                          <input
+                            type="text"
+                            class="lv-grid__set-filter-search"
+                            placeholder="검색..."
+                            phx-keyup="set_filter_search"
+                            phx-value-field={column.field}
+                            phx-debounce="200"
+                            phx-target={@myself}
+                            value={@set_filter_query}
+                          />
+                          <div class="lv-grid__set-filter-actions">
+                            <button phx-click="set_filter_select_all" phx-value-field={column.field} phx-target={@myself}>전체 선택</button>
+                            <button phx-click="set_filter_clear_all" phx-value-field={column.field} phx-target={@myself}>전체 해제</button>
+                          </div>
+                          <div class="lv-grid__set-filter-list">
+                            <% all_vals = Grid.unique_values(@grid, column.field) %>
+                            <% query = String.downcase(@set_filter_query || "") %>
+                            <% filtered_vals = if query == "", do: all_vals, else: Enum.filter(all_vals, &String.contains?(String.downcase(&1), query)) %>
+                            <% selected = Map.get(@set_filter_selections, column.field, all_vals) %>
+                            <%= for val <- filtered_vals do %>
+                              <label class="lv-grid__set-filter-item">
+                                <input
+                                  type="checkbox"
+                                  checked={val in selected}
+                                  phx-click="toggle_set_filter_value"
+                                  phx-value-field={column.field}
+                                  phx-value-val={val}
+                                  phx-target={@myself}
+                                />
+                                <span><%= val %></span>
+                              </label>
+                            <% end %>
+                          </div>
+                          <button class="lv-grid__set-filter-apply" phx-click="apply_set_filter" phx-value-field={column.field} phx-target={@myself}>
+                            적용
+                          </button>
+                        </div>
+                      <% end %>
+                    </div>
+                  <% column.filter_type == :date -> %>
+                    <div class="lv-grid__date-filter">
+                      <form phx-change="grid_filter_date" phx-target={@myself} style="display: contents;">
+                        <input type="hidden" name="field" value={column.field} />
+                        <input type="hidden" name="part" value="from" />
+                        <input
+                          type="date"
+                          name="value"
+                          class="lv-grid__filter-input lv-grid__filter-input--date"
+                          value={parse_date_part(Map.get(@grid.state.filters, column.field, ""), :from)}
+                        />
+                      </form>
+                      <span class="lv-grid__date-filter-sep">~</span>
+                      <form phx-change="grid_filter_date" phx-target={@myself} style="display: contents;">
+                        <input type="hidden" name="field" value={column.field} />
+                        <input type="hidden" name="part" value="to" />
+                        <input
+                          type="date"
+                          name="value"
+                          class="lv-grid__filter-input lv-grid__filter-input--date"
+                          value={parse_date_part(Map.get(@grid.state.filters, column.field, ""), :to)}
+                        />
+                      </form>
+                    </div>
+                  <% true -> %>
+                    <input
+                      type="text"
+                      class="lv-grid__filter-input"
+                      placeholder={filter_placeholder(column)}
+                      value={Map.get(@grid.state.filters, column.field, "")}
+                      phx-keyup="grid_filter"
+                      phx-value-field={column.field}
+                      phx-debounce="300"
+                      phx-target={@myself}
+                    />
                 <% end %>
               <% end %>
             </div>
@@ -1493,6 +1612,37 @@ defmodule LiveviewGridWeb.GridComponent do
           <div class="lv-grid__context-menu-divider"></div>
           <div class="lv-grid__context-menu-item lv-grid__context-menu-item--danger" phx-click="context_menu_action" phx-value-action="delete_row" phx-value-row-id={@context_menu.row_id} phx-target={@myself}>
             <span>🗑</span> 행 삭제
+          </div>
+        </div>
+      <% end %>
+
+      <%!-- FA-010: Column Menu Dropdown --%>
+      <%= if @column_menu do %>
+        <div
+          class="lv-grid__column-menu"
+          style={"position:fixed;left:#{@column_menu.x}px;top:#{@column_menu.y}px;z-index:9999;"}
+          phx-click-away="close_column_menu"
+          phx-target={@myself}
+        >
+          <div class="lv-grid__column-menu-item" phx-click="column_menu_action" phx-value-action="sort_asc" phx-value-field={@column_menu.field} phx-target={@myself}>
+            <span>↑</span> 오름차순 정렬
+          </div>
+          <div class="lv-grid__column-menu-item" phx-click="column_menu_action" phx-value-action="sort_desc" phx-value-field={@column_menu.field} phx-target={@myself}>
+            <span>↓</span> 내림차순 정렬
+          </div>
+          <div class="lv-grid__column-menu-item" phx-click="column_menu_action" phx-value-action="clear_sort" phx-value-field={@column_menu.field} phx-target={@myself}>
+            <span>✕</span> 정렬 초기화
+          </div>
+          <div class="lv-grid__column-menu-divider"></div>
+          <div class="lv-grid__column-menu-item" phx-click="column_menu_action" phx-value-action="pin_left" phx-value-field={@column_menu.field} phx-target={@myself}>
+            <span>📌</span> 컬럼 고정
+          </div>
+          <div class="lv-grid__column-menu-item" phx-click="column_menu_action" phx-value-action="unpin" phx-value-field={@column_menu.field} phx-target={@myself}>
+            <span>📌</span> 고정 해제
+          </div>
+          <div class="lv-grid__column-menu-divider"></div>
+          <div class="lv-grid__column-menu-item" phx-click="column_menu_action" phx-value-action="hide_column" phx-value-field={@column_menu.field} phx-target={@myself}>
+            <span>👁</span> 컬럼 숨기기
           </div>
         </div>
       <% end %>

@@ -226,3 +226,93 @@
   color: var(--lv-grid-text-placeholder);
   font-weight: 700;
 }
+
+/* ========================================
+   4.9 FA-010: Column Menu
+   ======================================== */
+
+/* Column Menu Trigger (⋮) */
+.lv-grid__column-menu-trigger {
+  opacity: 0;
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  cursor: pointer;
+  padding: 2px 5px;
+  border: none;
+  background: var(--lv-grid-bg, #fff);
+  font-size: 14px;
+  line-height: 1;
+  border-radius: 3px;
+  color: var(--lv-grid-text-secondary, #666);
+  transition: opacity 0.15s ease;
+  z-index: 2;
+}
+
+.lv-grid__header-cell {
+  position: relative;
+}
+
+.lv-grid__header-cell:hover .lv-grid__column-menu-trigger {
+  opacity: 0.6;
+}
+
+.lv-grid__column-menu-trigger:hover {
+  opacity: 1 !important;
+  background: var(--lv-grid-hover, #f5f5f5);
+}
+
+/* Column Menu Dropdown */
+.lv-grid__column-menu {
+  min-width: 180px;
+  background: var(--lv-grid-bg, #fff);
+  border: 1px solid var(--lv-grid-border, #e0e0e0);
+  border-radius: 6px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  z-index: 9999;
+  padding: 4px 0;
+  font-size: 13px;
+}
+
+.lv-grid__column-menu-item {
+  padding: 8px 16px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--lv-grid-text, #333);
+  white-space: nowrap;
+}
+
+.lv-grid__column-menu-item:hover {
+  background: var(--lv-grid-hover, #f5f5f5);
+}
+
+.lv-grid__column-menu-item span {
+  width: 18px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.lv-grid__column-menu-divider {
+  height: 1px;
+  background: var(--lv-grid-border, #e0e0e0);
+  margin: 4px 0;
+}
+
+/* Dark mode */
+[data-theme="dark"] .lv-grid__column-menu-trigger {
+  background: var(--lv-grid-bg, #1e1e1e);
+  color: var(--lv-grid-text-secondary, #aaa);
+}
+
+[data-theme="dark"] .lv-grid__column-menu {
+  background: var(--lv-grid-bg, #1e1e1e);
+  border-color: var(--lv-grid-border, #3a3a3a);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+}
+
+[data-theme="dark"] .lv-grid__column-menu-item:hover {
+  background: var(--lv-grid-hover, #2a2a2a);
+}

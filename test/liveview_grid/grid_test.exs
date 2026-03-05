@@ -2190,4 +2190,105 @@ defmodule LiveViewGrid.GridTest do
       assert updated.data == grid.data
     end
   end
+
+  describe "unique_values/2 and set filter (FA-012)" do
+    setup do
+      data = [
+        %{id: 1, name: "Alice", city: "서울"},
+        %{id: 2, name: "Bob", city: "부산"},
+        %{id: 3, name: "Charlie", city: "서울"},
+        %{id: 4, name: "Dave", city: "대구"},
+        %{id: 5, name: "Eve", city: "부산"}
+      ]
+      columns = [
+        %{field: :name, label: "이름", filter_type: :text},
+        %{field: :city, label: "도시", filter_type: :set, filterable: true}
+      ]
+      grid = Grid.new(data: data, columns: columns)
+      %{grid: grid, data: data}
+    end
+
+    test "unique_values/2 returns sorted unique values", %{grid: grid} do
+      values = Grid.unique_values(grid, :city)
+      assert values == ["대구", "부산", "서울"]
+    end
+
+    test "set filter with selected values filters data", %{grid: grid} do
+      grid = put_in(grid.state.filters, %{city: ["서울"]})
+      result = Grid.visible_data(grid)
+      assert length(result) == 2
+      assert Enum.all?(result, fn row -> row.city == "서울" end)
+    end
+
+    test "set filter with empty list shows all data", %{grid: grid} do
+      grid = put_in(grid.state.filters, %{city: []})
+      result = Grid.visible_data(grid)
+      assert length(result) == 5
+    end
+
+    test "set filter with multiple values", %{grid: grid} do
+      grid = put_in(grid.state.filters, %{city: ["서울", "부산"]})
+      result = Grid.visible_data(grid)
+      assert length(result) == 4
+      cities = Enum.map(result, & &1.city) |> Enum.uniq() |> Enum.sort()
+      assert cities == ["부산", "서울"]
+    end
+
+    test "set filter combined with text filter", %{grid: grid} do
+      grid = put_in(grid.state.filters, %{city: ["서울"], name: "ali"})
+      result = Grid.visible_data(grid)
+      assert length(result) == 1
+      assert hd(result).name == "Alice"
+    end
+  end
+
+  describe "column menu functions (FA-010)" do
+    setup do
+      data = [
+        %{id: 1, name: "Alice", city: "서울"},
+        %{id: 2, name: "Bob", city: "부산"},
+        %{id: 3, name: "Charlie", city: "대구"},
+      ]
+
+      columns = [
+        %{field: :id, label: "ID"},
+        %{field: :name, label: "이름", sortable: true},
+        %{field: :city, label: "도시"},
+      ]
+
+      grid = Grid.new(data: data, columns: columns)
+      %{grid: grid}
+    end
+
+    test "hide_column sets suppress to true", %{grid: grid} do
+      grid = Grid.hide_column(grid, :city)
+      city_col = Enum.find(grid.columns, &(&1.field == :city))
+      assert city_col.suppress == true
+    end
+
+    test "show_column sets suppress to false", %{grid: grid} do
+      grid = grid |> Grid.hide_column(:city) |> Grid.show_column(:city)
+      city_col = Enum.find(grid.columns, &(&1.field == :city))
+      assert city_col.suppress == false
+    end
+
+    test "clear_sort resets sort state to nil", %{grid: grid} do
+      grid = put_in(grid.state.sort, %{field: :name, direction: :asc})
+      assert grid.state.sort != nil
+      grid = Grid.clear_sort(grid)
+      assert grid.state.sort == nil
+    end
+
+    test "hide and show column roundtrip", %{grid: grid} do
+      # hide_column → suppress: true
+      grid = Grid.hide_column(grid, :city)
+      city_col = Enum.find(grid.columns, &(&1.field == :city))
+      assert city_col.suppress == true
+
+      # show_column → suppress: false
+      grid = Grid.show_column(grid, :city)
+      city_col = Enum.find(grid.columns, &(&1.field == :city))
+      assert city_col.suppress == false
+    end
+  end
 end

@@ -49,7 +49,7 @@ mix docs
 open doc/index.html
 ```
 
-## ✨ Implemented Features (v0.1 ~ v0.12)
+## ✨ Implemented Features (v0.1 ~ v0.13)
 
 ### v0.1 - Core Grid
 - [x] Table rendering (LiveComponent-based)
@@ -132,21 +132,25 @@ open doc/index.html
 - [x] GridComponent refactoring (EventHandlers + RenderHelpers extraction)
 - [x] ExDoc documentation (@doc/@spec across all public modules)
 
-### v0.12.0 - Core UX Enhancement (Current)
+### v0.12.0 - Core UX Enhancement
 - [x] Row Pinning — Pin rows to top/bottom of grid (`Grid.pin_row/3`, `Grid.unpin_row/2`)
 - [x] Overlay System — Loading/No Data/Error overlay messages
 - [x] Status Bar — Bottom info bar (total rows, search results, filter status)
 - [x] Cell Text Selection — Allow drag-select text in cells (`user-select: text`)
 - [x] Column Resize Lock — Disable resize per column with `resizable: false` option
 
+### v0.13.0 - Filter Enhancement + Column Menu (Current)
+- [x] Set Filter (FA-012) — Unique value checkbox filter, Excel AutoFilter style (`filter_type: :set`)
+- [x] Column Menu (FA-010) — Header dropdown menu with sort/pin/hide actions (⋮ kebab trigger)
+
 ## 📊 Implementation Status
 
 | Item | Count |
 |------|-------|
-| Total Features | 67 |
-| Completed | 67 (100%) |
-| Versions Shipped | v0.1 ~ v0.12 |
-| Tests | 222 passing |
+| Total Features | 69 |
+| Completed | 69 (100%) |
+| Versions Shipped | v0.1 ~ v0.13 |
+| Tests | 231 passing |
 
 ## 🗺️ Roadmap (Not Yet Implemented)
 

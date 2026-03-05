@@ -638,6 +638,74 @@
 
 ---
 
+### 8. Set Filter (FA-012)
+
+**Status**: ✅ Complete | **Match Rate**: 100% (PASS)
+
+**Quick Info**:
+- Completion Date: 2026-03-05
+- Duration: 1 PDCA cycle (single-pass)
+- Iterations: 0 (exceeded 90% threshold on first implementation)
+- Match Rate: 100%
+- Production Ready: Yes
+
+**What was added**:
+- `:set` filter type in filter.ex (list/string value matching)
+- `Grid.unique_values/2` for extracting sorted unique column values
+- Set Filter dropdown UI (search + checkboxes + apply)
+- 7 event handlers for filter interaction
+- 5 unit tests
+
+**Key Documents**:
+- [Completion Report](set-filter.report.md)
+- [Gap Analysis](../03-analysis/features/set-filter.analysis.md)
+- [Design Document](../02-design/features/set-filter.design.md)
+- [Plan Document](../01-plan/features/set-filter.plan.md)
+
+**Statistics**:
+| Metric | Value |
+|--------|-------|
+| Match Rate | 100% |
+| Files Modified | 7 |
+| Tests Added | 5 |
+| All Tests | 227/227 passing |
+
+---
+
+### 9. Column Menu (FA-010)
+
+**Status**: ✅ Complete | **Match Rate**: 100% (PASS)
+
+**Quick Info**:
+- Completion Date: 2026-03-05
+- Duration: 1 PDCA cycle (single-pass)
+- Iterations: 0 (exceeded 90% threshold on first implementation)
+- Match Rate: 100%
+- Production Ready: Yes
+
+**What was added**:
+- `hide_column/2`, `show_column/2`, `clear_sort/1` in grid.ex
+- ⋮ kebab trigger icon on header cells (hover transition)
+- Column Menu dropdown (position:fixed) with 7 menu items
+- ColumnMenuTrigger JS Hook for coordinate tracking
+- 4 unit tests
+
+**Key Documents**:
+- [Completion Report](column-menu.report.md)
+- [Gap Analysis](../03-analysis/features/column-menu.analysis.md)
+- [Design Document](../02-design/features/column-menu.design.md)
+- [Plan Document](../01-plan/features/column-menu.plan.md)
+
+**Statistics**:
+| Metric | Value |
+|--------|-------|
+| Match Rate | 100% |
+| Files Modified | 6 |
+| Tests Added | 4 |
+| All Tests | 231/231 passing |
+
+---
+
 ## In Progress Features
 
 (None currently)
@@ -816,12 +884,12 @@ For questions about specific features or PDCA process:
 
 | Item | Value |
 |------|-------|
-| Last Updated | 2026-03-01 |
-| Report Count | 11 |
-| Completed Features | 9 |
+| Last Updated | 2026-03-05 |
+| Report Count | 13 |
+| Completed Features | 11 |
 | Bug Fixes | 2 |
 | In Progress | 0 |
-| Total PDCA Cycles | 11 |
+| Total PDCA Cycles | 13 |
 
 ---
 

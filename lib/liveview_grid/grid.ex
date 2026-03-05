@@ -243,6 +243,51 @@ defmodule LiveViewGrid.Grid do
     |> Enum.sort_by(fn row -> Enum.find_index(pinned_bottom, &(&1 == row.id)) end)
   end
 
+  # ── FA-012: Set Filter ──
+
+  @doc """
+  컬럼의 고유값 목록을 추출합니다. Set Filter 드롭다운 체크박스 목록 생성용.
+  """
+  @spec unique_values(t(), atom()) :: list(String.t())
+  def unique_values(%{data: data}, field) do
+    data
+    |> Enum.map(fn row -> Map.get(row, field) end)
+    |> Enum.reject(&is_nil/1)
+    |> Enum.map(&to_string/1)
+    |> Enum.uniq()
+    |> Enum.sort()
+  end
+
+  # ── FA-010: Column Menu ──
+
+  @doc "컬럼을 숨깁니다 (suppress: true)."
+  @spec hide_column(t(), atom()) :: t()
+  def hide_column(%{columns: columns} = grid, field) do
+    columns =
+      Enum.map(columns, fn col ->
+        if col.field == field, do: Map.put(col, :suppress, true), else: col
+      end)
+
+    %{grid | columns: columns}
+  end
+
+  @doc "숨긴 컬럼을 다시 표시합니다 (suppress: false)."
+  @spec show_column(t(), atom()) :: t()
+  def show_column(%{columns: columns} = grid, field) do
+    columns =
+      Enum.map(columns, fn col ->
+        if col.field == field, do: Map.put(col, :suppress, false), else: col
+      end)
+
+    %{grid | columns: columns}
+  end
+
+  @doc "정렬을 초기화합니다."
+  @spec clear_sort(t()) :: t()
+  def clear_sort(grid) do
+    put_in(grid.state.sort, nil)
+  end
+
   @doc """
   컬럼 표시 순서를 변경합니다. order는 field atom 리스트.
   """

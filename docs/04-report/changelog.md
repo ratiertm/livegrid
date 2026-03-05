@@ -4,7 +4,66 @@
 >
 > **Project**: LiveView Grid - Phoenix LiveView 기반 상용 그리드 컴포넌트
 > **Created**: 2026-02-21
-> **Last Updated**: 2026-03-01
+> **Last Updated**: 2026-03-05
+
+---
+
+## [0.13.0] - 2026-03-05
+
+### v0.13.0 - Filter Enhancement + Column Menu
+
+**Status**: Complete (100% Design Match Rate - PASS - Two Features, Zero Iterations)
+
+**Added**:
+- FA-012 Set Filter: `:set` filter type for checkbox-based value selection (Excel AutoFilter style)
+- FA-012: `Grid.unique_values/2` function for extracting sorted unique column values
+- FA-012: Set Filter dropdown UI with search input, checkboxes (select all/clear all), and apply button
+- FA-012: 7 event handlers for Set Filter interaction (toggle, close, search, toggle_value, select_all, clear_all, apply)
+- FA-012: Both list and comma-separated string value matching in filter.ex
+- FA-010 Column Menu: ⋮ kebab trigger icon on header cells with hover opacity transition
+- FA-010: Column Menu dropdown (position:fixed) with 7 menu items (sort asc/desc, clear sort, pin left, unpin, hide column)
+- FA-010: `hide_column/2`, `show_column/2`, `clear_sort/1` functions in grid.ex
+- FA-010: ColumnMenuTrigger JS Hook for accurate coordinate tracking via `getBoundingClientRect()`
+- FA-010: Column Menu CSS with dark mode support (Section 4.9 in header.css)
+- 9 new unit tests (5 for Set Filter + 4 for Column Menu)
+
+**Changed**:
+- filter.ex: Added `:set` filter type matching with list and string value support
+- grid_component.ex: Filter row uses `cond do` block for set/date/text filter types
+- grid_component.ex: Header cells include ⋮ trigger with `phx-hook="ColumnMenuTrigger"`
+- grid_component.ex: Header label wrapped in `<span class="lv-grid__header-label">`
+- event_handlers.ex: 10 new handler delegations (7 Set Filter + 3 Column Menu)
+- app.js: Added ColumnMenuTrigger to Hooks registry
+- body.css: Added `.lv-grid__filter-cell:has(.lv-grid__set-filter) { overflow: visible; }` fix
+
+**Fixed**:
+- Set Filter dropdown clipped by parent overflow:hidden → CSS `:has()` selector fix
+- Column Menu appearing at (0,0) → JS Hook with `getBoundingClientRect()` for proper positioning
+- Menu closes on outside click via `phx-click-away`
+
+**PDCA Details**:
+- FA-012 Plan: [set-filter.plan.md](../01-plan/features/set-filter.plan.md)
+- FA-012 Design: [set-filter.design.md](../02-design/features/set-filter.design.md)
+- FA-012 Analysis: [set-filter.analysis.md](../03-analysis/features/set-filter.analysis.md)
+- FA-012 Report: [set-filter.report.md](features/set-filter.report.md)
+- FA-010 Plan: [column-menu.plan.md](../01-plan/features/column-menu.plan.md)
+- FA-010 Design: [column-menu.design.md](../02-design/features/column-menu.design.md)
+- FA-010 Analysis: [column-menu.analysis.md](../03-analysis/features/column-menu.analysis.md)
+- FA-010 Report: [column-menu.report.md](features/column-menu.report.md)
+
+**Metrics**:
+- Duration: 1 session, 2 PDCA cycles (both single-pass)
+- Iterations: 0 (both features exceeded 90% threshold on first implementation)
+- Files Modified: 13 total (7 for FA-012, 6 for FA-010)
+- Tests Added: 9 (5 + 4)
+- Match Rate: 100% for both features
+- Test Coverage: 231/231 passing
+- Backwards Compatibility: 100%
+- Deployment Status: Production Ready
+
+**Browser Verified (Chrome MCP)**:
+- FA-012: Filter toggle → ▼ button → dropdown with checkboxes → select/apply → 11 rows filtered ✅
+- FA-010: Header hover → ⋮ icon → click → dropdown at correct position → sort action works ✅
 
 ---
 
@@ -670,16 +729,18 @@
 
 | Feature | ID | Status | Match Rate | Files | Tests | Date |
 |---------|-----|--------|-----------|-------|-------|------|
+| Set Filter | FA-012 | Complete | 100% | 7 modified | 231/231 | 2026-03-05 |
+| Column Menu | FA-010 | Complete | 100% | 6 modified | 231/231 | 2026-03-05 |
 | Custom Cell Renderer | F-300 | Complete | 92% | 5 modified, 1 new | 161/161 | 2026-02-21 |
 
 ### Total Project Metrics
 
 | Metric | Value |
 |--------|-------|
-| Completed Features | 1 |
+| Completed Features | 13 |
 | In Progress Features | 0 |
-| Design Match Rate (avg) | 92% |
-| Total Tests Passing | 161 |
+| Design Match Rate (avg) | 96% |
+| Total Tests Passing | 231 |
 | Code Quality | High |
 | Production Ready | Yes |
 
@@ -703,6 +764,7 @@ For each feature completion, use the following sections:
 
 | Version | Date | Release Type | Features | Status |
 |---------|------|-------------|----------|--------|
+| 0.13.0 | 2026-03-05 | Feature | Set Filter (FA-012) + Column Menu (FA-010) | Released |
 | 0.5.0 | 2026-02-21 | Feature | Custom Renderer (F-300) | Released |
 | 0.4.x | Earlier | Bugfix | Various fixes | Released |
 | 0.3.x | Earlier | Feature | Validation (F-200) | Released |

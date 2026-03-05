@@ -254,6 +254,21 @@ defmodule LiveViewGrid.Filter do
     end
   end
 
+  # FA-012: Set Filter (리스트 형태 값)
+  defp match_filter?(row, field, value, :set) when is_list(value) do
+    if value == [] do
+      true
+    else
+      cell_value = Map.get(row, field) |> to_string()
+      cell_value in Enum.map(value, &to_string/1)
+    end
+  end
+
+  defp match_filter?(row, field, value, :set) when is_binary(value) do
+    selected = value |> String.split(",") |> Enum.map(&String.trim/1) |> Enum.reject(&(&1 == ""))
+    if selected == [], do: true, else: to_string(Map.get(row, field)) in selected
+  end
+
   defp match_filter?(row, field, value, _unknown_type) do
     match_filter?(row, field, value, :text)
   end
