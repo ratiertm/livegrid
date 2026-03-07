@@ -189,6 +189,46 @@
   cursor: not-allowed;
 }
 
+/* F-961: Tree Expand/Collapse Controls */
+.lv-grid__tree-controls {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.lv-grid__tree-btn {
+  padding: 4px 8px;
+  border: 1px solid var(--lv-grid-border);
+  border-radius: 4px;
+  background: var(--lv-grid-bg);
+  color: var(--lv-grid-text);
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.lv-grid__tree-btn:hover {
+  background: var(--lv-grid-primary-light, #e3f2fd);
+  border-color: var(--lv-grid-primary, #1976d2);
+  color: var(--lv-grid-primary, #1976d2);
+}
+
+.lv-grid__tree-btn--active {
+  background: var(--lv-grid-primary, #1976d2);
+  border-color: var(--lv-grid-primary, #1976d2);
+  color: white;
+}
+
+.lv-grid__tree-level-select {
+  padding: 4px 6px;
+  border: 1px solid var(--lv-grid-border);
+  border-radius: 4px;
+  background: var(--lv-grid-bg);
+  color: var(--lv-grid-text);
+  font-size: 12px;
+  cursor: pointer;
+}
+
 /* 6.5 Validation Error Styles */
 .lv-grid__cell-value--error {
   background: var(--lv-grid-danger-light);

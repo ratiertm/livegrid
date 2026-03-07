@@ -1097,6 +1097,28 @@ defmodule LiveviewGridWeb.GridComponent.EventHandlers do
     {:noreply, assign(socket, grid: updated_grid)}
   end
 
+  @doc """
+  그룹 소계 표시를 토글한다.
+  """
+  @spec handle_toggle_subtotals(params :: map(), socket :: Phoenix.LiveView.Socket.t()) ::
+          {:noreply, Phoenix.LiveView.Socket.t()}
+  def handle_toggle_subtotals(_params, socket) do
+    grid = socket.assigns.grid
+    updated_grid = Grid.toggle_group_subtotals(grid)
+    {:noreply, assign(socket, grid: updated_grid)}
+  end
+
+  @doc """
+  총계 행 표시를 토글한다.
+  """
+  @spec handle_toggle_grand_total(params :: map(), socket :: Phoenix.LiveView.Socket.t()) ::
+          {:noreply, Phoenix.LiveView.Socket.t()}
+  def handle_toggle_grand_total(_params, socket) do
+    grid = socket.assigns.grid
+    updated_grid = Grid.toggle_group_grand_total(grid)
+    {:noreply, assign(socket, grid: updated_grid)}
+  end
+
   # ── Tree Grid (v0.7) ──
 
   @doc """
@@ -1120,6 +1142,35 @@ defmodule LiveviewGridWeb.GridComponent.EventHandlers do
     grid = socket.assigns.grid
     node_id = String.to_integer(node_id_str)
     updated_grid = Grid.toggle_tree_node(grid, node_id)
+    {:noreply, assign(socket, grid: updated_grid)}
+  end
+
+  @doc "트리 전체 노드를 펼친다."
+  @spec handle_tree_expand_all(map(), Phoenix.LiveView.Socket.t()) ::
+          {:noreply, Phoenix.LiveView.Socket.t()}
+  def handle_tree_expand_all(_params, socket) do
+    grid = socket.assigns.grid
+    updated_grid = Grid.expand_all_tree_nodes(grid)
+    {:noreply, assign(socket, grid: updated_grid)}
+  end
+
+  @doc "트리 전체 노드를 접는다."
+  @spec handle_tree_collapse_all(map(), Phoenix.LiveView.Socket.t()) ::
+          {:noreply, Phoenix.LiveView.Socket.t()}
+  def handle_tree_collapse_all(_params, socket) do
+    grid = socket.assigns.grid
+    updated_grid = Grid.collapse_all_tree_nodes(grid)
+    {:noreply, assign(socket, grid: updated_grid)}
+  end
+
+  @doc "트리를 특정 레벨까지 펼친다."
+  @spec handle_tree_expand_to_level(map(), Phoenix.LiveView.Socket.t()) ::
+          {:noreply, Phoenix.LiveView.Socket.t()}
+  def handle_tree_expand_to_level(params, socket) do
+    level_str = params["level"] || params["value"] || "0"
+    grid = socket.assigns.grid
+    level = String.to_integer(level_str)
+    updated_grid = Grid.expand_tree_to_level(grid, level)
     {:noreply, assign(socket, grid: updated_grid)}
   end
 
@@ -1452,6 +1503,40 @@ defmodule LiveviewGridWeb.GridComponent.EventHandlers do
     |> Enum.find_value(0, fn {col, idx} -> if col.editable, do: idx end)
   end
 
+  # ── FA-013: Cell Fill Handle ──
+
+  @doc """
+  셀 자동채우기를 처리한다. 소스 셀의 값을 대상 행들의 같은 필드에 복사한다.
+  """
+  @spec handle_cell_fill(params :: map(), socket :: Phoenix.LiveView.Socket.t()) ::
+          {:noreply, Phoenix.LiveView.Socket.t()}
+  def handle_cell_fill(%{"source_row_id" => source_row_id_str, "field" => field_str, "target_row_ids" => target_row_ids_str}, socket) do
+    grid = socket.assigns.grid
+    source_row_id = parse_row_id(source_row_id_str, grid)
+    field = String.to_existing_atom(field_str)
+
+    target_row_ids = Enum.map(target_row_ids_str, fn id_str ->
+      parse_row_id(id_str, grid)
+    end) |> Enum.reject(&is_nil/1)
+
+    source_row = Enum.find(grid.data, fn r -> r.id == source_row_id end)
+
+    if source_row && target_row_ids != [] do
+      source_value = Map.get(source_row, field)
+
+      updated_grid = Enum.reduce(target_row_ids, grid, fn row_id, acc ->
+        acc
+        |> Grid.update_cell(row_id, field, source_value)
+        |> Grid.validate_cell(row_id, field)
+      end)
+
+      send(self(), {:grid_cell_fill_completed, %{field: field, count: length(target_row_ids)}})
+      {:noreply, assign(socket, grid: updated_grid)}
+    else
+      {:noreply, socket}
+    end
+  end
+
   @doc """
   선택된 셀 범위의 데이터를 탭/줄바꿈 구분 텍스트로 클립보드에 복사한다.
   """
@@ -1497,5 +1582,17 @@ defmodule LiveviewGridWeb.GridComponent.EventHandlers do
           {:noreply, socket}
         end
     end
+  end
+
+  # ── FA-014: Master-Detail ──
+
+  @doc "디테일 행 확장/축소를 토글한다."
+  @spec handle_toggle_detail(params :: map(), socket :: Phoenix.LiveView.Socket.t()) ::
+          {:noreply, Phoenix.LiveView.Socket.t()}
+  def handle_toggle_detail(%{"row-id" => row_id_str}, socket) do
+    grid = socket.assigns.grid
+    row_id = parse_row_id(row_id_str, grid)
+    updated_grid = Grid.toggle_detail_row(grid, row_id)
+    {:noreply, assign(socket, grid: updated_grid)}
   end
 end

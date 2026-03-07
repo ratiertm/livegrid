@@ -38,14 +38,32 @@ defmodule LiveViewGrid.Grouping do
   ]
   ```
   """
-  @spec group_data(list(map()), list(atom()), map(), map()) :: list(map())
-  def group_data(data, [], _expanded, _aggregates), do: data
-  def group_data(data, group_by, expanded, aggregates) do
-    do_group(data, group_by, expanded, aggregates, 0, [])
+  @spec group_data(list(map()), list(atom()), map(), map(), keyword()) :: list(map())
+  def group_data(data, group_by, expanded, aggregates, opts \\ [])
+  def group_data(data, [], _expanded, _aggregates, _opts), do: data
+  def group_data(data, group_by, expanded, aggregates, opts) do
+    show_subtotals = Keyword.get(opts, :subtotals, false)
+    show_grand_total = Keyword.get(opts, :grand_total, false)
+
+    rows = do_group(data, group_by, expanded, aggregates, 0, [], show_subtotals)
+
+    if show_grand_total and aggregates != %{} do
+      grand_total = %{
+        _row_type: :grand_total,
+        _group_key: "__grand_total__",
+        _group_value: "총계",
+        _group_count: length(data),
+        _group_depth: 0,
+        _group_aggregates: compute_aggregates(data, aggregates)
+      }
+      rows ++ [grand_total]
+    else
+      rows
+    end
   end
 
-  defp do_group(data, [], _expanded, _aggregates, _depth, _parent_keys), do: data
-  defp do_group(data, [field | rest_fields], expanded, aggregates, depth, parent_keys) do
+  defp do_group(data, [], _expanded, _aggregates, _depth, _parent_keys, _subtotals), do: data
+  defp do_group(data, [field | rest_fields], expanded, aggregates, depth, parent_keys, show_subtotals) do
     data
     |> Enum.group_by(&Map.get(&1, field))
     |> Enum.sort_by(fn {key, _} -> to_string(key) end)
@@ -67,11 +85,25 @@ defmodule LiveViewGrid.Grouping do
 
       if is_expanded do
         child_rows = if rest_fields != [] do
-          do_group(rows, rest_fields, expanded, aggregates, depth + 1, group_key)
+          do_group(rows, rest_fields, expanded, aggregates, depth + 1, group_key, show_subtotals)
         else
           rows
         end
-        [header | child_rows]
+
+        if show_subtotals and aggregates != %{} do
+          subtotal = %{
+            _row_type: :subtotal,
+            _group_key: "subtotal_" <> key_string,
+            _group_field: field,
+            _group_value: "#{value} 소계",
+            _group_count: length(rows),
+            _group_depth: depth,
+            _group_aggregates: compute_aggregates(rows, aggregates)
+          }
+          [header | child_rows] ++ [subtotal]
+        else
+          [header | child_rows]
+        end
       else
         [header]
       end

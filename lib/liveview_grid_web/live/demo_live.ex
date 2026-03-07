@@ -517,6 +517,21 @@ defmodule LiveviewGridWeb.DemoLive do
   end
 
   @impl true
+  def handle_info({:grid_cell_fill_completed, _info}, socket) do
+    {:noreply, socket}
+  end
+
+  @impl true
+  def handle_info({:grid_import_completed, _count}, socket) do
+    {:noreply, socket}
+  end
+
+  @impl true
+  def handle_info({:grid_paste_completed, _count}, socket) do
+    {:noreply, socket}
+  end
+
+  @impl true
   def handle_info(%Phoenix.Socket.Broadcast{event: "presence_diff"}, socket) do
     online_users = LiveViewGrid.GridPresence.user_count(@grid_id)
     {:noreply, assign(socket, online_users: online_users)}
@@ -805,7 +820,8 @@ defmodule LiveviewGridWeb.DemoLive do
             merge_regions: [
               %{row_id: 1, col_field: :name, colspan: 2},
               %{row_id: 3, col_field: :age, rowspan: 2}
-            ]
+            ],
+            master_detail: true
           }}
         />
         
