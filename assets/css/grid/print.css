@@ -1,0 +1,163 @@
+/* ========================================
+   LiveView Grid - Print Styles (FA-018)
+   @media print 기반 인쇄 최적화
+   ======================================== */
+
+@media print {
+  /* Hide non-essential UI elements */
+  .lv-grid__toolbar,
+  .lv-grid__pagination,
+  .lv-grid__fill-handle,
+  .lv-grid__detail-toggle,
+  .lv-grid__row-edit-btn,
+  .lv-grid__row-drag-handle,
+  .lv-grid__tree-controls,
+  .lv-grid__context-menu,
+  .lv-grid__config-modal,
+  .lv-grid__cell input[type="checkbox"],
+  .lv-grid__row-edit-save,
+  .lv-grid__row-edit-cancel {
+    display: none !important;
+  }
+
+  /* Grid container: remove overflow and max-height for full content */
+  .lv-grid {
+    overflow: visible !important;
+    max-height: none !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+  }
+
+  .lv-grid__body {
+    overflow: visible !important;
+    max-height: none !important;
+    height: auto !important;
+  }
+
+  /* Remove virtual scroll fixed height */
+  .lv-grid__virtual-wrapper {
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  .lv-grid__virtual-content {
+    transform: none !important;
+    position: static !important;
+  }
+
+  /* Rows: clean borders for print */
+  .lv-grid__row {
+    page-break-inside: avoid;
+    border-bottom: 1px solid #ccc;
+  }
+
+  /* Header: repeat on each page */
+  .lv-grid__header {
+    display: table-header-group;
+  }
+
+  .lv-grid__header-row {
+    border-bottom: 2px solid #333;
+  }
+
+  .lv-grid__header-cell {
+    font-weight: 700;
+    background: #f5f5f5 !important;
+    cursor: default !important;
+  }
+
+  /* Remove hover/selection styles */
+  .lv-grid__row:hover,
+  .lv-grid__row--selected {
+    background: transparent !important;
+    box-shadow: none !important;
+  }
+
+  /* Cell styling for print */
+  .lv-grid__cell {
+    border-right: 1px solid #ddd;
+    color: #000 !important;
+    background: #fff !important;
+  }
+
+  /* Frozen column styles reset for print */
+  .lv-grid__cell--frozen,
+  .lv-grid__header-cell--frozen {
+    position: static !important;
+    left: auto !important;
+    z-index: auto !important;
+    box-shadow: none !important;
+  }
+
+  /* Status column: print-friendly */
+  .lv-grid__cell--status .lv-grid__status-badge {
+    border: 1px solid #999;
+  }
+
+  /* Detail panel: clean print */
+  .lv-grid__detail-panel {
+    border-left: 2px solid #333;
+    animation: none !important;
+  }
+
+  /* Summary row: visible border */
+  .lv-grid__summary-row {
+    border-top: 2px solid #333;
+    font-weight: 700;
+  }
+
+  /* Group/subtotal rows */
+  .lv-grid__row--subtotal,
+  .lv-grid__row--grand_total {
+    background: #f0f0f0 !important;
+    font-weight: 700;
+  }
+
+  /* Renderer adjustments for print */
+  .lv-grid__badge {
+    border: 1px solid #999;
+    background: #f5f5f5 !important;
+    color: #000 !important;
+  }
+
+  .lv-grid__progress-bar {
+    border: 1px solid #999;
+  }
+
+  /* Links: show URL */
+  .lv-grid__link::after {
+    content: " (" attr(href) ")";
+    font-size: 10px;
+    color: #666;
+  }
+
+  /* Page break settings */
+  .lv-grid__header-group-row {
+    page-break-after: avoid;
+  }
+
+  /* Ensure the grid takes full width */
+  .lv-grid {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+}
+
+/* Print button in toolbar (visible only on screen) */
+.lv-grid__print-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border: 1px solid var(--lv-grid-border, #e0e0e0);
+  border-radius: 4px;
+  background: var(--lv-grid-bg, #fff);
+  color: var(--lv-grid-text, #333);
+  cursor: pointer;
+  font-size: var(--lv-grid-font-size-sm, 13px);
+  transition: background 0.15s;
+}
+
+.lv-grid__print-btn:hover {
+  background: var(--lv-grid-hover, #f5f5f5);
+}

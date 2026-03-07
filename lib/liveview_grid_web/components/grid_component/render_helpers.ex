@@ -168,7 +168,7 @@ defmodule LiveviewGridWeb.GridComponent.RenderHelpers do
           [{map(), non_neg_integer() | nil}]
   def with_row_numbers(rows, offset) do
     {result, _} = Enum.reduce(rows, {[], 0}, fn row, {acc, data_idx} ->
-      if Map.get(row, :_row_type) == :group_header do
+      if Map.get(row, :_row_type) in [:group_header, :subtotal, :grand_total] do
         {[{row, nil} | acc], data_idx}
       else
         {[{row, offset + data_idx + 1} | acc], data_idx + 1}
@@ -201,6 +201,13 @@ defmodule LiveviewGridWeb.GridComponent.RenderHelpers do
   def next_direction(%{field: sort_field, direction: :asc}, field) when sort_field == field, do: "desc"
   def next_direction(%{field: sort_field, direction: :desc}, field) when sort_field == field, do: "asc"
   def next_direction(_sort, _field), do: "asc"
+
+  @doc "ARIA sort 속성 값을 반환한다."
+  @spec aria_sort_value(sort :: map() | nil, field :: atom()) :: String.t()
+  def aria_sort_value(nil, _field), do: "none"
+  def aria_sort_value(%{field: sort_field, direction: :asc}, field) when sort_field == field, do: "ascending"
+  def aria_sort_value(%{field: sort_field, direction: :desc}, field) when sort_field == field, do: "descending"
+  def aria_sort_value(_sort, _field), do: "none"
 
   # ── Filter ──
 

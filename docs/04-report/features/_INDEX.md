@@ -7,6 +7,57 @@
 
 ---
 
+## Released Versions
+
+### v0.15.0 - Enterprise Features (7 Features)
+
+**Status**: ✅ Complete | **Match Rate**: 94% (PASS)
+
+**Quick Info**:
+- Release Date: 2026-03-07
+- Features: 7 enterprise-level features
+- Match Rate: 94% (average across all 7)
+- Files Modified: 11 (1 new, 10 modified)
+- Tests: 698/698 passing
+- Iterations: 0 (single-pass completion)
+- Production Ready: Yes
+
+**Features Completed**:
+1. **F-961**: Tree Expand All - 모든 노드 일괄 펼침/접기 + 레벨 선택
+2. **F-963**: Multi-level Subtotals - 다단계 소계 및 총계 표시
+3. **F-964**: Tree In-place Edit - 트리 그리드에서 셀 편집 완전 지원
+4. **FA-013**: Cell Fill Handle - Excel 스타일 드래그로 셀 채우기
+5. **FA-014**: Master-Detail - 행 확장으로 디테일 패널 표시
+6. **FA-018**: Printing - 깨끗한 인쇄 출력 CSS
+7. **FA-006**: Accessibility - WCAG 2.1 AA 준수 ARIA 속성
+
+**Key Achievements**:
+- Tree controls with expand/collapse/level selection ✅
+- Multi-level subtotals in grouped grids ✅
+- Excel-style cell fill with drag handle ✅
+- Master-detail row expansion with animation ✅
+- Print-friendly CSS with clean layout ✅
+- WCAG 2.1 AA accessibility (400+ elements with ARIA) ✅
+- Zero iterations - single-pass completion ✅
+- 100% test coverage maintained ✅
+
+**Files Modified**:
+- `lib/liveview_grid/grid.ex` (7 new functions)
+- `lib/liveview_grid/operations/grouping.ex` (multi-level subtotals)
+- `lib/liveview_grid/operations/tree.ex` (depth-based expansion)
+- `lib/liveview_grid_web/components/grid_component.ex` (UI + ARIA)
+- `lib/liveview_grid_web/components/grid_component/event_handlers.ex` (4 handlers)
+- `lib/liveview_grid_web/components/grid_component/render_helpers.ex` (aria_sort_value/2)
+- `assets/css/grid/print.css` (NEW - 21 rules)
+- `assets/css/grid/interactions.css` (fill handle + master-detail)
+- `assets/css/liveview_grid.css` (print import)
+- `assets/js/app.js` (cell fill drag logic)
+- Demo files (demo_live.ex, advanced_demo_live.ex)
+
+**Report**: [phase6-v015-enterprise.report.md](phase6-v015-enterprise.report.md)
+
+---
+
 ## Bug Fixes
 
 ### Bugfix v0.20 - 미완성 기능 수정

@@ -609,6 +609,20 @@ defmodule LiveViewGrid.Grid do
     put_in(grid.state.group_expanded, updated)
   end
 
+  @doc "그룹 소계 표시를 토글합니다."
+  @spec toggle_group_subtotals(grid :: t()) :: t()
+  def toggle_group_subtotals(grid) do
+    current = Map.get(grid.state, :group_subtotals, false)
+    put_in(grid.state[:group_subtotals], !current)
+  end
+
+  @doc "총계 행 표시를 토글합니다."
+  @spec toggle_group_grand_total(grid :: t()) :: t()
+  def toggle_group_grand_total(grid) do
+    current = Map.get(grid.state, :group_grand_total, false)
+    put_in(grid.state[:group_grand_total], !current)
+  end
+
   # ── v0.7: Tree Grid API ──
 
   @doc "트리 모드를 설정합니다."
@@ -625,6 +639,51 @@ defmodule LiveViewGrid.Grid do
   def toggle_tree_node(grid, node_id) do
     updated = Tree.toggle_node(grid.state.tree_expanded, node_id)
     put_in(grid.state.tree_expanded, updated)
+  end
+
+  @doc "트리 모든 노드를 펼칩니다."
+  @spec expand_all_tree_nodes(grid :: t()) :: t()
+  def expand_all_tree_nodes(grid) do
+    parent_field = grid.state[:tree_parent_field] || :parent_id
+    expanded = Tree.expand_all(grid.data, parent_field)
+    put_in(grid.state.tree_expanded, expanded)
+  end
+
+  @doc "트리 모든 노드를 접습니다."
+  @spec collapse_all_tree_nodes(grid :: t()) :: t()
+  def collapse_all_tree_nodes(grid) do
+    parent_field = grid.state[:tree_parent_field] || :parent_id
+    expanded = Tree.collapse_all(grid.data, parent_field)
+    put_in(grid.state.tree_expanded, expanded)
+  end
+
+  @doc "트리를 특정 레벨까지 펼칩니다."
+  @spec expand_tree_to_level(grid :: t(), level :: non_neg_integer()) :: t()
+  def expand_tree_to_level(grid, level) do
+    parent_field = grid.state[:tree_parent_field] || :parent_id
+    expanded = Tree.expand_to_level(grid.data, level, parent_field)
+    put_in(grid.state.tree_expanded, expanded)
+  end
+
+  # ── FA-014: Master-Detail API ──
+
+  @doc "디테일 행의 확장/축소를 토글합니다."
+  @spec toggle_detail_row(grid :: t(), row_id :: any()) :: t()
+  def toggle_detail_row(grid, row_id) do
+    expanded = grid.state.detail_expanded_rows
+
+    updated =
+      if MapSet.member?(expanded, row_id),
+        do: MapSet.delete(expanded, row_id),
+        else: MapSet.put(expanded, row_id)
+
+    put_in(grid.state.detail_expanded_rows, updated)
+  end
+
+  @doc "디테일 행이 확장 상태인지 확인합니다."
+  @spec detail_expanded?(grid :: t(), row_id :: any()) :: boolean()
+  def detail_expanded?(grid, row_id) do
+    MapSet.member?(grid.state.detail_expanded_rows, row_id)
   end
 
   # ── v0.7: Pivot Table API ──
@@ -1036,7 +1095,10 @@ defmodule LiveViewGrid.Grid do
       theme: "light",
       show_row_number: false,
       show_summary: false,
-      autofit_type: :none
+      autofit_type: :none,
+      # FA-014: Master-Detail
+      master_detail: false,
+      detail_renderer: nil
     }
   end
 
@@ -1400,7 +1462,9 @@ defmodule LiveViewGrid.Grid do
       # F-904: Cell Merge
       merge_regions: %{},
       # Per-row Heights (extendsizetype)
-      row_heights: %{}
+      row_heights: %{},
+      # FA-014: Master-Detail
+      detail_expanded_rows: MapSet.new()
     }
   end
 
@@ -1508,9 +1572,13 @@ defmodule LiveViewGrid.Grid do
   end
 
   # v0.7: Grouping / Tree 구조화 적용
-  defp apply_data_structuring(data, %{group_by: group_by, group_expanded: expanded, group_aggregates: aggregates})
+  defp apply_data_structuring(data, %{group_by: group_by, group_expanded: expanded, group_aggregates: aggregates} = state)
        when is_list(group_by) and length(group_by) > 0 do
-    Grouping.group_data(data, group_by, expanded, aggregates)
+    opts = [
+      subtotals: Map.get(state, :group_subtotals, false),
+      grand_total: Map.get(state, :group_grand_total, false)
+    ]
+    Grouping.group_data(data, group_by, expanded, aggregates, opts)
   end
   defp apply_data_structuring(data, %{tree_mode: true, tree_parent_field: parent_field, tree_expanded: expanded}) do
     Tree.build_tree(data, parent_field, expanded)

@@ -67,3 +67,102 @@
 .lv-grid__header-cell[data-frozen="false"]:active {
   cursor: grabbing;
 }
+
+/* ── Section 14: Cell Fill Handle (FA-013) ── */
+
+/* Fill handle: small square at bottom-right corner of editable cells */
+.lv-grid__fill-handle {
+  position: absolute;
+  right: -3px;
+  bottom: -3px;
+  width: 7px;
+  height: 7px;
+  background: var(--lv-grid-primary, #1976d2);
+  border: 1px solid var(--lv-grid-bg, #fff);
+  cursor: crosshair;
+  z-index: 5;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+/* Show fill handle on cell hover */
+.lv-grid__cell:hover > .lv-grid__fill-handle {
+  opacity: 1;
+}
+
+/* Cell needs relative positioning for fill handle */
+.lv-grid__cell {
+  position: relative;
+}
+
+/* Fill target highlight: cells being dragged over */
+.lv-grid__cell--fill-target {
+  background: rgba(25, 118, 210, 0.12) !important;
+  outline: 2px dashed var(--lv-grid-primary, #1976d2);
+  outline-offset: -2px;
+}
+
+/* Body cursor during fill drag */
+.lv-grid--fill-dragging {
+  cursor: crosshair !important;
+  user-select: none;
+}
+
+.lv-grid--fill-dragging * {
+  cursor: crosshair !important;
+}
+
+/* ── Section 15: Master-Detail (FA-014) ── */
+
+/* Detail toggle button */
+.lv-grid__detail-toggle {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0 2px;
+  font-size: 11px;
+  color: var(--lv-grid-text-secondary, #666);
+  line-height: 1;
+}
+
+.lv-grid__detail-toggle:hover {
+  color: var(--lv-grid-primary, #1976d2);
+}
+
+/* Detail panel: full-width row below the data row */
+.lv-grid__detail-panel {
+  width: 100%;
+  background: var(--lv-grid-bg-secondary, #fafafa);
+  border-bottom: 2px solid var(--lv-grid-primary, #1976d2);
+  border-left: 3px solid var(--lv-grid-primary, #1976d2);
+  animation: lv-grid-detail-expand 0.2s ease-out;
+}
+
+@keyframes lv-grid-detail-expand {
+  from { opacity: 0; max-height: 0; }
+  to { opacity: 1; max-height: 500px; }
+}
+
+.lv-grid__detail-content {
+  padding: 12px 16px 12px 40px;
+}
+
+/* Default detail: key-value table */
+.lv-grid__detail-table {
+  border-collapse: collapse;
+  font-size: var(--lv-grid-font-size-sm, 13px);
+}
+
+.lv-grid__detail-th {
+  text-align: left;
+  padding: 4px 16px 4px 0;
+  font-weight: 600;
+  color: var(--lv-grid-text-secondary, #666);
+  white-space: nowrap;
+  vertical-align: top;
+}
+
+.lv-grid__detail-td {
+  padding: 4px 0;
+  color: var(--lv-grid-text, #333);
+}

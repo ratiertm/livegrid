@@ -22,6 +22,7 @@ import {GridKeyboardNav} from "./hooks/keyboard-nav"
 import {ConfigSortable} from "./hooks/config-sortable"
 import {RowReorder} from "./hooks/row-reorder"
 import {ScrollSync} from "./hooks/scroll-sync"
+import {CellFillHandle} from "./hooks/cell-fill-handle"
 
 // Assemble hooks
 let Hooks = {
@@ -35,7 +36,8 @@ let Hooks = {
   GridKeyboardNav,
   ConfigSortable,
   RowReorder,
-  ScrollSync
+  ScrollSync,
+  CellFillHandle
 }
 
 // Progress bar

@@ -216,6 +216,39 @@
   font-size: 11px;
 }
 
+/* ── Section 10b: Subtotal / Grand Total ── */
+
+.lv-grid__row--subtotal {
+  background: #f0f7ff;
+  border-top: 1px solid var(--lv-grid-border);
+  font-weight: 500;
+  font-style: italic;
+}
+
+.lv-grid__row--grand_total {
+  background: #e8edf5;
+  border-top: 2px solid var(--lv-grid-border);
+  font-weight: 700;
+}
+
+.lv-grid__subtotal-cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 36px;
+  padding: 6px 16px;
+}
+
+.lv-grid__subtotal-label {
+  font-weight: 600;
+  color: var(--lv-grid-primary);
+}
+
+.lv-grid__row--grand_total .lv-grid__subtotal-label {
+  color: var(--lv-grid-text);
+}
+
 /* ── Section 11: Tree Grid (v0.7) ── */
 
 .lv-grid__tree-toggle {

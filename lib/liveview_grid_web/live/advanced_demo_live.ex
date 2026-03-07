@@ -122,6 +122,18 @@ defmodule LiveviewGridWeb.AdvancedDemoLive do
   def handle_info(:grid_discard_requested, socket), do: {:noreply, socket}
 
   @impl true
+  def handle_info({:grid_cell_fill_completed, _info}, socket), do: {:noreply, socket}
+
+  @impl true
+  def handle_info({:grid_row_updated, _row_id, _values}, socket), do: {:noreply, socket}
+
+  @impl true
+  def handle_info({:grid_undo, _summary}, socket), do: {:noreply, socket}
+
+  @impl true
+  def handle_info({:grid_redo, _summary}, socket), do: {:noreply, socket}
+
+  @impl true
   def render(assigns) do
     ~H"""
     <div style="padding: 20px;">
@@ -388,9 +400,9 @@ defmodule LiveviewGridWeb.AdvancedDemoLive do
 
   defp org_columns do
     [
-      %{field: :name, label: "이름/부서명", width: 200, sortable: true},
-      %{field: :role, label: "역할", width: 120, sortable: true},
-      %{field: :team, label: "팀", width: 120, sortable: true},
+      %{field: :name, label: "이름/부서명", width: 200, sortable: true, editable: true},
+      %{field: :role, label: "역할", width: 120, sortable: true, editable: true},
+      %{field: :team, label: "팀", width: 120, sortable: true, editable: true},
       %{field: :level, label: "레벨", width: 80, sortable: true}
     ]
   end
